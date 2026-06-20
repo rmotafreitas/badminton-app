@@ -1,0 +1,61 @@
+services:
+  # ── MongoDB ────────────────────────────────────────────────────────────────
+  mongo:
+    image: mongo:7
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USER:-admin}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD:?MONGO_PASSWORD is required}
+    volumes:
+      - mongo_data:/data/db
+    ports:
+      - "27017:27017"
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── Backend (Bun + Elysia, Onion arch) ────────────────────────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      mongo:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: mongodb://${MONGO_USER:-admin}:${MONGO_PASSWORD}@mongo:27017/app?authSource=admin
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+      SMTP_HOST: ${SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_SECURE: ${SMTP_SECURE:-false}
+      SMTP_USERNAME: ${SMTP_USERNAME}
+      SMTP_PASSWORD: ${SMTP_PASSWORD}
+      SMTP_FROM: ${SMTP_FROM}
+      APP_URL: ${APP_URL}
+      TWILIO_ACCOUNT_SID: ${TWILIO_ACCOUNT_SID}
+      TWILIO_AUTH_TOKEN: ${TWILIO_AUTH_TOKEN}
+      TWILIO_FROM_NUMBER: ${TWILIO_FROM_NUMBER}
+      FRONTEND_URL: ${FRONTEND_URL}
+      ENABLE_LOCAL_HTTPS: "false"
+    ports:
+      - "3000:3000"
+
+  # ── Frontend (nginx serving Vite build) ────────────────────────────────────
+  frontend:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      - backend
+    environment:
+      VITE_GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+    ports:
+      - "80:80"
+
+volumes:
+  mongo_data:

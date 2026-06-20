@@ -1,0 +1,48 @@
+version: "3.8"
+
+services:
+  e2e-db:
+    image: mongo:latest
+    ports:
+      - "27018:27017"
+    volumes:
+      - e2e-db-data:/data/db
+
+  e2e-backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3001:3000"
+    environment:
+      - DATABASE_URL=mongodb://e2e-db:27017/badminton-e2e
+      - JWT_SECRET=e2e_secret
+      - APP_URL=http://e2e-backend:3000
+      # Mock the others or use mailhog
+      - SMTP_HOST=smtp.mailtrap.io
+      - SMTP_PORT=2525
+      - SMTP_USERNAME=test
+      - SMTP_PASSWORD=test
+      - SMTP_FROM=test@example.com
+      - SMTP_SECURE=false
+    depends_on:
+      - e2e-db
+    networks:
+      - e2e-net
+
+  newman:
+    image: postman/newman:alpine
+    depends_on:
+      e2e-backend:
+        condition: service_started
+    volumes:
+      - ./e2e:/etc/newman
+    command: run /etc/newman/collection.json --env-var "baseUrl=http://e2e-backend:3000" --bail
+    networks:
+      - e2e-net
+
+volumes:
+  e2e-db-data:
+
+networks:
+  e2e-net:

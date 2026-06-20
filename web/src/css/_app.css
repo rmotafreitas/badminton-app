@@ -1,0 +1,31 @@
+.has-aside {
+  @apply pt-14 lg:pl-60;
+}
+
+#app {
+  @apply w-full transition-all lg:w-auto min-h-screen bg-gray-50 overflow-x-hidden;
+}
+
+.main-section {
+  @apply p-3 sm:p-6;
+}
+
+.dropdown {
+  @apply cursor-pointer;
+}
+
+.clipped, .clipped body {
+  @apply overflow-hidden;
+}
+
+.m-clipped, .m-clipped body {
+  @apply overflow-hidden lg:overflow-visible;
+}
+
+.form-screen body {
+  @apply p-0;
+}
+
+.form-screen .main-section {
+  @apply flex h-screen items-center justify-center;
+}

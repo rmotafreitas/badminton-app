@@ -1,0 +1,16 @@
+{
+  "files": [],
+  "references": [
+    { "path": "./tsconfig.app.json" },
+    { "path": "./tsconfig.node.json" }
+  ],
+  "compilerOptions": {
+    // Not amazing, check in the future, using this to silence the baseUrl deprecation warning for now...
+    "ignoreDeprecations": "6.0",
+
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/*"]
+    }
+  }
+}

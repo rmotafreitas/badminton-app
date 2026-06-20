@@ -1,0 +1,9 @@
+- A player can only registe their games, games that they participated
+- A player can only update their games, games that they participated
+- A player can only delete their games, games that they participated
+- A player can only view their games, games that they participated
+  (CRUD)
+
+- A player when viewing other player profile, they can only see games they played together or against each other
+
+- Coach and Club admin bypasses all

@@ -1,0 +1,44 @@
+# OS
+.DS_Store
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Dependencies
+node_modules/
+**/node_modules/
+
+# Build outputs
+build/
+dist/
+.next/
+out/
+coverage/
+**/build/
+**/dist/
+**/.next/
+**/out/
+**/coverage/
+
+# Environment files
+.env
+.env.local
+.env.*.local
+**/.env
+**/.env.local
+**/.env.*.local
+
+# Local TLS certificates
+certs/local/*.pem
+backend/certs/local/*.pem
+
+# Archives and traces
+*.trace
+*.zip
+*.tar.gz
+*.tgz
