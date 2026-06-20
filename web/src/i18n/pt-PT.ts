@@ -1,6 +1,6 @@
 export const ptPT = {
   common: {
-    appName: "🏸 Badminton App",
+    appName: "🏸 Badminton Buddy",
     dashboard: "Painel",
     goToDashboard: "Ir para o Painel",
     goHome: "Ir para Início",
@@ -38,12 +38,13 @@ export const ptPT = {
   },
 
   landing: {
-    title: "Bem-vindo ao Badminton App",
+    title: "Bem-vindo ao Badminton Buddy",
     subtitle: "A tua plataforma para gerir jogos, clubes e torneios.",
     login: "Entrar",
     dashboard: "Painel",
     trackProgress: "Acompanha o Progresso",
-    trackProgressDesc: "Monitoriza as tuas sessões de treino e métricas de desempenho",
+    trackProgressDesc:
+      "Monitoriza as tuas sessões de treino e métricas de desempenho",
     bookCourts: "Reserva Campos",
     bookCourtsDesc: "Reserva campos e gere o teu calendário de jogos",
     connect: "Conecta-te",
@@ -72,7 +73,8 @@ export const ptPT = {
     googleSignInFailed: "Início de sessão Google falhou",
     loginWithEmail: "Entrar com Email",
     magicLinkSentTo: "Enviámos um link de acesso para",
-    checkInbox: "Verifica a tua caixa de entrada e clica no link para continuar. Expira em 15 minutos.",
+    checkInbox:
+      "Verifica a tua caixa de entrada e clica no link para continuar. Expira em 15 minutos.",
     enter4DigitCode: "Introduz o código de 4 dígitos enviado para",
     enter6DigitCode: "Introduz o código de 6 dígitos enviado para",
     noAccountYet: "Ainda não tens conta?",
@@ -81,9 +83,11 @@ export const ptPT = {
     age18Plus: "18 anos ou mais",
     dataProtectionConsent: "Ao usar o site, aceitas a nossa",
     invalidToken: "O teu link de acesso é inválido ou expirou.",
-    registrationDisabled: "Nenhuma conta encontrada. Contacta o administrador para criar uma.",
+    registrationDisabled:
+      "Nenhuma conta encontrada. Contacta o administrador para criar uma.",
     accountDeactivated: "Esta conta foi desativada. Contacta o administrador.",
-    invalidCredentials: "Credenciais inválidas. Verifica o email/telefone e a palavra-passe.",
+    invalidCredentials:
+      "Credenciais inválidas. Verifica o email/telefone e a palavra-passe.",
     invalidOrExpiredLink: "Este link de acesso é inválido ou expirou.",
     linkAlreadyUsed: "Este link de acesso já foi utilizado.",
     linkExpired: "Este link de acesso expirou. Solicita um novo.",
@@ -109,7 +113,8 @@ export const ptPT = {
     status: "Estado",
     active: "Ativo",
     systemAdmin: "Admin do Sistema",
-    systemAdminDesc: "Tens acesso total para gerir clubes, utilizadores e configurações do sistema.",
+    systemAdminDesc:
+      "Tens acesso total para gerir clubes, utilizadores e configurações do sistema.",
     clubAdmin: "Admin do Clube",
     clubAdminDesc: "Gere os membros do clube, horários e configurações.",
     coach: "Treinador",
@@ -161,7 +166,8 @@ export const ptPT = {
     reset: "Repor",
     noClubError: "Precisas de estar associado a um clube para registar jogos.",
     success: "Jogo registado com sucesso!",
-    validationPlayers: "Seleciona o número correto de jogadores para cada lado.",
+    validationPlayers:
+      "Seleciona o número correto de jogadores para cada lado.",
     validationSets: "Adiciona pelo menos um set.",
     failedToRegister: "Falha ao registar jogo",
     noWinner: "Cada set precisa de um vencedor — não são permitidos empates.",
@@ -211,7 +217,7 @@ export const ptPT = {
     settings: "Configurações",
     logout: "Sair",
     brandName: "Badminton",
-    brandApp: "App",
+    brandApp: "Buddy",
     brand: "🏸 Badminton",
   },
 
@@ -226,7 +232,8 @@ export const ptPT = {
     name: "Nome",
     location: "Localização",
     created: "Criado",
-    accessDenied: "Acesso negado. Apenas administradores do sistema podem ver esta página.",
+    accessDenied:
+      "Acesso negado. Apenas administradores do sistema podem ver esta página.",
     clubNamePlaceholder: "Nome do Clube",
     locationPlaceholder: "Localização",
     editClub: "Editar",
@@ -262,7 +269,7 @@ export const ptPT = {
   },
 
   footer: {
-    copyright: `© ${new Date().getFullYear()} Badminton App. Todos os direitos reservados.`,
+    copyright: `© ${new Date().getFullYear()} Badminton Buddy. Todos os direitos reservados.`,
     privacyPolicy: "Política de Privacidade",
     termsOfService: "Termos de Serviço",
     dataProtection: "Proteção de Dados",

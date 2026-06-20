@@ -5,6 +5,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useDictionary } from "@/i18n";
 import { getErrorMessage } from "@/lib/errors";
 import type { Dictionary } from "@/i18n";
+import { Logo } from "@/components/Logo";
 
 type Step =
   | { type: "select" }
@@ -49,11 +50,16 @@ export function LoginPage() {
     if (err === "invalid-token") setError(dict.invalidToken);
   }, [searchParams, dict.invalidToken]);
 
-  function translateAuthError(raw: string, authDict: Dictionary["auth"]): string {
-    if (raw.startsWith("Unknown auth provider")) return authDict.unknownAuthProvider;
+  function translateAuthError(
+    raw: string,
+    authDict: Dictionary["auth"],
+  ): string {
+    if (raw.startsWith("Unknown auth provider"))
+      return authDict.unknownAuthProvider;
 
     const map: Record<string, string> = {
-      "No account found. Please contact your administrator to create one.": authDict.registrationDisabled,
+      "No account found. Please contact your administrator to create one.":
+        authDict.registrationDisabled,
       "Account is deactivated": authDict.accountDeactivated,
       "User not found or inactive": authDict.accountDeactivated,
       "Invalid credentials": authDict.invalidCredentials,
@@ -77,9 +83,13 @@ export function LoginPage() {
   const withLoading = async (fn: () => Promise<void>) => {
     setError("");
     setIsLoading(true);
-    try { await fn(); } catch (e) {
+    try {
+      await fn();
+    } catch (e) {
       setError(translateAuthError(getErrorMessage(e), dict));
-    } finally { setIsLoading(false); }
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleGoogleSuccess = (credential: string) =>
@@ -111,7 +121,9 @@ export function LoginPage() {
     const isEmail = trimmed.includes("@");
     withLoading(async () => {
       await completeAuth("password", {
-        [isEmail ? "email" : "phone"]: isEmail ? trimmed.toLowerCase() : trimmed,
+        [isEmail ? "email" : "phone"]: isEmail
+          ? trimmed.toLowerCase()
+          : trimmed,
         password,
       });
       navigate("/dashboard");
@@ -137,207 +149,328 @@ export function LoginPage() {
 
   return (
     <div className="w-full max-w-4xl bg-white sm:rounded-lg sm:shadow-2xl overflow-hidden flex md:flex-row flex-col min-h-dvh sm:min-h-0">
-        {/* Image side */}
-        <div className="md:w-1/2 relative h-[200px] md:h-auto md:min-h-[500px]">
-          <img
-            src="/images/login.gif"
-            alt=""
-            className="absolute inset-0 w-full h-full object-cover"
-          />
+      {/* Image side */}
+      <div className="md:w-1/2 relative h-[200px] md:h-auto md:min-h-[500px]">
+        <img
+          src="/images/login.gif"
+          alt=""
+          className="absolute inset-0 w-full h-full object-cover"
+        />
+      </div>
+
+      {/* Form side */}
+      <div className="md:w-1/2 p-6 sm:p-10 flex flex-col flex-1 md:min-h-[500px]">
+        <div className="mb-8 flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-800">
+              {sidebar.brandName}{" "}
+              <span className="font-black">{sidebar.brandApp}</span>
+            </h1>
+            <p className="text-sm text-gray-500 mt-0.5">{dict.loginDesc}</p>
+          </div>
+          <div className="shrink-0">
+            <Logo className="w-12 h-12" />
+          </div>
         </div>
 
-        {/* Form side */}
-        <div className="md:w-1/2 p-6 sm:p-10 flex flex-col flex-1 md:min-h-[500px]">
-          <div className="mb-8 flex items-center justify-between">
+        {error && (
+          <div className="notification red mb-4">
             <div>
-              <h1 className="text-2xl font-bold text-gray-800">
-                {sidebar.brandName}<span className="font-black">{sidebar.brandApp}</span>
-              </h1>
-              <p className="text-sm text-gray-500 mt-0.5">{dict.loginDesc}</p>
+              <span className="icon">
+                <i className="mdi mdi-alert"></i>
+              </span>
+              {error}
             </div>
-            <div className="text-4xl shrink-0">🏸</div>
           </div>
+        )}
 
-          {error && (
-            <div className="notification red mb-4">
-              <div><span className="icon"><i className="mdi mdi-alert"></i></span>{error}</div>
+        {step.type === "select" && (
+          <div className="space-y-3">
+            {googleClientId && (
+              <>
+                <div className="flex justify-center">
+                  <GoogleLogin
+                    onSuccess={(res) => {
+                      if (res.credential) handleGoogleSuccess(res.credential);
+                    }}
+                    onError={() => setError(dict.googleSignInFailed)}
+                    width="368"
+                    text="continue_with"
+                    shape="rectangular"
+                  />
+                </div>
+
+                <div className="mt-4 flex gap-4 text-xs text-gray-400">
+                  <a href="#" className="hover:text-gray-600">
+                    {footer.privacyPolicy}
+                  </a>
+                  <a href="#" className="hover:text-gray-600">
+                    {footer.termsOfService}
+                  </a>
+                </div>
+
+                <hr />
+              </>
+            )}
+
+            <button
+              onClick={() => setStep({ type: "email-code-input" })}
+              className="button w-full justify-start light"
+            >
+              <span className="icon">
+                <i className="mdi mdi-email-outline"></i>
+              </span>
+              <span>{dict.continueWithEmail}</span>
+            </button>
+
+            <button
+              onClick={() => setStep({ type: "phone-input" })}
+              className="button w-full justify-start light"
+            >
+              <span className="icon">
+                <i className="mdi mdi-cellphone"></i>
+              </span>
+              <span>{dict.continueWithPhone}</span>
+            </button>
+
+            <button
+              onClick={() => setStep({ type: "password-input" })}
+              className="button w-full justify-start light"
+            >
+              <span className="icon">
+                <i className="mdi mdi-key"></i>
+              </span>
+              <span>{dict.signInWithPassword}</span>
+            </button>
+          </div>
+        )}
+
+        {step.type === "email-code-input" && (
+          <form onSubmit={handleEmailCodeSubmit}>
+            <div className="field">
+              <label className="label">{common.emailAddress}</label>
+              <div className="control icons-left">
+                <input
+                  className="input"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  autoFocus
+                  placeholder={common.emailPlaceholder}
+                />
+                <span className="icon left">
+                  <i className="mdi mdi-email"></i>
+                </span>
+              </div>
             </div>
-          )}
-
-          {step.type === "select" && (
-            <div className="space-y-3">
-              {googleClientId && (
-                <>
-                  <div className="flex justify-center">
-                    <GoogleLogin
-                      onSuccess={(res) => { if (res.credential) handleGoogleSuccess(res.credential); }}
-                      onError={() => setError(dict.googleSignInFailed)}
-                      width="368"
-                      text="continue_with"
-                      shape="rectangular"
-                    />
-          </div>
-
-          <div className="mt-4 flex gap-4 text-xs text-gray-400">
-            <a href="#" className="hover:text-gray-600">{footer.privacyPolicy}</a>
-            <a href="#" className="hover:text-gray-600">{footer.termsOfService}</a>
-          </div>
-
-                  <hr />
-                </>
-              )}
-
-              <button onClick={() => setStep({ type: "email-code-input" })} className="button w-full justify-start light">
-                <span className="icon"><i className="mdi mdi-email-outline"></i></span>
-                <span>{dict.continueWithEmail}</span>
+            <div className="flex gap-2">
+              <button
+                type="submit"
+                className="button blue flex-1"
+                disabled={isLoading || !isValidEmail(email)}
+              >
+                {isLoading ? common.sending : common.sendVerificationCode}
               </button>
-
-              <button onClick={() => setStep({ type: "phone-input" })} className="button w-full justify-start light">
-                <span className="icon"><i className="mdi mdi-cellphone"></i></span>
-                <span>{dict.continueWithPhone}</span>
-              </button>
-
-              <button onClick={() => setStep({ type: "password-input" })} className="button w-full justify-start light">
-                <span className="icon"><i className="mdi mdi-key"></i></span>
-                <span>{dict.signInWithPassword}</span>
+              <button
+                type="button"
+                className="button light flex-1"
+                onClick={() => setStep({ type: "select" })}
+              >
+                {common.back}
               </button>
             </div>
-          )}
+          </form>
+        )}
 
-          {step.type === "email-code-input" && (
-            <form onSubmit={handleEmailCodeSubmit}>
-              <div className="field">
-                <label className="label">{common.emailAddress}</label>
-                <div className="control icons-left">
-                  <input className="input" type="email" value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    required autoFocus placeholder={common.emailPlaceholder} />
-                  <span className="icon left"><i className="mdi mdi-email"></i></span>
-                </div>
+        {step.type === "email-code-verify" && (
+          <form onSubmit={handleEmailCodeVerify}>
+            <p className="text-sm text-gray-600 text-center mb-4">
+              {dict.enter4DigitCode} <strong>{step.email}</strong>
+            </p>
+            <div className="field">
+              <div className="control">
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]{4}"
+                  maxLength={4}
+                  value={code}
+                  onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
+                  required
+                  autoFocus
+                  className="input text-center text-2xl tracking-widest"
+                  placeholder="0000"
+                />
               </div>
-              <div className="flex gap-2">
-                <button type="submit" className="button blue flex-1" disabled={isLoading || !isValidEmail(email)}>
-                  {isLoading ? common.sending : common.sendVerificationCode}
-                </button>
-                <button type="button" className="button light flex-1" onClick={() => setStep({ type: "select" })}>
-                  {common.back}
-                </button>
-              </div>
-            </form>
-          )}
+            </div>
 
-          {step.type === "email-code-verify" && (
-            <form onSubmit={handleEmailCodeVerify}>
-              <p className="text-sm text-gray-600 text-center mb-4">
-                {dict.enter4DigitCode} <strong>{step.email}</strong>
-              </p>
-              <div className="field">
-                <div className="control">
-                  <input type="text" inputMode="numeric" pattern="[0-9]{4}" maxLength={4}
-                    value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
-                    required autoFocus
-                    className="input text-center text-2xl tracking-widest"
-                    placeholder="0000" />
-                </div>
-              </div>
-              
-              <div className="flex gap-2">
-                <button type="submit" className="button blue flex-1" disabled={isLoading || code.length !== 4}>
-                  {isLoading ? common.verifying : common.verifyCode}
-                </button>
-                <button type="button" className="button light flex-1" onClick={() => { setCode(""); setStep({ type: "email-code-input" }); }}>
-                  {common.resendCode}
-                </button>
-              </div>
-            </form>
-          )}
+            <div className="flex gap-2">
+              <button
+                type="submit"
+                className="button blue flex-1"
+                disabled={isLoading || code.length !== 4}
+              >
+                {isLoading ? common.verifying : common.verifyCode}
+              </button>
+              <button
+                type="button"
+                className="button light flex-1"
+                onClick={() => {
+                  setCode("");
+                  setStep({ type: "email-code-input" });
+                }}
+              >
+                {common.resendCode}
+              </button>
+            </div>
+          </form>
+        )}
 
-          {step.type === "phone-input" && (
-            <form onSubmit={handlePhoneSubmit}>
-              <div className="field">
-                <label className="label">{common.phoneNumber}</label>
-                <div className="control icons-left">
-                  <input className="input" type="tel" value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    required autoFocus placeholder="+1 555 000 0000" />
-                  <span className="icon left"><i className="mdi mdi-phone"></i></span>
-                </div>
+        {step.type === "phone-input" && (
+          <form onSubmit={handlePhoneSubmit}>
+            <div className="field">
+              <label className="label">{common.phoneNumber}</label>
+              <div className="control icons-left">
+                <input
+                  className="input"
+                  type="tel"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  required
+                  autoFocus
+                  placeholder="+1 555 000 0000"
+                />
+                <span className="icon left">
+                  <i className="mdi mdi-phone"></i>
+                </span>
               </div>
-              
-              <div className="flex gap-2">
-                <button type="submit" className="button blue flex-1" disabled={isLoading || !isValidPhone(phone)}>
-                  {isLoading ? common.sending : common.sendCode}
-                </button>
-                <button type="button" className="button light flex-1" onClick={() => setStep({ type: "select" })}>
-                  {common.back}
-                </button>
-              </div>
-            </form>
-          )}
+            </div>
 
-          {step.type === "password-input" && (
-            <form onSubmit={handlePasswordSubmit}>
-              <div className="field">
-                <label className="label">{common.emailOrPhone}</label>
-                <div className="control icons-left">
-                  <input className="input" type="text" value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    required autoFocus placeholder={common.emailOrPhone} />
-                  <span className="icon left"><i className="mdi mdi-account"></i></span>
-                </div>
-              </div>
-              <div className="field">
-                <label className="label">{common.password}</label>
-                <div className="control icons-left">
-                  <input className="input" type="password" value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required placeholder={common.passwordPlaceholder} />
-                  <span className="icon left"><i className="mdi mdi-asterisk"></i></span>
-                </div>
-              </div>
-              
-              <div className="flex gap-2">
-                <button type="submit" className="button blue flex-1" disabled={isLoading || !email || !password}>
-                  {isLoading ? common.signingIn : common.signIn}
-                </button>
-                <button type="button" className="button light flex-1" onClick={() => setStep({ type: "select" })}>
-                  {common.back}
-                </button>
-              </div>
-            </form>
-          )}
+            <div className="flex gap-2">
+              <button
+                type="submit"
+                className="button blue flex-1"
+                disabled={isLoading || !isValidPhone(phone)}
+              >
+                {isLoading ? common.sending : common.sendCode}
+              </button>
+              <button
+                type="button"
+                className="button light flex-1"
+                onClick={() => setStep({ type: "select" })}
+              >
+                {common.back}
+              </button>
+            </div>
+          </form>
+        )}
 
-          {step.type === "phone-code" && (
-            <form onSubmit={handleCodeSubmit}>
-              <p className="text-sm text-gray-600 text-center mb-4">
-                {dict.enter6DigitCode} <strong>{step.phone}</strong>
-              </p>
-              <div className="field">
-                <div className="control">
-                  <input type="text" inputMode="numeric" pattern="[0-9]{6}" maxLength={6}
-                    value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
-                    required autoFocus
-                    className="input text-center text-2xl tracking-widest"
-                    placeholder="000000" />
-                </div>
+        {step.type === "password-input" && (
+          <form onSubmit={handlePasswordSubmit}>
+            <div className="field">
+              <label className="label">{common.emailOrPhone}</label>
+              <div className="control icons-left">
+                <input
+                  className="input"
+                  type="text"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  autoFocus
+                  placeholder={common.emailOrPhone}
+                />
+                <span className="icon left">
+                  <i className="mdi mdi-account"></i>
+                </span>
               </div>
-              
-              <div className="flex gap-2">
-                <button type="submit" className="button blue flex-1" disabled={isLoading || code.length !== 6}>
-                  {isLoading ? common.verifying : common.verifyCode}
-                </button>
-                <button type="button" className="button light flex-1" onClick={() => setStep({ type: "phone-input" })}>
-                  {common.resendCode}
-                </button>
+            </div>
+            <div className="field">
+              <label className="label">{common.password}</label>
+              <div className="control icons-left">
+                <input
+                  className="input"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  placeholder={common.passwordPlaceholder}
+                />
+                <span className="icon left">
+                  <i className="mdi mdi-asterisk"></i>
+                </span>
               </div>
-            </form>
-          )}
+            </div>
 
-          <div className="mt-auto pt-6 flex gap-4 text-xs text-gray-400">
-            <a href="#" className="hover:text-gray-600">{footer.privacyPolicy}</a>
-            <a href="#" className="hover:text-gray-600">{footer.termsOfService}</a>
-          </div>
+            <div className="flex gap-2">
+              <button
+                type="submit"
+                className="button blue flex-1"
+                disabled={isLoading || !email || !password}
+              >
+                {isLoading ? common.signingIn : common.signIn}
+              </button>
+              <button
+                type="button"
+                className="button light flex-1"
+                onClick={() => setStep({ type: "select" })}
+              >
+                {common.back}
+              </button>
+            </div>
+          </form>
+        )}
+
+        {step.type === "phone-code" && (
+          <form onSubmit={handleCodeSubmit}>
+            <p className="text-sm text-gray-600 text-center mb-4">
+              {dict.enter6DigitCode} <strong>{step.phone}</strong>
+            </p>
+            <div className="field">
+              <div className="control">
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]{6}"
+                  maxLength={6}
+                  value={code}
+                  onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
+                  required
+                  autoFocus
+                  className="input text-center text-2xl tracking-widest"
+                  placeholder="000000"
+                />
+              </div>
+            </div>
+
+            <div className="flex gap-2">
+              <button
+                type="submit"
+                className="button blue flex-1"
+                disabled={isLoading || code.length !== 6}
+              >
+                {isLoading ? common.verifying : common.verifyCode}
+              </button>
+              <button
+                type="button"
+                className="button light flex-1"
+                onClick={() => setStep({ type: "phone-input" })}
+              >
+                {common.resendCode}
+              </button>
+            </div>
+          </form>
+        )}
+
+        <div className="mt-auto pt-6 flex gap-4 text-xs text-gray-400">
+          <a href="#" className="hover:text-gray-600">
+            {footer.privacyPolicy}
+          </a>
+          <a href="#" className="hover:text-gray-600">
+            {footer.termsOfService}
+          </a>
         </div>
       </div>
-    );
-  }
+    </div>
+  );
+}

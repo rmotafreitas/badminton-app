@@ -1,5 +1,4 @@
 export { AuthCallbackPage } from "./AuthCallbackPage";
-export { LandingPage } from "./LandingPage";
 export { LoginPage } from "./LoginPage";
 export { LogoutPage } from "./LogoutPage";
 export { UnauthorizedPage } from "./UnauthorizedPage";

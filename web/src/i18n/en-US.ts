@@ -1,6 +1,6 @@
 export const enUS = {
   common: {
-    appName: "🏸 Badminton App",
+    appName: "🏸 Badminton Buddy",
     dashboard: "Dashboard",
     goToDashboard: "Go to Dashboard",
     goHome: "Go Home",
@@ -38,8 +38,9 @@ export const enUS = {
   },
 
   landing: {
-    title: "Welcome to Badminton App",
-    subtitle: "Your ultimate platform for managing games, clubs, and tournaments.",
+    title: "Welcome to Badminton Buddy",
+    subtitle:
+      "Your ultimate platform for managing games, clubs, and tournaments.",
     login: "Login",
     dashboard: "Dashboard",
     trackProgress: "Track Progress",
@@ -72,7 +73,8 @@ export const enUS = {
     googleSignInFailed: "Google sign-in failed",
     loginWithEmail: "Login with Email",
     magicLinkSentTo: "We sent a sign-in link to",
-    checkInbox: "Check your inbox and click the link to continue. It expires in 15 minutes.",
+    checkInbox:
+      "Check your inbox and click the link to continue. It expires in 15 minutes.",
     enter4DigitCode: "Enter the 4-digit code sent to",
     enter6DigitCode: "Enter the 6-digit code sent to",
     noAccountYet: "Don't have an account yet?",
@@ -81,9 +83,12 @@ export const enUS = {
     age18Plus: "18 years old or more",
     dataProtectionConsent: "By using the site, you agree to our",
     invalidToken: "Your sign-in link is invalid or expired.",
-    registrationDisabled: "No account found. Please contact your administrator to create one.",
-    accountDeactivated: "This account has been deactivated. Contact your administrator.",
-    invalidCredentials: "Invalid credentials. Check your email/phone and password.",
+    registrationDisabled:
+      "No account found. Please contact your administrator to create one.",
+    accountDeactivated:
+      "This account has been deactivated. Contact your administrator.",
+    invalidCredentials:
+      "Invalid credentials. Check your email/phone and password.",
     invalidOrExpiredLink: "This sign-in link is invalid or has expired.",
     linkAlreadyUsed: "This sign-in link has already been used.",
     linkExpired: "This sign-in link has expired. Request a new one.",
@@ -109,7 +114,8 @@ export const enUS = {
     status: "Status",
     active: "Active",
     systemAdmin: "System Admin",
-    systemAdminDesc: "You have full access to manage clubs, users, and system settings.",
+    systemAdminDesc:
+      "You have full access to manage clubs, users, and system settings.",
     clubAdmin: "Club Admin",
     clubAdminDesc: "Manage your club members, schedule, and settings.",
     coach: "Coach",
@@ -161,7 +167,8 @@ export const enUS = {
     reset: "Reset",
     noClubError: "You must be assigned to a club to register games.",
     success: "Game registered successfully!",
-    validationPlayers: "Please select the correct number of players for each side.",
+    validationPlayers:
+      "Please select the correct number of players for each side.",
     validationSets: "Please add at least one set.",
     failedToRegister: "Failed to register game",
     noWinner: "Each set needs a clear winner — no draws allowed.",
@@ -211,7 +218,7 @@ export const enUS = {
     settings: "Settings",
     logout: "Logout",
     brandName: "Badminton",
-    brandApp: "App",
+    brandApp: "Buddy",
     brand: "🏸 Badminton",
   },
 
@@ -226,7 +233,8 @@ export const enUS = {
     name: "Name",
     location: "Location",
     created: "Created",
-    accessDenied: "Access denied. Only system administrators can view this page.",
+    accessDenied:
+      "Access denied. Only system administrators can view this page.",
     clubNamePlaceholder: "Club Name",
     locationPlaceholder: "Location",
     editClub: "Edit",
@@ -262,7 +270,7 @@ export const enUS = {
   },
 
   footer: {
-    copyright: `© ${new Date().getFullYear()} Badminton App. All rights reserved.`,
+    copyright: `© ${new Date().getFullYear()} Badminton Buddy. All rights reserved.`,
     privacyPolicy: "Privacy Policy",
     termsOfService: "Terms of Service",
     dataProtection: "Data Protection",
@@ -271,10 +279,12 @@ export const enUS = {
   errors: {
     unauthorized: "401 - Unauthorized",
     unauthorizedDesc: "You don't have permission to access this page.",
-    contactAdmin: "Please contact your administrator if you believe you should have access.",
+    contactAdmin:
+      "Please contact your administrator if you believe you should have access.",
     notFound: "404 - Page Not Found",
     notFoundDesc: "Oops! The page you're looking for doesn't exist.",
-    notFoundHint: "It might have been moved, deleted, or you may have mistyped the URL.",
+    notFoundHint:
+      "It might have been moved, deleted, or you may have mistyped the URL.",
   },
 
   profile: {
