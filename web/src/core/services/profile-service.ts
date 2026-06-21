@@ -12,7 +12,9 @@ export class ProfileServiceImpl implements ProfileService {
   async getMyProfile(): Promise<Profile> {
     return this.profileRepo.getMyProfile();
   }
-
+  async getProfile(userId: string): Promise<Profile> {
+    return this.profileRepo.getProfile(userId);
+  }
   async updateMyProfile(data: {
     name?: string;
     birthday?: string;

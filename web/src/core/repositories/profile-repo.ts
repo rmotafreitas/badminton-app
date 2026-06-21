@@ -10,6 +10,11 @@ export class ProfileRepoImpl implements ProfileRepo {
     return ProfileMapper.toDomain(data);
   }
 
+  async getProfile(userId: string): Promise<Profile> {
+    const { data } = await api.get<ProfileView>(`/profile/${userId}`);
+    return ProfileMapper.toDomain(data);
+  }
+
   async updateMyProfile(dto: {
     name?: string;
     birthday?: string;
@@ -27,13 +32,19 @@ export class ProfileRepoImpl implements ProfileRepo {
     if (dto.photo) {
       formData.append("photo", dto.photo);
     } else if (dto.photo === null) {
-      formData.append("photo", new File([], "empty.webp", { type: "image/webp" }));
+      formData.append(
+        "photo",
+        new File([], "empty.webp", { type: "image/webp" }),
+      );
     }
 
     if (dto.banner) {
       formData.append("banner", dto.banner);
     } else if (dto.banner === null) {
-      formData.append("banner", new File([], "empty.webp", { type: "image/webp" }));
+      formData.append(
+        "banner",
+        new File([], "empty.webp", { type: "image/webp" }),
+      );
     }
 
     const { data } = await api.put<ProfileView>("/profile/me", formData);

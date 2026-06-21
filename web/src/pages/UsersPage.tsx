@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useClubService, useUserService } from "@/di/container";
 import { useDictionary } from "@/i18n";
+import { Link } from "react-router-dom";
 import { Table } from "@/components/ui";
 import type { Column } from "@/components/ui";
 
@@ -87,8 +88,8 @@ export function UsersPage() {
         <div className="image">
           <img
             src={
-              u.profile?.photo
-                || `https://api.dicebear.com/9.x/initials/svg?seed=${encodeURIComponent(u.email || u.id)}`
+              u.profile?.photo ||
+              `https://api.dicebear.com/9.x/initials/svg?seed=${encodeURIComponent(u.email || u.id)}`
             }
             className="rounded-full"
             alt=""
@@ -98,7 +99,14 @@ export function UsersPage() {
     },
     {
       header: dict.name,
-      accessor: (u) => u.profile?.name || "-",
+      accessor: (u) => (
+        <Link
+          to={`/profile/${u.id}`}
+          className="text-blue-600 hover:text-blue-800"
+        >
+          {u.profile?.name || "-"}
+        </Link>
+      ),
     },
     {
       header: dict.email,

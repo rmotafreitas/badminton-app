@@ -63,18 +63,94 @@ export class GameService {
     return game;
   }
 
-  async getRecentGames(clubId: string): Promise<Game[]> {
-    return this.gameRepo.findRecentByClub(clubId);
+  async getRecentGames(
+    currentUser: { sub: string; roles: string[] },
+    clubId: string,
+  ): Promise<Game[]> {
+    const games = await this.gameRepo.findRecentByClub(clubId);
+
+    if (currentUser.roles.includes("SYSTEM_ADMIN")) return games;
+
+    if (
+      currentUser.roles.includes("COACH") ||
+      currentUser.roles.includes("CLUB_ADMIN")
+    ) {
+      return games;
+    }
+
+    if (currentUser.roles.includes("PLAYER")) {
+      return games.filter(
+        (g) =>
+          g.team1PlayerIds.includes(currentUser.sub) ||
+          g.team2PlayerIds.includes(currentUser.sub),
+      );
+    }
+
+    return [];
   }
 
   async getMyGames(currentUser: { sub: string }): Promise<Game[]> {
     return this.gameRepo.findByPlayerId(currentUser.sub);
   }
 
-  async getGame(gameId: string): Promise<Game> {
+  async getGamesByPlayerId(
+    currentUser: { sub: string; roles: string[] },
+    targetPlayerId: string,
+  ): Promise<Game[]> {
+    const games = await this.gameRepo.findByPlayerId(targetPlayerId);
+
+    if (currentUser.roles.includes("SYSTEM_ADMIN")) return games;
+
+    if (
+      currentUser.roles.includes("COACH") ||
+      currentUser.roles.includes("CLUB_ADMIN")
+    ) {
+      const user = await this.userRepo.findById(currentUser.sub);
+      return games.filter((g) => g.clubId === user?.clubId);
+    }
+
+    if (currentUser.roles.includes("PLAYER")) {
+      return games.filter(
+        (g) =>
+          g.team1PlayerIds.includes(currentUser.sub) ||
+          g.team2PlayerIds.includes(currentUser.sub),
+      );
+    }
+
+    return [];
+  }
+
+  async getGame(
+    currentUser: { sub: string; roles: string[] },
+    gameId: string,
+  ): Promise<Game> {
     const game = await this.gameRepo.findById(gameId);
     if (!game) throw new Error("Game not found");
-    return game;
+
+    if (currentUser.roles.includes("SYSTEM_ADMIN")) return game;
+
+    if (
+      currentUser.roles.includes("COACH") ||
+      currentUser.roles.includes("CLUB_ADMIN")
+    ) {
+      const user = await this.userRepo.findById(currentUser.sub);
+      if (user?.clubId !== game.clubId) {
+        throw new Error("You can only view games from your own club.");
+      }
+      return game;
+    }
+
+    if (currentUser.roles.includes("PLAYER")) {
+      if (
+        !game.team1PlayerIds.includes(currentUser.sub) &&
+        !game.team2PlayerIds.includes(currentUser.sub)
+      ) {
+        throw new Error("You can only view your own games.");
+      }
+      return game;
+    }
+
+    throw new Error("You don't have permission to view this game.");
   }
 
   async deleteGame(
@@ -103,7 +179,8 @@ export class GameService {
 
     if (
       currentUser.roles.includes("PLAYER") &&
-      game.registeredById === currentUser.sub
+      (game.team1PlayerIds.includes(currentUser.sub) ||
+        game.team2PlayerIds.includes(currentUser.sub))
     ) {
       await this.gameRepo.delete(gameId);
       return;
@@ -115,7 +192,13 @@ export class GameService {
   async updateGame(
     currentUser: { sub: string; roles: string[] },
     gameId: string,
-    data: { type?: "SINGLES" | "DOUBLES"; team1PlayerIds?: string[]; team2PlayerIds?: string[]; sets?: { team1Score: number; team2Score: number }[]; playedAt?: Date },
+    data: {
+      type?: "SINGLES" | "DOUBLES";
+      team1PlayerIds?: string[];
+      team2PlayerIds?: string[];
+      sets?: { team1Score: number; team2Score: number }[];
+      playedAt?: Date;
+    },
   ): Promise<Game> {
     const game = await this.gameRepo.findById(gameId);
     if (!game) throw new Error("Game not found");
@@ -137,7 +220,8 @@ export class GameService {
 
     if (
       currentUser.roles.includes("PLAYER") &&
-      game.registeredById === currentUser.sub
+      (game.team1PlayerIds.includes(currentUser.sub) ||
+        game.team2PlayerIds.includes(currentUser.sub))
     ) {
       return this.gameRepo.update(gameId, data);
     }
@@ -159,13 +243,19 @@ export class GameService {
         .filter((p) => game.team2PlayerIds.includes(p.id))
         .map((p) => ({ playerId: p.id, elo: p.elo }));
 
-      const wonBySetCount1 = game.sets.filter((s) => s.team1Score > s.team2Score).length;
-      const wonBySetCount2 = game.sets.filter((s) => s.team2Score > s.team1Score).length;
+      const wonBySetCount1 = game.sets.filter(
+        (s) => s.team1Score > s.team2Score,
+      ).length;
+      const wonBySetCount2 = game.sets.filter(
+        (s) => s.team2Score > s.team1Score,
+      ).length;
       const team1Won = wonBySetCount1 > wonBySetCount2;
 
       const results = calculateElo(team1Elos, team2Elos, team1Won);
 
-      await Promise.all(results.map((r) => this.userRepo.updateElo(r.playerId, r.newElo)));
+      await Promise.all(
+        results.map((r) => this.userRepo.updateElo(r.playerId, r.newElo)),
+      );
     } catch (err) {
       console.error("Failed to update ELO ratings:", err);
     }

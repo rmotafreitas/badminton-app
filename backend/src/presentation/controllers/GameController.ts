@@ -1,5 +1,8 @@
 import { GameService } from "@/application/services/GameService";
-import type { RegisterGameDto, RegisterQuickGameDto } from "@/application/dtos/game.dto";
+import type {
+  RegisterGameDto,
+  RegisterQuickGameDto,
+} from "@/application/dtos/game.dto";
 import type { GameView } from "@/application/views/game.view";
 import { GameMapper } from "@/application/mappers/GameMapper";
 
@@ -25,8 +28,11 @@ export class GameController {
     return GameMapper.toView(game);
   }
 
-  async getRecentGamesByClub(clubId: string): Promise<GameView[]> {
-    const games = await this.gameService.getRecentGames(clubId);
+  async getRecentGamesByClub(
+    currentUser: { sub: string; roles: string[] },
+    clubId: string,
+  ): Promise<GameView[]> {
+    const games = await this.gameService.getRecentGames(currentUser, clubId);
     return games.map(GameMapper.toView);
   }
 
@@ -35,8 +41,22 @@ export class GameController {
     return games.map(GameMapper.toView);
   }
 
-  async getGameById(gameId: string): Promise<GameView> {
-    const game = await this.gameService.getGame(gameId);
+  async getGamesByPlayerId(
+    currentUser: { sub: string; roles: string[] },
+    playerId: string,
+  ): Promise<GameView[]> {
+    const games = await this.gameService.getGamesByPlayerId(
+      currentUser,
+      playerId,
+    );
+    return games.map(GameMapper.toView);
+  }
+
+  async getGameById(
+    currentUser: { sub: string; roles: string[] },
+    gameId: string,
+  ): Promise<GameView> {
+    const game = await this.gameService.getGame(currentUser, gameId);
     return GameMapper.toView(game);
   }
 

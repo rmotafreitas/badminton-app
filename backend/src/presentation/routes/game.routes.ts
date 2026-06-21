@@ -52,23 +52,32 @@ export const gameRoutes = (ctrl: GameController, jwtService: JwtService) =>
 
     .get(
       "/club/:clubId",
-      ({ params }) => ctrl.getRecentGamesByClub(params.clubId),
+      ({ currentUser, params }) =>
+        ctrl.getRecentGamesByClub(currentUser, params.clubId),
       {
         detail: { tags: ["Games"], summary: "Get recent games for a club" },
       },
     )
 
+    .get("/me", ({ currentUser }) => ctrl.getMyGames(currentUser), {
+      detail: {
+        tags: ["Games"],
+        summary: "Get all games for the current user",
+      },
+    })
+
     .get(
-      "/me",
-      ({ currentUser }) => ctrl.getMyGames(currentUser),
+      "/player/:playerId",
+      ({ currentUser, params }) =>
+        ctrl.getGamesByPlayerId(currentUser, params.playerId),
       {
-        detail: { tags: ["Games"], summary: "Get all games for the current user" },
+        detail: { tags: ["Games"], summary: "Get games for a specific player" },
       },
     )
 
     .get(
       "/:gameId",
-      ({ params }) => ctrl.getGameById(params.gameId),
+      ({ currentUser, params }) => ctrl.getGameById(currentUser, params.gameId),
       {
         detail: { tags: ["Games"], summary: "Get a single game by ID" },
       },
@@ -84,14 +93,19 @@ export const gameRoutes = (ctrl: GameController, jwtService: JwtService) =>
 
     .put(
       "/:gameId",
-      ({ currentUser, params, body }) => ctrl.updateGame(currentUser, params.gameId, body),
+      ({ currentUser, params, body }) =>
+        ctrl.updateGame(currentUser, params.gameId, body),
       {
         body: t.Object({
-          type: t.Optional(t.Union([t.Literal("SINGLES"), t.Literal("DOUBLES")])),
+          type: t.Optional(
+            t.Union([t.Literal("SINGLES"), t.Literal("DOUBLES")]),
+          ),
           team1PlayerIds: t.Optional(t.Array(t.String())),
           team2PlayerIds: t.Optional(t.Array(t.String())),
           sets: t.Optional(
-            t.Array(t.Object({ team1Score: t.Number(), team2Score: t.Number() })),
+            t.Array(
+              t.Object({ team1Score: t.Number(), team2Score: t.Number() }),
+            ),
           ),
           playedAt: t.Optional(t.Date()),
         }),

@@ -86,4 +86,10 @@ export const protectedRoutes: readonly Route[] = [
     layout: LayoutAdmin,
     roles: ["SYSTEM_ADMIN", "CLUB_ADMIN", "COACH", "PLAYER"],
   },
+  {
+    path: "/profile/:id",
+    element: <ProfilePage />,
+    layout: LayoutAdmin,
+    roles: ["SYSTEM_ADMIN", "CLUB_ADMIN", "COACH", "PLAYER"],
+  },
 ] as const;

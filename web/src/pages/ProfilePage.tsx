@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef, useCallback, useMemo } from "react";
+import { useParams } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import {
   useProfileService,
@@ -43,6 +44,7 @@ function getAge(birthday: string): number {
 }
 
 export function ProfilePage() {
+  const { id } = useParams<{ id: string }>();
   const { user } = useAuth();
   const profileService = useProfileService();
   const clubService = useClubService();
@@ -83,7 +85,9 @@ export function ProfilePage() {
 
   const fetchProfile = useCallback(async () => {
     try {
-      const data = await profileService.getMyProfile();
+      const data = id
+        ? await profileService.getProfile(id)
+        : await profileService.getMyProfile();
       setProfile(data);
       setName(data.name || "");
       setBirthday(
@@ -100,7 +104,7 @@ export function ProfilePage() {
     } finally {
       setLoading(false);
     }
-  }, [profileService]);
+  }, [profileService, id]);
 
   useEffect(() => {
     if (user?.clubId) {
@@ -112,15 +116,24 @@ export function ProfilePage() {
   }, [user?.clubId, clubService]);
 
   useEffect(() => {
-    gameService
-      .getMyGames()
-      .then(setGames)
-      .catch(() => {});
-  }, [gameService]);
+    if (id && user?.id !== id) {
+      gameService
+        .getGamesByPlayerId(id)
+        .then(setGames)
+        .catch(() => {});
+    } else {
+      gameService
+        .getMyGames()
+        .then(setGames)
+        .catch(() => {});
+    }
+  }, [gameService, id, user?.id]);
 
   useEffect(() => {
     fetchProfile();
   }, [fetchProfile]);
+
+  const isOwnProfile = !id || id === user?.id;
 
   const handlePhotoCropped = useCallback((file: File | null) => {
     if (photoPreviewRef.current) URL.revokeObjectURL(photoPreviewRef.current);
@@ -376,16 +389,22 @@ export function ProfilePage() {
 
       <section className="is-hero-bar">
         <div className="flex flex-col md:flex-row items-center justify-between space-y-6 md:space-y-0">
-          <h1 className="title">{dict.myProfile}</h1>
-          <button
-            onClick={() => setIsEditing(!isEditing)}
-            className={`button ${isEditing ? "light" : "blue"}`}
-          >
-            <span className="icon">
-              <i className={`mdi ${isEditing ? "mdi-eye" : "mdi-pencil"}`}></i>
-            </span>
-            <span>{isEditing ? dict.viewProfile : dict.editProfile}</span>
-          </button>
+          <h1 className="title">
+            {isOwnProfile ? dict.myProfile : profile?.name || "Profile"}
+          </h1>
+          {isOwnProfile && (
+            <button
+              onClick={() => setIsEditing(!isEditing)}
+              className={`button ${isEditing ? "light" : "blue"}`}
+            >
+              <span className="icon">
+                <i
+                  className={`mdi ${isEditing ? "mdi-eye" : "mdi-pencil"}`}
+                ></i>
+              </span>
+              <span>{isEditing ? dict.viewProfile : dict.editProfile}</span>
+            </button>
+          )}
         </div>
       </section>
 

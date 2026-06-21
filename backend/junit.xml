@@ -1,0 +1,184 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites name="bun test" tests="85" assertions="260" failures="6" skipped="0" time="1.174954">
+  <testsuite name="tests/unit/GameService.test.ts" file="tests/unit/GameService.test.ts" tests="7" assertions="15" failures="0" skipped="0" time="0" hostname="Ricardos-MacBook-Pro.local">
+    <testsuite name="GameService" file="tests/unit/GameService.test.ts" line="8" tests="7" assertions="15" failures="0" skipped="0" time="0" hostname="Ricardos-MacBook-Pro.local">
+      <testsuite name="registerGame" file="tests/unit/GameService.test.ts" line="19" tests="7" assertions="15" failures="0" skipped="0" time="0" hostname="Ricardos-MacBook-Pro.local">
+        <testcase name="should allow a PLAYER to register a game if they participated in team 1" classname="registerGame &amp;gt; GameService" time="0.00086" file="tests/unit/GameService.test.ts" line="20" assertions="2" />
+        <testcase name="should reject a PLAYER trying to register a game they did not participate in" classname="registerGame &amp;gt; GameService" time="0.000079" file="tests/unit/GameService.test.ts" line="37" assertions="2" />
+        <testcase name="should allow a COACH to register a game for their club" classname="registerGame &amp;gt; GameService" time="0.000114" file="tests/unit/GameService.test.ts" line="54" assertions="3" />
+        <testcase name="should reject a COACH trying to register a game for another club" classname="registerGame &amp;gt; GameService" time="0.000051" file="tests/unit/GameService.test.ts" line="78" assertions="2" />
+        <testcase name="should allow CLUB_ADMIN+PLAYER to register game for their club without participating" classname="registerGame &amp;gt; GameService" time="0.000047" file="tests/unit/GameService.test.ts" line="101" assertions="2" />
+        <testcase name="should allow SYSTEM_ADMIN to register any game without checks" classname="registerGame &amp;gt; GameService" time="0.000062" file="tests/unit/GameService.test.ts" line="124" assertions="2" />
+        <testcase name="should allow COACH+PLAYER to register game for their club without participating" classname="registerGame &amp;gt; GameService" time="0.000033" file="tests/unit/GameService.test.ts" line="142" assertions="2" />
+      </testsuite>
+    </testsuite>
+  </testsuite>
+  <testsuite name="tests/unit/PasswordAuthProvider.test.ts" file="tests/unit/PasswordAuthProvider.test.ts" tests="11" assertions="15" failures="0" skipped="0" time="0" hostname="Ricardos-MacBook-Pro.local">
+    <testsuite name="PasswordAuthProvider" file="tests/unit/PasswordAuthProvider.test.ts" line="25" tests="11" assertions="15" failures="0" skipped="0" time="0" hostname="Ricardos-MacBook-Pro.local">
+      <testcase name="providerType is &apos;password&apos;" classname="PasswordAuthProvider" time="0.000151" file="tests/unit/PasswordAuthProvider.test.ts" line="26" assertions="1" />
+      <testsuite name="initiate" file="tests/unit/PasswordAuthProvider.test.ts" line="32" tests="1" assertions="2" failures="0" skipped="0" time="0" hostname="Ricardos-MacBook-Pro.local">
+        <testcase name="returns code-sent confirmation" classname="initiate &amp;gt; PasswordAuthProvider" time="0.000099" file="tests/unit/PasswordAuthProvider.test.ts" line="33" assertions="2" />
+      </testsuite>
+      <testsuite name="complete" file="tests/unit/PasswordAuthProvider.test.ts" line="42" tests="7" assertions="9" failures="0" skipped="0" time="0.311" hostname="Ricardos-MacBook-Pro.local">
+        <testcase name="returns identity when password is correct" classname="complete &amp;gt; PasswordAuthProvider" time="0.115715" file="tests/unit/PasswordAuthProvider.test.ts" line="43" assertions="2" />
+        <testcase name="returns identity when using phone with correct password" classname="complete &amp;gt; PasswordAuthProvider" time="0.09884" file="tests/unit/PasswordAuthProvider.test.ts" line="57" assertions="2" />
+        <testcase name="throws on wrong password" classname="complete &amp;gt; PasswordAuthProvider" time="0.098242" file="tests/unit/PasswordAuthProvider.test.ts" line="84" assertions="1" />
+        <testcase name="throws when user has no password set" classname="complete &amp;gt; PasswordAuthProvider" time="0.00019" file="tests/unit/PasswordAuthProvider.test.ts" line="94" assertions="1" />
+        <testcase name="throws when user not found" classname="complete &amp;gt; PasswordAuthProvider" time="0.000041" file="tests/unit/PasswordAuthProvider.test.ts" line="103" assertions="1" />
+        <testcase name="throws when password field is missing" classname="complete &amp;gt; PasswordAuthProvider" time="0.000051" file="tests/unit/PasswordAuthProvider.test.ts" line="112" assertions="1" />
+        <testcase name="throws when email and phone are both missing" classname="complete &amp;gt; PasswordAuthProvider" time="0.000016" file="tests/unit/PasswordAuthProvider.test.ts" line="121" assertions="1" />
+      </testsuite>
+      <testsuite name="hashPassword" file="tests/unit/PasswordAuthProvider.test.ts" line="131" tests="2" assertions="3" failures="0" skipped="0" time="0.143" hostname="Ricardos-MacBook-Pro.local">
+        <testcase name="produces a bcrypt hash string" classname="hashPassword &amp;gt; PasswordAuthProvider" time="0.047374" file="tests/unit/PasswordAuthProvider.test.ts" line="132" assertions="2" />
+        <testcase name="produces different hashes for same password" classname="hashPassword &amp;gt; PasswordAuthProvider" time="0.096447" file="tests/unit/PasswordAuthProvider.test.ts" line="138" assertions="1" />
+      </testsuite>
+    </testsuite>
+  </testsuite>
+  <testsuite name="tests/arch/architecture.test.ts" file="tests/arch/architecture.test.ts" tests="8" assertions="115" failures="0" skipped="0" time="0" hostname="Ricardos-MacBook-Pro.local">
+    <testsuite name="Architecture" file="tests/arch/architecture.test.ts" line="62" tests="8" assertions="115" failures="0" skipped="0" time="0" hostname="Ricardos-MacBook-Pro.local">
+      <testcase name="index.ts only imports from app.ts and elysia-local-https" classname="Architecture" time="0.000153" file="tests/arch/architecture.test.ts" line="65" assertions="1" />
+      <testcase name="app.ts does not import from index.ts or elysia-local-https (no circular ref)" classname="Architecture" time="0.000076" file="tests/arch/architecture.test.ts" line="75" assertions="32" />
+      <testcase name="routes only depend on controllers, middleware, and JwtService" classname="Architecture" time="0.000157" file="tests/arch/architecture.test.ts" line="82" assertions="5" />
+      <testcase name="controllers only depend on services (no repos, no routes)" classname="Architecture" time="0.000149" file="tests/arch/architecture.test.ts" line="96" assertions="16" />
+      <testcase name="services only depend on domain (interfaces/entities) and application utilities" classname="Architecture" time="0.000064" file="tests/arch/architecture.test.ts" line="110" assertions="8" />
+      <testcase name="repos only depend on domain interfaces and Prisma" classname="Architecture" time="0.000075" file="tests/arch/architecture.test.ts" line="124" assertions="15" />
+      <testcase name="domain layer never imports from application or presentation" classname="Architecture" time="0.00025" file="tests/arch/architecture.test.ts" line="139" assertions="0" />
+      <testcase name="no file imports from index.ts except app.ts (no circular entrypoints)" classname="Architecture" time="0.000628" file="tests/arch/architecture.test.ts" line="152" assertions="38" />
+    </testsuite>
+  </testsuite>
+  <testsuite name="tests/e2e/profile.test.ts" file="tests/e2e/profile.test.ts" tests="6" assertions="12" failures="0" skipped="0" time="0" hostname="Ricardos-MacBook-Pro.local">
+    <testsuite name="Profile" file="tests/e2e/profile.test.ts" line="4" tests="6" assertions="12" failures="0" skipped="0" time="0" hostname="Ricardos-MacBook-Pro.local">
+      <testsuite name="GET /profile/me" file="tests/e2e/profile.test.ts" line="6" tests="2" assertions="4" failures="0" skipped="0" time="0.019" hostname="Ricardos-MacBook-Pro.local">
+        <testcase name="returns current user profile" classname="GET /profile/me &amp;gt; Profile" time="0.016449" file="tests/e2e/profile.test.ts" line="7" assertions="3" />
+        <testcase name="returns 401 without auth" classname="GET /profile/me &amp;gt; Profile" time="0.003331" file="tests/e2e/profile.test.ts" line="15" assertions="1" />
+      </testsuite>
+      <testsuite name="PUT /profile/me" file="tests/e2e/profile.test.ts" line="23" tests="2" assertions="4" failures="0" skipped="0" time="0.008" hostname="Ricardos-MacBook-Pro.local">
+        <testcase name="updates and returns profile" classname="PUT /profile/me &amp;gt; Profile" time="0.005513" file="tests/e2e/profile.test.ts" line="24" assertions="3" />
+        <testcase name="returns 401 without auth" classname="PUT /profile/me &amp;gt; Profile" time="0.003221" file="tests/e2e/profile.test.ts" line="35" assertions="1" />
+      </testsuite>
+      <testsuite name="GET /profile/:userId" file="tests/e2e/profile.test.ts" line="45" tests="2" assertions="4" failures="0" skipped="0" time="0.005" hostname="Ricardos-MacBook-Pro.local">
+        <testcase name="returns another user&apos;s profile" classname="GET /profile/:userId &amp;gt; Profile" time="0.003442" file="tests/e2e/profile.test.ts" line="46" assertions="3" />
+        <testcase name="returns 401 without auth" classname="GET /profile/:userId &amp;gt; Profile" time="0.002634" file="tests/e2e/profile.test.ts" line="54" assertions="1" />
+      </testsuite>
+    </testsuite>
+  </testsuite>
+  <testsuite name="tests/e2e/auth.test.ts" file="tests/e2e/auth.test.ts" tests="26" assertions="46" failures="6" skipped="0" time="0" hostname="Ricardos-MacBook-Pro.local">
+    <testsuite name="Auth" file="tests/e2e/auth.test.ts" line="6" tests="26" assertions="46" failures="6" skipped="0" time="0" hostname="Ricardos-MacBook-Pro.local">
+      <testsuite name="POST /auth/initiate" file="tests/e2e/auth.test.ts" line="10" tests="6" assertions="8" failures="3" skipped="0" time="0.004" hostname="Ricardos-MacBook-Pro.local">
+        <testcase name="returns redirect for google provider" classname="POST /auth/initiate &amp;gt; Auth" time="0.002893" file="tests/e2e/auth.test.ts" line="11" assertions="3" />
+        <testcase name="returns code-sent for email provider" classname="POST /auth/initiate &amp;gt; Auth" time="0.000105" file="tests/e2e/auth.test.ts" line="21" assertions="1">
+          <failure type="AssertionError" />
+        </testcase>
+        <testcase name="returns code-sent for email-code provider" classname="POST /auth/initiate &amp;gt; Auth" time="0.00013" file="tests/e2e/auth.test.ts" line="30" assertions="1">
+          <failure type="AssertionError" />
+        </testcase>
+        <testcase name="returns code-sent for phone provider" classname="POST /auth/initiate &amp;gt; Auth" time="0.000054" file="tests/e2e/auth.test.ts" line="39" assertions="1">
+          <failure type="AssertionError" />
+        </testcase>
+        <testcase name="returns confirmation for password provider" classname="POST /auth/initiate &amp;gt; Auth" time="0.000042" file="tests/e2e/auth.test.ts" line="48" assertions="1" />
+        <testcase name="returns 422 for unknown provider (schema validation)" classname="POST /auth/initiate &amp;gt; Auth" time="0.002025" file="tests/e2e/auth.test.ts" line="56" assertions="1" />
+      </testsuite>
+      <testsuite name="POST /auth/complete" file="tests/e2e/auth.test.ts" line="66" tests="8" assertions="14" failures="3" skipped="0" time="0" hostname="Ricardos-MacBook-Pro.local">
+        <testcase name="completes google auth and returns user with httpOnly cookie" classname="POST /auth/complete &amp;gt; Auth" time="0.00054" file="tests/e2e/auth.test.ts" line="67" assertions="1">
+          <failure type="AssertionError" />
+        </testcase>
+        <testcase name="completes email magic link auth" classname="POST /auth/complete &amp;gt; Auth" time="0.000092" file="tests/e2e/auth.test.ts" line="83" assertions="1">
+          <failure type="AssertionError" />
+        </testcase>
+        <testcase name="completes phone sms auth" classname="POST /auth/complete &amp;gt; Auth" time="0.000155" file="tests/e2e/auth.test.ts" line="92" assertions="1">
+          <failure type="AssertionError" />
+        </testcase>
+        <testsuite name="password provider" file="tests/e2e/auth.test.ts" line="101" tests="5" assertions="11" failures="0" skipped="0" time="0.36" hostname="Ricardos-MacBook-Pro.local">
+          <testcase name="logs in with correct email and password" classname="password provider &amp;gt; POST /auth/complete &amp;gt; Auth" time="0.101182" file="tests/e2e/auth.test.ts" line="102" assertions="7" />
+          <testcase name="rejects wrong password" classname="password provider &amp;gt; POST /auth/complete &amp;gt; Auth" time="0.099512" file="tests/e2e/auth.test.ts" line="122" assertions="1" />
+          <testcase name="rejects unknown email" classname="password provider &amp;gt; POST /auth/complete &amp;gt; Auth" time="0.05458" file="tests/e2e/auth.test.ts" line="134" assertions="1" />
+          <testcase name="rejects user with no password set" classname="password provider &amp;gt; POST /auth/complete &amp;gt; Auth" time="0.05344" file="tests/e2e/auth.test.ts" line="146" assertions="1" />
+          <testcase name="requires a password field" classname="password provider &amp;gt; POST /auth/complete &amp;gt; Auth" time="0.053429" file="tests/e2e/auth.test.ts" line="159" assertions="1" />
+        </testsuite>
+      </testsuite>
+      <testsuite name="GET /auth/me" file="tests/e2e/auth.test.ts" line="174" tests="1" assertions="1" failures="0" skipped="0" time="0" hostname="Ricardos-MacBook-Pro.local">
+        <testcase name="returns 401 without cookie" classname="GET /auth/me &amp;gt; Auth" time="0.000521" file="tests/e2e/auth.test.ts" line="175" assertions="1" />
+      </testsuite>
+      <testsuite name="POST /auth/logout" file="tests/e2e/auth.test.ts" line="182" tests="1" assertions="3" failures="0" skipped="0" time="0" hostname="Ricardos-MacBook-Pro.local">
+        <testcase name="returns 204 and clears cookie" classname="POST /auth/logout &amp;gt; Auth" time="0.000157" file="tests/e2e/auth.test.ts" line="183" assertions="3" />
+      </testsuite>
+      <testsuite name="GET /auth/claims/me" file="tests/e2e/auth.test.ts" line="194" tests="2" assertions="4" failures="0" skipped="0" time="0.003" hostname="Ricardos-MacBook-Pro.local">
+        <testcase name="returns claims for PLAYER" classname="GET /auth/claims/me &amp;gt; Auth" time="0.003335" file="tests/e2e/auth.test.ts" line="195" assertions="3" />
+        <testcase name="returns 401 without auth cookie" classname="GET /auth/claims/me &amp;gt; Auth" time="0.00014" file="tests/e2e/auth.test.ts" line="203" assertions="1" />
+      </testsuite>
+      <testsuite name="GET /auth/admin/claims" file="tests/e2e/auth.test.ts" line="209" tests="2" assertions="3" failures="0" skipped="0" time="0.005" hostname="Ricardos-MacBook-Pro.local">
+        <testcase name="returns admin data for SYSTEM_ADMIN" classname="GET /auth/admin/claims &amp;gt; Auth" time="0.003784" file="tests/e2e/auth.test.ts" line="210" assertions="2" />
+        <testcase name="returns 403 for PLAYER" classname="GET /auth/admin/claims &amp;gt; Auth" time="0.002929" file="tests/e2e/auth.test.ts" line="217" assertions="1" />
+      </testsuite>
+      <testsuite name="GET /auth/club-admin/claims" file="tests/e2e/auth.test.ts" line="224" tests="3" assertions="5" failures="0" skipped="0" time="0.007" hostname="Ricardos-MacBook-Pro.local">
+        <testcase name="returns data for CLUB_ADMIN" classname="GET /auth/club-admin/claims &amp;gt; Auth" time="0.002792" file="tests/e2e/auth.test.ts" line="225" assertions="2" />
+        <testcase name="returns 403 for PLAYER" classname="GET /auth/club-admin/claims &amp;gt; Auth" time="0.003159" file="tests/e2e/auth.test.ts" line="232" assertions="1" />
+        <testcase name="returns data for CLUB_ADMIN+PLAYER (multi-role)" classname="GET /auth/club-admin/claims &amp;gt; Auth" time="0.002691" file="tests/e2e/auth.test.ts" line="238" assertions="2" />
+      </testsuite>
+      <testsuite name="multi-role access" file="tests/e2e/auth.test.ts" line="246" tests="3" assertions="8" failures="0" skipped="0" time="0.007" hostname="Ricardos-MacBook-Pro.local">
+        <testcase name="CLUB_ADMIN+PLAYER can access player claims" classname="multi-role access &amp;gt; Auth" time="0.002988" file="tests/e2e/auth.test.ts" line="247" assertions="4" />
+        <testcase name="CLUB_ADMIN+PLAYER cannot access admin claims" classname="multi-role access &amp;gt; Auth" time="0.002828" file="tests/e2e/auth.test.ts" line="256" assertions="1" />
+        <testcase name="SYSTEM_ADMIN can access all claims" classname="multi-role access &amp;gt; Auth" time="0.003981" file="tests/e2e/auth.test.ts" line="262" assertions="3" />
+      </testsuite>
+    </testsuite>
+  </testsuite>
+  <testsuite name="tests/e2e/games.test.ts" file="tests/e2e/games.test.ts" tests="14" assertions="31" failures="0" skipped="0" time="0" hostname="Ricardos-MacBook-Pro.local">
+    <testsuite name="Games" file="tests/e2e/games.test.ts" line="4" tests="14" assertions="31" failures="0" skipped="0" time="0" hostname="Ricardos-MacBook-Pro.local">
+      <testsuite name="POST /games/" file="tests/e2e/games.test.ts" line="6" tests="7" assertions="14" failures="0" skipped="0" time="0.028" hostname="Ricardos-MacBook-Pro.local">
+        <testcase name="registers a game as PLAYER in team 1" classname="POST /games/ &amp;gt; Games" time="0.00488" file="tests/e2e/games.test.ts" line="7" assertions="4" />
+        <testcase name="registers a DOUBLES game with multiple sets" classname="POST /games/ &amp;gt; Games" time="0.003478" file="tests/e2e/games.test.ts" line="22" assertions="3" />
+        <testcase name="registers a game with custom playedAt date" classname="POST /games/ &amp;gt; Games" time="0.003986" file="tests/e2e/games.test.ts" line="40" assertions="2" />
+        <testcase name="registers a game as COACH for their club" classname="POST /games/ &amp;gt; Games" time="0.004973" file="tests/e2e/games.test.ts" line="55" assertions="2" />
+        <testcase name="registers a game as SYSTEM_ADMIN for any club" classname="POST /games/ &amp;gt; Games" time="0.007258" file="tests/e2e/games.test.ts" line="68" assertions="1" />
+        <testcase name="rejects PLAYER not in either team" classname="POST /games/ &amp;gt; Games" time="0.00416" file="tests/e2e/games.test.ts" line="80" assertions="1" />
+        <testcase name="returns 401 without auth" classname="POST /games/ &amp;gt; Games" time="0.003937" file="tests/e2e/games.test.ts" line="92" assertions="1" />
+      </testsuite>
+      <testsuite name="POST /games/quick" file="tests/e2e/games.test.ts" line="106" tests="4" assertions="10" failures="0" skipped="0" time="0.019" hostname="Ricardos-MacBook-Pro.local">
+        <testcase name="registers a quick game with points" classname="POST /games/quick &amp;gt; Games" time="0.004317" file="tests/e2e/games.test.ts" line="107" assertions="4" />
+        <testcase name="quick game converts points to single set" classname="POST /games/quick &amp;gt; Games" time="0.008664" file="tests/e2e/games.test.ts" line="123" assertions="3" />
+        <testcase name="quick game with playedAt" classname="POST /games/quick &amp;gt; Games" time="0.004134" file="tests/e2e/games.test.ts" line="138" assertions="2" />
+        <testcase name="rejects PLAYER not in either team on quick" classname="POST /games/quick &amp;gt; Games" time="0.003611" file="tests/e2e/games.test.ts" line="154" assertions="1" />
+      </testsuite>
+      <testsuite name="POST /games/ with multi-role" file="tests/e2e/games.test.ts" line="169" tests="1" assertions="2" failures="0" skipped="0" time="0.003" hostname="Ricardos-MacBook-Pro.local">
+        <testcase name="CLUB_ADMIN+PLAYER can register game for their club without being in team" classname="POST /games/ with multi-role &amp;gt; Games" time="0.003167" file="tests/e2e/games.test.ts" line="170" assertions="2" />
+      </testsuite>
+      <testsuite name="GET /games/club/:clubId" file="tests/e2e/games.test.ts" line="185" tests="2" assertions="5" failures="0" skipped="0" time="0.006" hostname="Ricardos-MacBook-Pro.local">
+        <testcase name="returns recent games for club" classname="GET /games/club/:clubId &amp;gt; Games" time="0.004953" file="tests/e2e/games.test.ts" line="186" assertions="3" />
+        <testcase name="returns empty array for club with no games" classname="GET /games/club/:clubId &amp;gt; Games" time="0.002939" file="tests/e2e/games.test.ts" line="204" assertions="2" />
+      </testsuite>
+    </testsuite>
+  </testsuite>
+  <testsuite name="tests/e2e/clubs.test.ts" file="tests/e2e/clubs.test.ts" tests="11" assertions="20" failures="0" skipped="0" time="0" hostname="Ricardos-MacBook-Pro.local">
+    <testsuite name="Clubs" file="tests/e2e/clubs.test.ts" line="4" tests="11" assertions="20" failures="0" skipped="0" time="0" hostname="Ricardos-MacBook-Pro.local">
+      <testsuite name="POST /clubs/admin/" file="tests/e2e/clubs.test.ts" line="6" tests="2" assertions="3" failures="0" skipped="0" time="0.006" hostname="Ricardos-MacBook-Pro.local">
+        <testcase name="creates a club as SYSTEM_ADMIN" classname="POST /clubs/admin/ &amp;gt; Clubs" time="0.003884" file="tests/e2e/clubs.test.ts" line="7" assertions="2" />
+        <testcase name="returns 403 for PLAYER" classname="POST /clubs/admin/ &amp;gt; Clubs" time="0.003028" file="tests/e2e/clubs.test.ts" line="16" assertions="1" />
+      </testsuite>
+      <testsuite name="GET /clubs/admin/" file="tests/e2e/clubs.test.ts" line="26" tests="1" assertions="2" failures="0" skipped="0" time="0.003" hostname="Ricardos-MacBook-Pro.local">
+        <testcase name="returns all clubs as SYSTEM_ADMIN" classname="GET /clubs/admin/ &amp;gt; Clubs" time="0.003218" file="tests/e2e/clubs.test.ts" line="27" assertions="2" />
+      </testsuite>
+      <testsuite name="POST /clubs/admin/assign" file="tests/e2e/clubs.test.ts" line="36" tests="2" assertions="4" failures="0" skipped="0" time="0.006" hostname="Ricardos-MacBook-Pro.local">
+        <testcase name="assigns a user to a club as SYSTEM_ADMIN" classname="POST /clubs/admin/assign &amp;gt; Clubs" time="0.003836" file="tests/e2e/clubs.test.ts" line="37" assertions="3" />
+        <testcase name="returns 403 for PLAYER" classname="POST /clubs/admin/assign &amp;gt; Clubs" time="0.0031" file="tests/e2e/clubs.test.ts" line="48" assertions="1" />
+      </testsuite>
+      <testsuite name="PUT /clubs/manage/:id" file="tests/e2e/clubs.test.ts" line="59" tests="2" assertions="4" failures="0" skipped="0" time="0.006" hostname="Ricardos-MacBook-Pro.local">
+        <testcase name="updates club as SYSTEM_ADMIN" classname="PUT /clubs/manage/:id &amp;gt; Clubs" time="0.003394" file="tests/e2e/clubs.test.ts" line="60" assertions="3" />
+        <testcase name="returns 403 for PLAYER trying to update" classname="PUT /clubs/manage/:id &amp;gt; Clubs" time="0.003137" file="tests/e2e/clubs.test.ts" line="71" assertions="1" />
+      </testsuite>
+      <testsuite name="GET /clubs/:id" file="tests/e2e/clubs.test.ts" line="81" tests="1" assertions="2" failures="0" skipped="0" time="0.002" hostname="Ricardos-MacBook-Pro.local">
+        <testcase name="returns club details for PLAYER" classname="GET /clubs/:id &amp;gt; Clubs" time="0.002574" file="tests/e2e/clubs.test.ts" line="82" assertions="2" />
+      </testsuite>
+      <testsuite name="multi-role access" file="tests/e2e/clubs.test.ts" line="91" tests="3" assertions="5" failures="0" skipped="0" time="0.007" hostname="Ricardos-MacBook-Pro.local">
+        <testcase name="CLUB_ADMIN+PLAYER can update club (has CLUB_ADMIN role)" classname="multi-role access &amp;gt; Clubs" time="0.003182" file="tests/e2e/clubs.test.ts" line="92" assertions="2" />
+        <testcase name="CLUB_ADMIN+PLAYER cannot create club (needs SYSTEM_ADMIN)" classname="multi-role access &amp;gt; Clubs" time="0.002656" file="tests/e2e/clubs.test.ts" line="103" assertions="1" />
+        <testcase name="CLUB_ADMIN+PLAYER can view club details" classname="multi-role access &amp;gt; Clubs" time="0.002467" file="tests/e2e/clubs.test.ts" line="111" assertions="2" />
+      </testsuite>
+    </testsuite>
+  </testsuite>
+  <testsuite name="tests/e2e/health.test.ts" file="tests/e2e/health.test.ts" tests="2" assertions="6" failures="0" skipped="0" time="0" hostname="Ricardos-MacBook-Pro.local">
+    <testsuite name="Health" file="tests/e2e/health.test.ts" line="4" tests="2" assertions="6" failures="0" skipped="0" time="0.001" hostname="Ricardos-MacBook-Pro.local">
+      <testcase name="GET /health returns 200 with status ok" classname="Health" time="0.001254" file="tests/e2e/health.test.ts" line="7" assertions="5" />
+      <testcase name="GET /health ts is a valid date" classname="Health" time="0.000081" file="tests/e2e/health.test.ts" line="16" assertions="1" />
+    </testsuite>
+  </testsuite>
+</testsuites>

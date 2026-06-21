@@ -2,6 +2,7 @@ import type { Profile } from "@/core/domain/profile";
 
 export interface ProfileService {
   getMyProfile(): Promise<Profile>;
+  getProfile(userId: string): Promise<Profile>;
   updateMyProfile(data: {
     name?: string;
     birthday?: string;

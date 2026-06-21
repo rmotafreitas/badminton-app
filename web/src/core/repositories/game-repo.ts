@@ -1,5 +1,9 @@
 import type { GameRepo } from "@/core/repositories/interfaces/game-repo";
-import type { Game, RegisterGameParams, RegisterQuickGameParams } from "@/core/domain/game";
+import type {
+  Game,
+  RegisterGameParams,
+  RegisterQuickGameParams,
+} from "@/core/domain/game";
 import type { GameView } from "@/core/views/game.view";
 import { GameMapper } from "@/core/mappers/game-mapper";
 import api from "@/lib/api";
@@ -25,6 +29,11 @@ export class GameRepoImpl implements GameRepo {
     return data.map(GameMapper.toDomain);
   }
 
+  async getGamesByPlayerId(playerId: string): Promise<Game[]> {
+    const { data } = await api.get<GameView[]>(`/games/player/${playerId}`);
+    return data.map(GameMapper.toDomain);
+  }
+
   async getById(gameId: string): Promise<Game> {
     const { data } = await api.get<GameView>(`/games/${gameId}`);
     return GameMapper.toDomain(data);
@@ -34,7 +43,10 @@ export class GameRepoImpl implements GameRepo {
     await api.delete(`/games/${gameId}`);
   }
 
-  async update(gameId: string, params: Partial<RegisterGameParams>): Promise<Game> {
+  async update(
+    gameId: string,
+    params: Partial<RegisterGameParams>,
+  ): Promise<Game> {
     const { data } = await api.put<GameView>(`/games/${gameId}`, params);
     return GameMapper.toDomain(data);
   }
