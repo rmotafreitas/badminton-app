@@ -167,6 +167,36 @@ describe("Auth", () => {
         });
         expect(status).toBe(401);
       });
+
+      it("logs in with phone (no spaces) when stored with spaces", async () => {
+        // Stored phone is "+351 912 345 678"; login uses the no-spaces form.
+        const deps = await setupDepsForPasswordTest();
+        const app = createApp(deps);
+        const api = treaty(app);
+
+        const { data, status } = await api.auth.complete.post({
+          provider: "password",
+          input: { phone: "+351912345678", password: "correct-password" },
+        });
+        expect(status).toBe(200);
+        expect(data).toBeObject();
+        expect(data!.phone).toBeTruthy();
+      });
+
+      it("trims whitespace from the password on login", async () => {
+        const deps = await setupDepsForPasswordTest();
+        const app = createApp(deps);
+        const api = treaty(app);
+
+        const { status } = await api.auth.complete.post({
+          provider: "password",
+          input: {
+            email: "pwuser@test.com",
+            password: "  correct-password  ",
+          },
+        });
+        expect(status).toBe(200);
+      });
     });
   });
 

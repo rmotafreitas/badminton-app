@@ -5,6 +5,7 @@ import type {
 } from "@/domain/repositories/IUserRepo";
 import type { User, AuthProvider } from "@/domain/entities/User";
 import { UserMapper } from "@/application/mappers/UserMapper";
+import { normalizePhone } from "@/application/utils/normalizePhone";
 
 export class PrismaUserRepo implements IUserRepo {
   constructor(private readonly prisma: PrismaClient) {}
@@ -20,8 +21,19 @@ export class PrismaUserRepo implements IUserRepo {
   }
 
   async findByPhone(phone: string): Promise<User | null> {
-    const record = await this.prisma.user.findFirst({ where: { phone } });
-    return record ? UserMapper.toDomain(record) : null;
+    const normalized = normalizePhone(phone);
+    // Fast path: exact match on the canonical input (handles already-normalized
+    // stored phones).
+    const exact = await this.prisma.user.findFirst({ where: { phone: normalized } });
+    if (exact) return UserMapper.toDomain(exact);
+
+    // Fallback for legacy phones stored with spaces/separators: compare the
+    // canonical form of every stored phone number.
+    const candidates = await this.prisma.user.findMany({
+      where: { phone: { not: null } },
+    });
+    const match = candidates.find((c) => normalizePhone(c.phone) === normalized);
+    return match ? UserMapper.toDomain(match) : null;
   }
 
   async findByAuthMethod(

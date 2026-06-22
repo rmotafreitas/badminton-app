@@ -2,6 +2,7 @@ import { treaty } from "@elysiajs/eden";
 import { createApp } from "../src/app";
 import type { AppDependencies } from "../src/app";
 import { JwtService } from "../src/application/jwt/JwtService";
+import { normalizePhone } from "../src/application/utils/normalizePhone";
 
 import type { IUserRepo } from "../src/domain/repositories/IUserRepo";
 import type { IGameRepo } from "../src/domain/repositories/IGameRepo";
@@ -285,6 +286,22 @@ export async function setupDepsForPasswordTest() {
   };
   users.set("pwuser-id", pwUser);
 
+  // Phone-based password user — stored with spaces to exercise normalization.
+  const pwPhoneUser: User = {
+    id: "pwphone-id",
+    email: null,
+    phone: "+351 912 345 678",
+    passwordHash,
+    roles: ["PLAYER"],
+    elo: 200,
+    isActive: true,
+    lastAccess: null,
+    clubId: null,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  };
+  users.set("pwphone-id", pwPhoneUser);
+
   // Also pre-seed user-1 (needed for other tests)
   users.set("user-1", {
     id: "user-1",
@@ -326,7 +343,13 @@ export async function setupDepsForPasswordTest() {
       }
       return null;
     },
-    findByPhone: async () => null,
+    findByPhone: async (phone) => {
+      const norm = normalizePhone(phone);
+      for (const u of users.values()) {
+        if (u.phone && normalizePhone(u.phone) === norm) return u;
+      }
+      return null;
+    },
     findByAuthMethod: async () => null,
     createUserWithAuthMethod: async (params) => {
       const user: User = {

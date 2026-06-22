@@ -4,6 +4,7 @@ import type {
   AuthIdentity,
 } from "@/application/interfaces/IAuthProvider";
 import type { IUserRepo } from "@/domain/repositories/IUserRepo";
+import { normalizePhone } from "@/application/utils/normalizePhone";
 
 export class PasswordAuthProvider implements IAuthProvider {
   readonly providerType = "password";
@@ -17,10 +18,11 @@ export class PasswordAuthProvider implements IAuthProvider {
   async complete(input: Record<string, string>): Promise<AuthIdentity> {
     const { email, phone, username, password } = input;
 
-    if (!password) throw new Error("Password is required");
+    const cleanPassword = (password || "").trim();
+    if (!cleanPassword) throw new Error("Password is required");
 
     const cleanEmail = (email || username || "").toLowerCase().trim();
-    const cleanPhone = (phone || "").trim();
+    const cleanPhone = normalizePhone(phone);
 
     if (!cleanEmail && !cleanPhone) {
       throw new Error("Email or phone is required");
@@ -33,13 +35,13 @@ export class PasswordAuthProvider implements IAuthProvider {
     if (!user) throw new Error("Invalid credentials");
     if (!user.passwordHash) throw new Error("No password set for this account");
 
-    const isValid = await Bun.password.verify(password, user.passwordHash);
+    const isValid = await Bun.password.verify(cleanPassword, user.passwordHash);
     if (!isValid) throw new Error("Invalid credentials");
 
     return {
       providerId: cleanEmail || cleanPhone,
       email: user.email ?? undefined,
-      phone: user.phone ?? undefined,
+      phone: user.phone ? normalizePhone(user.phone) : undefined,
     };
   }
 

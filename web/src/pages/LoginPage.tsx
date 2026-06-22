@@ -11,15 +11,10 @@ type Step =
   | { type: "select" }
   | { type: "email-code-input" }
   | { type: "email-code-verify"; email: string }
-  | { type: "phone-input" }
-  | { type: "phone-code"; phone: string }
   | { type: "password-input" };
 
 function isValidEmail(v: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim());
-}
-function isValidPhone(v: string) {
-  return v.trim().replace(/\D/g, "").length >= 7;
 }
 
 const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
@@ -27,7 +22,6 @@ const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 export function LoginPage() {
   const [step, setStep] = useState<Step>({ type: "select" });
   const [email, setEmail] = useState("");
-  const [phone, setPhone] = useState("");
   const [code, setCode] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -72,8 +66,6 @@ export function LoginPage() {
       "Code has expired": authDict.codeExpired,
       "Valid email is required": authDict.invalidEmail,
       "Email and code are required": authDict.invalidEmail,
-      "Phone number is required": authDict.phoneRequired,
-      "Phone and code are required": authDict.phoneRequired,
       "Token is required": authDict.invalidOrExpiredLink,
     };
 
@@ -97,23 +89,6 @@ export function LoginPage() {
       await completeAuth("google", { credential });
       navigate("/dashboard");
     });
-
-  const handlePhoneSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    withLoading(async () => {
-      await initiateAuth("phone", { phone: phone.trim() });
-      setStep({ type: "phone-code", phone: phone.trim() });
-    });
-  };
-
-  const handleCodeSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (step.type !== "phone-code") return;
-    withLoading(async () => {
-      await completeAuth("phone", { phone: step.phone, code });
-      navigate("/dashboard");
-    });
-  };
 
   const handlePasswordSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -224,16 +199,6 @@ export function LoginPage() {
             </button>
 
             <button
-              onClick={() => setStep({ type: "phone-input" })}
-              className="button w-full justify-start light"
-            >
-              <span className="icon">
-                <i className="mdi mdi-cellphone"></i>
-              </span>
-              <span>{dict.continueWithPhone}</span>
-            </button>
-
-            <button
               onClick={() => setStep({ type: "password-input" })}
               className="button w-full justify-start light"
             >
@@ -327,45 +292,6 @@ export function LoginPage() {
           </form>
         )}
 
-        {step.type === "phone-input" && (
-          <form onSubmit={handlePhoneSubmit}>
-            <div className="field">
-              <label className="label">{common.phoneNumber}</label>
-              <div className="control icons-left">
-                <input
-                  className="input"
-                  type="tel"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  required
-                  autoFocus
-                  placeholder="+1 555 000 0000"
-                />
-                <span className="icon left">
-                  <i className="mdi mdi-phone"></i>
-                </span>
-              </div>
-            </div>
-
-            <div className="flex gap-2">
-              <button
-                type="submit"
-                className="button blue flex-1"
-                disabled={isLoading || !isValidPhone(phone)}
-              >
-                {isLoading ? common.sending : common.sendCode}
-              </button>
-              <button
-                type="button"
-                className="button light flex-1"
-                onClick={() => setStep({ type: "select" })}
-              >
-                {common.back}
-              </button>
-            </div>
-          </form>
-        )}
-
         {step.type === "password-input" && (
           <form onSubmit={handlePasswordSubmit}>
             <div className="field">
@@ -416,47 +342,6 @@ export function LoginPage() {
                 onClick={() => setStep({ type: "select" })}
               >
                 {common.back}
-              </button>
-            </div>
-          </form>
-        )}
-
-        {step.type === "phone-code" && (
-          <form onSubmit={handleCodeSubmit}>
-            <p className="text-sm text-muted-foreground text-center mb-4">
-              {dict.enter6DigitCode} <strong>{step.phone}</strong>
-            </p>
-            <div className="field">
-              <div className="control">
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  pattern="[0-9]{6}"
-                  maxLength={6}
-                  value={code}
-                  onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
-                  required
-                  autoFocus
-                  className="input text-center text-2xl tracking-widest"
-                  placeholder="000000"
-                />
-              </div>
-            </div>
-
-            <div className="flex gap-2">
-              <button
-                type="submit"
-                className="button blue flex-1"
-                disabled={isLoading || code.length !== 6}
-              >
-                {isLoading ? common.verifying : common.verifyCode}
-              </button>
-              <button
-                type="button"
-                className="button light flex-1"
-                onClick={() => setStep({ type: "phone-input" })}
-              >
-                {common.resendCode}
               </button>
             </div>
           </form>

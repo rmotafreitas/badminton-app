@@ -69,7 +69,11 @@ describe("PasswordAuthProvider", () => {
         createdAt: new Date(),
         updatedAt: new Date(),
       };
-      (repo as any).findByPhone = async () => user;
+      let lookedUpPhone: string | undefined;
+      (repo as any).findByPhone = async (phone: string) => {
+        lookedUpPhone = phone;
+        return user;
+      };
       const provider = new PasswordAuthProvider(repo);
 
       const identity = await provider.complete({
@@ -77,8 +81,56 @@ describe("PasswordAuthProvider", () => {
         password: "mypassword",
       });
 
-      expect(identity.providerId).toBe("+351 912 345 678");
-      expect(identity.phone).toBe("+351 912 345 678");
+      // Phone is canonicalized (spaces stripped, country code preserved)
+      // before the repository lookup.
+      expect(lookedUpPhone).toBe("+351912345678");
+      expect(identity.providerId).toBe("+351912345678");
+      expect(identity.phone).toBe("+351912345678");
+    });
+
+    it("matches a no-spaces phone against a spaced stored phone", async () => {
+      const hash = await PasswordAuthProvider.hashPassword("mypassword");
+      const repo = mockUserRepo();
+      const user: User = {
+        id: "seed-user-3",
+        email: null,
+        phone: "+351 912 345 678",
+        passwordHash: hash,
+        role: "PLAYER",
+        isActive: true,
+        lastAccess: null,
+        clubId: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      let lookedUpPhone: string | undefined;
+      (repo as any).findByPhone = async (phone: string) => {
+        lookedUpPhone = phone;
+        return user;
+      };
+      const provider = new PasswordAuthProvider(repo);
+
+      const identity = await provider.complete({
+        phone: "+351912345678",
+        password: "mypassword",
+      });
+
+      expect(lookedUpPhone).toBe("+351912345678");
+      expect(identity.providerId).toBe("+351912345678");
+      expect(identity.phone).toBe("+351912345678");
+    });
+
+    it("trims surrounding whitespace from the password", async () => {
+      const hash = await PasswordAuthProvider.hashPassword("mypassword");
+      const repo = seededUserRepo("user@test.com", hash);
+      const provider = new PasswordAuthProvider(repo);
+
+      const identity = await provider.complete({
+        email: "user@test.com",
+        password: "  mypassword  ",
+      });
+
+      expect(identity.providerId).toBe("user@test.com");
     });
 
     it("throws on wrong password", async () => {

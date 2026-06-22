@@ -1,4 +1,5 @@
 import { PrismaClient } from "@prisma/client";
+import { normalizePhone } from "../src/application/utils/normalizePhone";
 
 const prisma = new PrismaClient();
 
@@ -119,6 +120,8 @@ async function main() {
   for (const m of members) {
     console.log(`  Creating ${m.roles.join("/")}: ${m.name}...`);
 
+    const normalizedPhone = m.phone ? normalizePhone(m.phone) : undefined;
+
     const data: Record<string, unknown> = {
       passwordHash,
       roles: m.roles,
@@ -126,7 +129,7 @@ async function main() {
       authMethods: {
         create: {
           provider: "password",
-          providerId: m.email ?? m.phone ?? m.name,
+          providerId: m.email ?? normalizedPhone ?? m.name,
         },
       },
       profile: {
@@ -137,7 +140,7 @@ async function main() {
       },
     };
     if (m.email) data.email = m.email;
-    if (m.phone) data.phone = m.phone;
+    if (normalizedPhone) data.phone = normalizedPhone;
 
     await prisma.user.create({ data: data as any });
   }

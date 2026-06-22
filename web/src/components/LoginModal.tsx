@@ -13,8 +13,6 @@ type Step =
   | { type: "email-sent"; email: string }
   | { type: "email-code-input" }
   | { type: "email-code-verify"; email: string }
-  | { type: "phone-input" }
-  | { type: "phone-code"; phone: string }
   | { type: "password-input" };
 
 class GoogleErrorBoundary extends Component<
@@ -69,7 +67,6 @@ export function LoginModal() {
 function LoginModalContent() {
   const [step, setStep] = useState<Step>({ type: "select" });
   const [email, setEmail] = useState("");
-  const [phone, setPhone] = useState("");
   const [code, setCode] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -90,7 +87,6 @@ function LoginModalContent() {
     if (!loginModalOpen) {
       setStep({ type: "select" });
       setEmail("");
-      setPhone("");
       setCode("");
       setPassword("");
       setError("");
@@ -128,8 +124,6 @@ function LoginModalContent() {
       "Code has expired": authDict.codeExpired,
       "Valid email is required": authDict.invalidEmail,
       "Email and code are required": authDict.invalidEmail,
-      "Phone number is required": authDict.phoneRequired,
-      "Phone and code are required": authDict.phoneRequired,
       "Token is required": authDict.invalidOrExpiredLink,
     };
 
@@ -160,24 +154,6 @@ function LoginModalContent() {
     withLoading(async () => {
       await initiateAuth("email", { email: cleanEmail });
       setStep({ type: "email-sent", email: cleanEmail });
-    });
-  };
-
-  const handlePhoneSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    const cleanPhone = phone.trim();
-    withLoading(async () => {
-      await initiateAuth("phone", { phone: cleanPhone });
-      setStep({ type: "phone-code", phone: cleanPhone });
-    });
-  };
-
-  const handleCodeSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (step.type !== "phone-code") return;
-    withLoading(async () => {
-      await completeAuth("phone", { phone: step.phone, code });
-      navigate("/dashboard");
     });
   };
 
@@ -275,13 +251,6 @@ function LoginModalContent() {
               </GoogleErrorBoundary>
 
               <button
-                onClick={() => setStep({ type: "phone-input" })}
-                className="w-full flex items-center justify-center gap-3 px-4 py-3 border border-border rounded-lg hover:bg-secondary transition-colors text-sm font-medium"
-              >
-                <span>📱</span> {dict.continueWithPhone}
-              </button>
-
-              <button
                 onClick={() => setStep({ type: "password-input" })}
                 className="w-full flex items-center justify-center gap-3 px-4 py-3 border border-border rounded-lg hover:bg-secondary transition-colors text-sm font-medium"
               >
@@ -361,49 +330,6 @@ function LoginModalContent() {
                 {isLoading ? common.verifying : common.verifyCode}
               </button>
               <button type="button" onClick={() => { setCode(""); setStep({ type: "email-code-input" }); }}
-                className="w-full text-sm text-muted-foreground hover:text-foreground">
-                {common.resendCode}
-              </button>
-            </form>
-          )}
-
-          {step.type === "phone-input" && (
-            <form onSubmit={handlePhoneSubmit} className="space-y-4">
-              <div>
-                <label htmlFor="login-phone" className="block text-sm font-medium text-foreground mb-2">
-                  {common.phoneNumber}
-                </label>
-                <input id="login-phone" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)}
-                  required autoFocus
-                  className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                  placeholder="+1 555 000 0000" />
-              </div>
-              <button type="submit" disabled={isLoading}
-                className="w-full py-3 bg-primary text-white rounded-lg font-semibold hover:bg-primary/90 transition-colors disabled:opacity-50">
-                {isLoading ? common.sending : common.sendCode}
-              </button>
-              <button type="button" onClick={() => setStep({ type: "select" })}
-                className="w-full text-sm text-muted-foreground hover:text-foreground">
-                {common.back}
-              </button>
-            </form>
-          )}
-
-          {step.type === "phone-code" && (
-            <form onSubmit={handleCodeSubmit} className="space-y-4">
-              <p className="text-sm text-muted-foreground text-center">
-                {dict.enter6DigitCode} <strong>{step.phone}</strong>
-              </p>
-              <input type="text" inputMode="numeric" pattern="[0-9]{6}" maxLength={6}
-                value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
-                required autoFocus
-                className="w-full px-4 py-3 text-center text-2xl tracking-widest border border-border rounded-lg focus:ring-2 focus:ring-primary"
-                placeholder="000000" />
-              <button type="submit" disabled={isLoading || code.length !== 6}
-                className="w-full py-3 bg-primary text-white rounded-lg font-semibold hover:bg-primary/90 transition-colors disabled:opacity-50">
-                {isLoading ? common.verifying : common.verifyCode}
-              </button>
-              <button type="button" onClick={() => setStep({ type: "phone-input" })}
                 className="w-full text-sm text-muted-foreground hover:text-foreground">
                 {common.resendCode}
               </button>
