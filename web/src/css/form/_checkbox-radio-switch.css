@@ -7,7 +7,7 @@
 }
 
 .checkbox input[type=checkbox]+.check, .radio input[type=radio]+.check, .switch input[type=checkbox]+.check {
-  @apply border-gray-300 border hover:border-gray-400;
+  @apply border-border border hover:border-muted-foreground;
 }
 
 .checkbox input[type=checkbox]+.check, .radio input[type=radio]+.check {
@@ -19,7 +19,7 @@
 }
 
 .switch input[type=checkbox]+.check {
-  @apply flex items-center flex-shrink-0 w-12 h-6 p-0.5 bg-gray-200;
+  @apply flex items-center flex-shrink-0 w-12 h-6 p-0.5 bg-muted;
 }
 
 .radio input[type=radio]+.check, .switch input[type=checkbox]+.check, .switch input[type=checkbox]+.check:before {
@@ -27,7 +27,7 @@
 }
 
 .checkbox input[type=checkbox]:checked+.check, .radio input[type=radio]:checked+.check {
-  @apply bg-no-repeat bg-center bg-blue-500 border-blue-500 border-4;
+  @apply bg-no-repeat bg-center bg-primary border-primary border-4;
 }
 
 .checkbox input[type=checkbox]:checked+.check {
@@ -39,17 +39,17 @@
 }
 
 .switch input[type=checkbox]:checked+.check {
-  @apply bg-blue-500 border-blue-500;
+  @apply bg-primary border-primary;
 }
 
 .switch input[type=checkbox]+.check:before {
   content: '';
-  @apply block w-5 h-5 bg-white border border-gray-300;
+  @apply block w-5 h-5 bg-card border border-border;
 }
 
 .switch input[type=checkbox]:checked+.check:before {
   transform: translate3d(110%, 0 ,0);
-  @apply border-blue-500;
+  @apply border-primary;
 }
 
 .checkbox .control-label, .radio .control-label, .switch .control-label {

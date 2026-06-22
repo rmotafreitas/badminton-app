@@ -74,8 +74,8 @@ export function PlayerSelect({
   };
 
   const chipBg = color === "blue"
-    ? "bg-blue-100 text-blue-800 border-blue-300"
-    : "bg-red-100 text-red-800 border-red-300";
+    ? "bg-primary/10 text-primary border-primary/30"
+    : "bg-destructive/10 text-destructive border-destructive/30";
 
   return (
     <div className="field" ref={ref}>
@@ -105,9 +105,9 @@ export function PlayerSelect({
             </span>
           ))}
           {selected.length < max && (
-            <button
+              <button
               type="button"
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium border border-dashed border-gray-400 text-gray-500 hover:border-gray-600 hover:text-gray-700 active:scale-95 transition-transform"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium border border-dashed border-muted-foreground text-muted-foreground hover:border-foreground hover:text-foreground active:scale-95 transition-transform"
               onClick={(e) => {
                 e.stopPropagation();
                 setOpen(!open);
@@ -121,8 +121,8 @@ export function PlayerSelect({
         </div>
 
         {open && (
-          <div className="absolute z-50 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-xl max-h-64 overflow-hidden">
-            <div className="p-2 border-b bg-gray-50">
+          <div className="absolute z-50 mt-1 w-full bg-card border border-border rounded-lg shadow-xl max-h-64 overflow-hidden">
+            <div className="p-2 border-b bg-muted">
               <input
                 type="text"
                 className="input text-base"
@@ -134,7 +134,7 @@ export function PlayerSelect({
             </div>
             <div className="overflow-y-auto max-h-48">
               {filtered.length === 0 ? (
-                <div className="p-4 text-sm text-gray-500 text-center">
+                <div className="p-4 text-sm text-muted-foreground text-center">
                   {search ? (labels.noMatches || "No matches") : (labels.noAvailable || "No players available")}
                 </div>
               ) : (
@@ -142,13 +142,13 @@ export function PlayerSelect({
                   <button
                     key={p.id}
                     type="button"
-                    className="w-full text-left px-4 py-3 text-sm hover:bg-blue-50 flex items-center gap-3 border-b border-gray-50 last:border-0 active:bg-blue-100 transition-colors"
+                    className="w-full text-left px-4 py-3 text-sm hover:bg-primary/5 flex items-center gap-3 border-b border-border last:border-0 active:bg-primary/10 transition-colors"
                     onClick={() => togglePlayer(p.id)}
                   >
                     {p.photo ? (
                       <img src={p.photo} alt="" className="w-8 h-8 rounded-full object-cover shrink-0" />
                     ) : (
-                      <span className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center text-sm font-bold text-gray-500 shrink-0">
+                      <span className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-sm font-bold text-muted-foreground shrink-0">
                         {p.name.charAt(0).toUpperCase()}
                       </span>
                     )}

@@ -3,17 +3,17 @@ progress {
 }
 
 progress::-webkit-progress-bar {
-  @apply bg-gray-200;
+  @apply bg-muted;
 }
 
 progress::-webkit-progress-value {
-  @apply bg-blue-500;
+  @apply bg-primary;
 }
 
 progress::-moz-progress-bar {
-  @apply bg-blue-500;
+  @apply bg-primary;
 }
 
 progress::-ms-fill {
-  @apply bg-blue-500 border-0;
+  @apply bg-primary border-0;
 }

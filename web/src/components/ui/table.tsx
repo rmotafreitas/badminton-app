@@ -38,7 +38,7 @@ export function Table<T extends { id?: string }>({
         {loading ? (
           <div className="p-4 text-center">{loadingMessage}</div>
         ) : data.length === 0 ? (
-          <div className="p-4 text-center text-gray-500">{emptyMessage}</div>
+          <div className="p-4 text-center text-muted-foreground">{emptyMessage}</div>
         ) : (
           <table>
             <thead>

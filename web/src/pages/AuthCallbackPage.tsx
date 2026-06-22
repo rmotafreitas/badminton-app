@@ -37,7 +37,7 @@ export function AuthCallbackPage() {
     return (
       <div className="flex items-center justify-center min-h-[50vh]">
         <div className="text-center">
-          <div className="text-red-600 font-semibold">{error}</div>
+          <div className="text-destructive font-semibold">{error}</div>
         </div>
       </div>
     );
@@ -46,10 +46,10 @@ export function AuthCallbackPage() {
   return (
     <div className="flex items-center justify-center min-h-[50vh]">
       <div className="text-center">
-        <div className="text-2xl font-semibold text-gray-700">
+        <div className="text-2xl font-semibold text-foreground">
           {dict.signingYouIn}
         </div>
-        <p className="text-gray-500 mt-2">{common.pleaseWait}</p>
+        <p className="text-muted-foreground mt-2">{common.pleaseWait}</p>
       </div>
     </div>
   );

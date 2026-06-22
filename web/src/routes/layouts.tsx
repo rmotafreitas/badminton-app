@@ -20,7 +20,7 @@ export function LayoutApp({ children }: LayoutProps) {
 
 export function LayoutLogin({ children }: LayoutProps) {
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-0 sm:p-4">
+    <div className="min-h-screen bg-background flex items-center justify-center p-0 sm:p-4">
       {children}
     </div>
   );

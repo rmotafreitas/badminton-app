@@ -29,10 +29,10 @@ function ScoreInput({
   return (
     <div className="flex flex-col items-center gap-1 w-full">
       <span className={`text-xs font-semibold ${labelColor}`}>{label}</span>
-      <div className="flex items-stretch w-full rounded-lg border border-gray-200 overflow-hidden">
+      <div className="flex items-stretch w-full rounded-lg border border-border overflow-hidden">
         <button
           type="button"
-          className={`${btn} bg-gray-100 text-gray-600 hover:bg-gray-200`}
+          className={`${btn} bg-secondary text-muted-foreground hover:bg-secondary/80`}
           onClick={() => onChange(Math.max(0, value - 1))}
           tabIndex={-1}
         >
@@ -40,7 +40,7 @@ function ScoreInput({
         </button>
         <input
           type="number"
-          className="flex-1 w-0 min-w-0 text-center text-3xl font-bold tabular-nums bg-white border-none outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+          className="flex-1 w-0 min-w-0 text-center text-3xl font-bold tabular-nums bg-card border-none outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
           value={value}
           onChange={(e) => {
             const v = parseInt(e.target.value);
@@ -52,7 +52,7 @@ function ScoreInput({
         />
         <button
           type="button"
-          className={`${btn} bg-gray-100 text-gray-600 hover:bg-gray-200`}
+          className={`${btn} bg-secondary text-muted-foreground hover:bg-secondary/80`}
           onClick={() => onChange(Math.min(30, value + 1))}
           tabIndex={-1}
         >
@@ -219,7 +219,7 @@ export function GameRegistration({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
             <PlayerSelect
               label={sideALabel}
-              labelColor="text-blue-600"
+              labelColor="text-primary"
               available={players}
               selected={team1Players}
               max={maxPerSide}
@@ -230,7 +230,7 @@ export function GameRegistration({
             />
             <PlayerSelect
               label={sideBLabel}
-              labelColor="text-red-600"
+              labelColor="text-destructive"
               available={players}
               selected={team2Players}
               max={maxPerSide}
@@ -243,11 +243,11 @@ export function GameRegistration({
 
           {allSelected.length > 0 && (
             <div className="flex items-center justify-center gap-3 my-3 text-sm">
-              <span className="font-semibold text-blue-600">
+              <span className="font-semibold text-primary">
                 {team1Players.map((id) => players.find((p) => p.id === id)?.name).join(" & ") || "—"}
               </span>
-              <span className="text-gray-400 font-bold">{common.vs}</span>
-              <span className="font-semibold text-red-600">
+              <span className="text-muted-foreground/70 font-bold">{common.vs}</span>
+              <span className="font-semibold text-destructive">
                 {team2Players.map((id) => players.find((p) => p.id === id)?.name).join(" & ") || "—"}
               </span>
             </div>
@@ -257,21 +257,21 @@ export function GameRegistration({
 
           <div className="space-y-3 mb-4">
             {sets.map((set, idx) => (
-              <div key={idx} className="bg-gray-50 p-3 rounded border">
+              <div key={idx} className="bg-muted p-3 rounded border">
                 <div className="flex items-center gap-3">
-                  <span className="text-xs font-bold text-gray-500 w-8 shrink-0">{dict.set} {idx + 1}</span>
+                  <span className="text-xs font-bold text-muted-foreground w-8 shrink-0">{dict.set} {idx + 1}</span>
                   <ScoreInput
                     value={set.team1Score}
                     onChange={(v) => updateSetScore(idx, 1, v)}
                     label=""
-                    labelColor="text-blue-600"
+                    labelColor="text-primary"
                   />
-                  <span className="text-gray-300 text-sm font-bold shrink-0 pt-4">{common.vs}</span>
+                  <span className="text-border text-sm font-bold shrink-0 pt-4">{common.vs}</span>
                   <ScoreInput
                     value={set.team2Score}
                     onChange={(v) => updateSetScore(idx, 2, v)}
                     label=""
-                    labelColor="text-red-600"
+                    labelColor="text-destructive"
                   />
                   {sets.length > 1 && (
                     <button type="button" className="button small red shrink-0" onClick={() => removeSet(idx)}>

@@ -311,5 +311,11 @@ export const ptPT = {
     activity: "Atividade",
     recentGames: "Jogos Recentes",
     noGames: "Nenhum jogo registado.",
+    winsShort: "V",
+    lossesShort: "D",
+    gamesCount: "jogo",
+    gamesCountPlural: "jogos",
+    activityLegendLess: "Menos",
+    activityLegendMore: "Mais",
   },
 };

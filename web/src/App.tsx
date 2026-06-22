@@ -2,6 +2,7 @@ import { BrowserRouter } from "react-router-dom";
 import { GoogleOAuthProvider } from "@react-oauth/google";
 import { DIProvider } from "@/di/container";
 import { AuthProvider } from "@/context/AuthContext";
+import { PageTitleProvider } from "@/context/PageTitleContext";
 import { LanguageProvider } from "@/i18n";
 import { Router } from "@/routes/Router";
 
@@ -12,7 +13,9 @@ export function App() {
         <DIProvider>
           <LanguageProvider>
             <AuthProvider>
-              <Router />
+              <PageTitleProvider>
+                <Router />
+              </PageTitleProvider>
             </AuthProvider>
           </LanguageProvider>
         </DIProvider>

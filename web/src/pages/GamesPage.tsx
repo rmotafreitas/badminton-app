@@ -13,7 +13,7 @@ function playerImg(player: any, cls: string) {
   }
   const initial = (player?.profile?.name || player?.email || "?")[0].toUpperCase();
   return (
-    <span className={`${cls} bg-gray-200 flex items-center justify-center text-[10px] font-medium text-gray-500`}>
+    <span className={`${cls} bg-muted flex items-center justify-center text-[10px] font-medium text-muted-foreground`}>
       {initial}
     </span>
   );
@@ -38,7 +38,6 @@ export function GamesPage() {
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
   const dict = useDictionary().games;
-  const navDict = useDictionary().nav;
   const common = useDictionary().common;
 
   const fetchGames = async () => {
@@ -120,11 +119,11 @@ export function GamesPage() {
     {
       header: dict.winner,
       accessor: (g) => {
-        if (!g.winner) return <span className="text-gray-400 text-xs">—</span>;
+        if (!g.winner) return <span className="text-muted-foreground/70 text-xs">—</span>;
         const names = g.winner === "team1"
           ? g.team1Players?.map((p: any) => p.profile?.name || p.email?.split("@")[0] || "?").join(" & ")
           : g.team2Players?.map((p: any) => p.profile?.name || p.email?.split("@")[0] || "?").join(" & ");
-        const color = g.winner === "team1" ? "text-blue-600" : "text-red-600";
+        const color = g.winner === "team1" ? "text-primary" : "text-destructive";
         return <span className={`font-semibold text-xs ${color}`}>{names}</span>;
       },
     },
@@ -133,7 +132,7 @@ export function GamesPage() {
       accessor: (g) => (
         <div className="flex items-center gap-1">
           <span className="font-bold text-sm" title={g.setsSummary}>{g.resultSummary}</span>
-          <span className={`text-[10px] uppercase font-semibold px-1 rounded ${g.isQuickMode ? "bg-green-100 text-green-700" : "bg-purple-100 text-purple-700"}`}>
+          <span className={`text-[10px] uppercase font-semibold px-1 rounded ${g.isQuickMode ? "bg-success/10 text-success" : "bg-accent/10 text-accent-foreground"}`}>
             {g.isQuickMode ? dict.quickBadge : dict.setsBadge}
           </span>
         </div>
@@ -142,7 +141,7 @@ export function GamesPage() {
     {
       header: dict.date,
       accessor: (g) => (
-        <small className="text-gray-500" title={new Date(g.playedAt || g.createdAt).toLocaleString()}>
+        <small className="text-muted-foreground" title={new Date(g.playedAt || g.createdAt).toLocaleString()}>
           {new Date(g.playedAt || g.createdAt).toLocaleDateString()}
         </small>
       ),
@@ -178,15 +177,6 @@ export function GamesPage() {
 
   return (
     <>
-      <section className="is-title-bar">
-        <div className="flex flex-col md:flex-row items-center justify-between space-y-6 md:space-y-0">
-          <ul>
-            <li>{navDict.admin}</li>
-            <li>{dict.registeredGames}</li>
-          </ul>
-        </div>
-      </section>
-
       <section className="is-hero-bar">
         <div className="flex flex-col md:flex-row items-center justify-between space-y-6 md:space-y-0">
           <h1 className="title">{dict.registerGame}</h1>

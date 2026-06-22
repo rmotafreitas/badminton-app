@@ -25,7 +25,6 @@ export function ClubsPage() {
 
   const dict = useDictionary().clubs;
   const gameDict = useDictionary().games;
-  const navDict = useDictionary().nav;
   const common = useDictionary().common;
 
   useEffect(() => {
@@ -95,7 +94,7 @@ export function ClubsPage() {
 
   if (!user?.roles?.includes("SYSTEM_ADMIN")) {
     return (
-      <div className="p-8 text-center text-red-500">
+      <div className="p-8 text-center text-destructive">
         {dict.accessDenied}
       </div>
     );
@@ -103,15 +102,6 @@ export function ClubsPage() {
 
   return (
     <>
-      <section className="is-title-bar">
-        <div className="flex flex-col md:flex-row items-center justify-between space-y-6 md:space-y-0">
-          <ul>
-            <li>{navDict.admin}</li>
-            <li>{dict.registeredClubs}</li>
-          </ul>
-        </div>
-      </section>
-
       <section className="is-hero-bar">
         <div className="flex flex-col md:flex-row items-center justify-between space-y-6 md:space-y-0">
           <h1 className="title">{dict.registeredClubs}</h1>
@@ -198,7 +188,7 @@ export function ClubsPage() {
             {loading ? (
               <div className="p-4 text-center">{common.loading}</div>
             ) : clubs.length === 0 ? (
-              <div className="p-4 text-center text-gray-500">{dict.noClubsFound}</div>
+              <div className="p-4 text-center text-muted-foreground">{dict.noClubsFound}</div>
             ) : (
               <table>
                 <thead>
@@ -215,7 +205,7 @@ export function ClubsPage() {
                       <td data-label={dict.name} className="font-bold">{club.name}</td>
                       <td data-label={dict.location}>{club.location || "-"}</td>
                       <td data-label={dict.created}>
-                        <small className="text-gray-500" title={new Date(club.createdAt).toLocaleString()}>
+                        <small className="text-muted-foreground" title={new Date(club.createdAt).toLocaleString()}>
                           {new Date(club.createdAt).toLocaleDateString()}
                         </small>
                       </td>

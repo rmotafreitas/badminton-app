@@ -1,9 +1,9 @@
 .is-title-bar {
-  @apply p-4 sm:p-6 border-b border-gray-100;
+  @apply p-4 sm:p-6 border-b border-border;
 }
 
 .is-title-bar li {
-  @apply inline-block pr-3 text-xl sm:text-2xl text-gray-500;
+  @apply inline-block pr-3 text-xl sm:text-2xl text-muted-foreground;
 }
 
 .is-title-bar li:not(:last-child):after {
@@ -12,5 +12,5 @@
 }
 
 .is-title-bar li:last-child {
-  @apply pr-0 font-black text-black;
+  @apply pr-0 font-black text-foreground;
 }

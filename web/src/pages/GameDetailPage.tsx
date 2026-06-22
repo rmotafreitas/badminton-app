@@ -21,7 +21,7 @@ function playerLine(p: any) {
       {src ? (
         <img src={src} alt="" className="w-5 h-5 rounded-full object-cover shrink-0" />
       ) : (
-        <span className="w-5 h-5 rounded-full bg-gray-200 flex items-center justify-center text-[10px] font-medium text-gray-500 shrink-0">
+        <span className="w-5 h-5 rounded-full bg-muted flex items-center justify-center text-[10px] font-medium text-muted-foreground shrink-0">
           {(p?.profile?.name || p?.email || "?")[0].toUpperCase()}
         </span>
       )}
@@ -48,7 +48,6 @@ export function GameDetailPage() {
   const gameService = useGameService();
   const clubService = useClubService();
   const dict = useDictionary().games;
-  const navDict = useDictionary().nav;
   const common = useDictionary().common;
 
   const playerLabels = {
@@ -198,16 +197,6 @@ export function GameDetailPage() {
 
   return (
     <>
-      <section className="is-title-bar">
-        <div className="flex flex-col md:flex-row items-center justify-between space-y-6 md:space-y-0">
-          <ul>
-            <li>{navDict.admin}</li>
-            <li><Link to="/games">{dict.registeredGames}</Link></li>
-            <li>{isEditing ? dict.editGame : dict.viewGame}</li>
-          </ul>
-        </div>
-      </section>
-
       <section className="is-hero-bar">
         <div className="flex flex-col md:flex-row items-center justify-between space-y-6 md:space-y-0">
           <h1 className="title">{isEditing ? dict.editGame : dict.viewGame}</h1>
@@ -250,8 +239,8 @@ export function GameDetailPage() {
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                <PlayerSelect label={sideALabel} labelColor="text-blue-600" available={players} selected={team1Players} max={maxPerSide} onChange={setTeam1Players} disabledIds={team2Players} color="blue" labels={playerLabels} />
-                <PlayerSelect label={sideBLabel} labelColor="text-red-600" available={players} selected={team2Players} max={maxPerSide} onChange={setTeam2Players} disabledIds={team1Players} color="red" labels={playerLabels} />
+                <PlayerSelect label={sideALabel} labelColor="text-primary" available={players} selected={team1Players} max={maxPerSide} onChange={setTeam1Players} disabledIds={team2Players} color="blue" labels={playerLabels} />
+                <PlayerSelect label={sideBLabel} labelColor="text-destructive" available={players} selected={team2Players} max={maxPerSide} onChange={setTeam2Players} disabledIds={team1Players} color="red" labels={playerLabels} />
               </div>
 
               <hr />
@@ -260,10 +249,10 @@ export function GameDetailPage() {
                 <label className="label">{dict.set}s</label>
                 <div className="space-y-2">
                   {sets.map((set, idx) => (
-                    <div key={idx} className="flex items-center gap-2 bg-gray-50 p-2 rounded border">
-                      <span className="text-xs font-bold text-gray-400 w-5 shrink-0">{idx + 1}</span>
+                    <div key={idx} className="flex items-center gap-2 bg-muted p-2 rounded border">
+                      <span className="text-xs font-bold text-muted-foreground/80 w-5 shrink-0">{idx + 1}</span>
                       <div className="flex-1 flex items-center gap-2">
-                        <span className="text-xs font-semibold text-blue-600 shrink-0">{dict.team1}</span>
+                        <span className="text-xs font-semibold text-primary shrink-0">{dict.team1}</span>
                         <input
                           type="number"
                           className="input text-center font-bold h-9 flex-1 min-w-0"
@@ -272,7 +261,7 @@ export function GameDetailPage() {
                           min="0" max="30" inputMode="numeric"
                         />
                       </div>
-                      <span className="text-gray-300 text-xs font-bold shrink-0">{common.vs}</span>
+                      <span className="text-border text-xs font-bold shrink-0">{common.vs}</span>
                       <div className="flex-1 flex items-center gap-2">
                         <input
                           type="number"
@@ -281,7 +270,7 @@ export function GameDetailPage() {
                           onChange={(e) => updateSetScore(idx, 2, parseInt(e.target.value) || 0)}
                           min="0" max="30" inputMode="numeric"
                         />
-                        <span className="text-xs font-semibold text-red-600 shrink-0">{dict.team2}</span>
+                        <span className="text-xs font-semibold text-destructive shrink-0">{dict.team2}</span>
                       </div>
                       {sets.length > 1 && (
                         <button type="button" className="button small red shrink-0" onClick={() => setSets((p) => p.filter((_, i) => i !== idx))}>
@@ -345,21 +334,21 @@ export function GameDetailPage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-3">
                 <div>
-                  <p className="text-sm text-gray-500">{dict.type}</p>
+                  <p className="text-sm text-muted-foreground">{dict.type}</p>
                   <p className="font-semibold">{typeLabel(game.type)}</p>
                 </div>
                 <div>
-                  <p className="text-sm text-blue-600 font-medium mb-1">{dict.team1}</p>
+                  <p className="text-sm text-primary font-medium mb-1">{dict.team1}</p>
                   {game.team1Players?.map((p: any, i: number) => <div key={i} className="mb-0.5">{playerLine(p)}</div>)}
                 </div>
                 <div>
-                  <p className="text-sm text-red-600 font-medium mb-1">{dict.team2}</p>
+                  <p className="text-sm text-destructive font-medium mb-1">{dict.team2}</p>
                   {game.team2Players?.map((p: any, i: number) => <div key={i} className="mb-0.5">{playerLine(p)}</div>)}
                 </div>
               </div>
               <div className="space-y-3">
                 <div>
-                  <p className="text-sm text-gray-500">{dict.winner}</p>
+                  <p className="text-sm text-muted-foreground">{dict.winner}</p>
                   <p className="font-semibold">
                     {game.winner === "team1"
                       ? game.team1Players?.map((p: any) => p.profile?.name || p.email?.split("@")[0] || "?").join(" & ")
@@ -369,18 +358,18 @@ export function GameDetailPage() {
                   </p>
                 </div>
                 <div>
-                  <p className="text-sm text-gray-500">{dict.result}</p>
+                  <p className="text-sm text-muted-foreground">{dict.result}</p>
                   <p>
                     <span className="font-bold" title={game.setsSummary}>{game.resultSummary}</span>
-                    <span className={`ml-1 text-[10px] uppercase font-semibold px-1 rounded ${game.isQuickMode ? "bg-green-100 text-green-700" : "bg-purple-100 text-purple-700"}`}>
+                    <span className={`ml-1 text-[10px] uppercase font-semibold px-1 rounded ${game.isQuickMode ? "bg-success/10 text-success" : "bg-accent/10 text-accent-foreground"}`}>
                       {game.isQuickMode ? dict.quickBadge : dict.setsBadge}
                     </span>
                   </p>
                   {!game.isQuickMode && game.sets?.length > 1 && (
                     <div className="mt-1.5 space-y-0.5">
                       {game.sets.map((s: any, i: number) => (
-                        <div key={i} className="text-xs text-gray-500 flex gap-2">
-                          <span className="font-medium text-gray-400 w-8">{dict.set} {i + 1}</span>
+                        <div key={i} className="text-xs text-muted-foreground flex gap-2">
+                          <span className="font-medium text-muted-foreground/80 w-8">{dict.set} {i + 1}</span>
                           <span className="tabular-nums">{s.team1Score} - {s.team2Score}</span>
                         </div>
                       ))}
@@ -388,8 +377,8 @@ export function GameDetailPage() {
                   )}
                 </div>
                 <div>
-                  <p className="text-sm text-gray-500">{dict.date}</p>
-                  <p className="text-gray-500 text-sm">
+                  <p className="text-sm text-muted-foreground">{dict.date}</p>
+                  <p className="text-muted-foreground text-sm">
                     {new Date(game.playedAt || game.createdAt).toLocaleDateString()}
                   </p>
                 </div>

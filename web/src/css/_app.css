@@ -3,7 +3,7 @@
 }
 
 #app {
-  @apply w-full transition-all lg:w-auto min-h-screen bg-gray-50 overflow-x-hidden;
+  @apply w-full transition-all lg:w-auto min-h-screen bg-background overflow-x-hidden;
 }
 
 .main-section {

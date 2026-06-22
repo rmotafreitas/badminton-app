@@ -25,7 +25,6 @@ export function UsersPage() {
   const [showAssignForm, setShowAssignForm] = useState(false);
 
   const dict = useDictionary().users;
-  const navDict = useDictionary().nav;
   const common = useDictionary().common;
 
   const isSystemAdmin = user?.roles?.includes("SYSTEM_ADMIN");
@@ -102,7 +101,7 @@ export function UsersPage() {
       accessor: (u) => (
         <Link
           to={`/profile/${u.id}`}
-          className="text-blue-600 hover:text-blue-800"
+          className="text-primary hover:text-primary/80"
         >
           {u.profile?.name || "-"}
         </Link>
@@ -119,7 +118,7 @@ export function UsersPage() {
           {u.roles?.map((r: string) => (
             <span
               key={r}
-              className="inline-block bg-blue-100 text-blue-800 text-xs px-2 rounded-full uppercase font-semibold tracking-wide"
+              className="inline-block bg-primary/10 text-primary text-xs px-2 rounded-full uppercase font-semibold tracking-wide"
             >
               {r.replace("_", " ")}
             </span>
@@ -131,7 +130,7 @@ export function UsersPage() {
       header: dict.joined,
       accessor: (u) => (
         <small
-          className="text-gray-500"
+          className="text-muted-foreground"
           title={new Date(u.createdAt).toLocaleString()}
         >
           {new Date(u.createdAt).toLocaleDateString()}
@@ -142,15 +141,6 @@ export function UsersPage() {
 
   return (
     <>
-      <section className="is-title-bar">
-        <div className="flex flex-col md:flex-row items-center justify-between space-y-6 md:space-y-0">
-          <ul>
-            <li>{navDict.admin}</li>
-            <li>{dict.clubUsers}</li>
-          </ul>
-        </div>
-      </section>
-
       <section className="is-hero-bar">
         <div className="flex flex-col md:flex-row items-center justify-between space-y-6 md:space-y-0">
           <h1 className="title">{dict.clubUsers}</h1>

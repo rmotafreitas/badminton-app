@@ -7,7 +7,7 @@ thead {
 }
 
 tr {
-  @apply max-w-full block relative border-b-4 border-gray-100
+  @apply max-w-full block relative border-b-4 border-border
     lg:table-row lg:border-b-0;
 }
 
@@ -20,12 +20,12 @@ th {
 }
 
 td {
-  @apply flex justify-between text-right py-3 px-4 align-top border-b border-gray-100 text-sm
+  @apply flex justify-between text-right py-3 px-4 align-top border-b border-border text-sm
     lg:table-cell lg:text-left lg:py-2 lg:px-3 lg:align-middle lg:border-b-0 lg:text-base;
 }
 
 tr:nth-child(odd) td {
-  @apply bg-gray-50 lg:bg-gray-50;
+  @apply bg-muted lg:bg-muted;
 }
 
 td:last-child {
@@ -33,12 +33,12 @@ td:last-child {
 }
 
 tbody tr:hover td {
-  @apply lg:bg-gray-100;
+  @apply lg:bg-secondary;
 }
 
 td:before {
   content: attr(data-label);
-  @apply font-semibold pr-3 text-left text-gray-500 lg:hidden;
+  @apply font-semibold pr-3 text-left text-muted-foreground lg:hidden;
 }
 
 td.checkbox-cell, th.checkbox-cell {
@@ -62,5 +62,5 @@ td.image-cell .image {
 }
 
 .table-pagination {
-  @apply px-4 sm:px-6 py-3 border-t border-gray-100;
+  @apply px-4 sm:px-6 py-3 border-t border-border;
 }

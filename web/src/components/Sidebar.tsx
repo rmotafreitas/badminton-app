@@ -2,67 +2,89 @@ import { useLocation, Link } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useDictionary } from "@/i18n";
 
+function isActivePath(current: string, path: string) {
+  if (current === path) return true;
+  if (path !== "/" && current.startsWith(path + "/")) return true;
+  return false;
+}
+
+function closeMobileSidebar() {
+  document.documentElement.classList.remove("aside-mobile-expanded");
+}
+
 export function Sidebar() {
   const { logout, user } = useAuth();
   const location = useLocation();
   const dict = useDictionary().sidebar;
 
+  const linkClass = (path: string) =>
+    isActivePath(location.pathname, path) ? "active" : "";
+
   return (
-    <aside className="aside is-placed-left is-expanded">
-      <div className="aside-tools">
-        <div>
-          {dict.brandName} <b className="font-black">{dict.brandApp}</b>
+    <>
+      <aside className="aside is-placed-left is-expanded">
+        <div className="aside-tools">
+          <div>
+            {dict.brandName} <b className="font-black">{dict.brandApp}</b>
+          </div>
         </div>
-      </div>
-      <div className="menu is-menu-main">
-        <p className="menu-label">{dict.general}</p>
-        <ul className="menu-list">
-          <li className={location.pathname === "/dashboard" ? "active" : ""}>
-            <Link to="/dashboard">
-              <span className="icon"><i className="mdi mdi-desktop-mac"></i></span>
-              <span className="menu-item-label">{dict.dashboard}</span>
-            </Link>
-          </li>
-        </ul>
-        <p className="menu-label">{dict.management}</p>
-        <ul className="menu-list">
-          <li className={location.pathname === "/games" ? "active" : ""}>
-            <Link to="/games">
-              <span className="icon"><i className="mdi mdi-badminton"></i></span>
-              <span className="menu-item-label">{dict.games}</span>
-            </Link>
-          </li>
-          <li className={location.pathname === "/users" ? "active" : ""}>
-            <Link to="/users">
-              <span className="icon"><i className="mdi mdi-account-multiple"></i></span>
-              <span className="menu-item-label">{dict.users}</span>
-            </Link>
-          </li>
-          {user?.roles?.includes("SYSTEM_ADMIN") && (
-            <li className={location.pathname === "/clubs" ? "active" : ""}>
-              <Link to="/clubs">
-                <span className="icon"><i className="mdi mdi-home-group"></i></span>
-                <span className="menu-item-label">{dict.clubs}</span>
+        <div className="menu is-menu-main">
+          <p className="menu-label">{dict.general}</p>
+          <ul className="menu-list">
+            <li className={linkClass("/dashboard")}>
+              <Link to="/dashboard" onClick={closeMobileSidebar}>
+                <span className="icon"><i className="mdi mdi-desktop-mac"></i></span>
+                <span className="menu-item-label">{dict.dashboard}</span>
               </Link>
             </li>
-          )}
-        </ul>
-        <p className="menu-label">{dict.settings}</p>
-        <ul className="menu-list">
-          <li className={location.pathname === "/profile" ? "active" : ""}>
-            <Link to="/profile">
-              <span className="icon"><i className="mdi mdi-account-circle"></i></span>
-              <span className="menu-item-label">{dict.profile}</span>
-            </Link>
-          </li>
-          <li>
-            <a onClick={logout} className="cursor-pointer">
-              <span className="icon"><i className="mdi mdi-logout"></i></span>
-              <span className="menu-item-label">{dict.logout}</span>
-            </a>
-          </li>
-        </ul>
-      </div>
-    </aside>
+          </ul>
+          <p className="menu-label">{dict.management}</p>
+          <ul className="menu-list">
+            <li className={linkClass("/games")}>
+              <Link to="/games" onClick={closeMobileSidebar}>
+                <span className="icon"><i className="mdi mdi-badminton"></i></span>
+                <span className="menu-item-label">{dict.games}</span>
+              </Link>
+            </li>
+            <li className={linkClass("/users")}>
+              <Link to="/users" onClick={closeMobileSidebar}>
+                <span className="icon"><i className="mdi mdi-account-multiple"></i></span>
+                <span className="menu-item-label">{dict.users}</span>
+              </Link>
+            </li>
+            {user?.roles?.includes("SYSTEM_ADMIN") && (
+              <li className={linkClass("/clubs")}>
+                <Link to="/clubs" onClick={closeMobileSidebar}>
+                  <span className="icon"><i className="mdi mdi-home-group"></i></span>
+                  <span className="menu-item-label">{dict.clubs}</span>
+                </Link>
+              </li>
+            )}
+          </ul>
+          <p className="menu-label">{dict.settings}</p>
+          <ul className="menu-list">
+            <li className={linkClass("/profile")}>
+              <Link to="/profile" onClick={closeMobileSidebar}>
+                <span className="icon"><i className="mdi mdi-account-circle"></i></span>
+                <span className="menu-item-label">{dict.profile}</span>
+              </Link>
+            </li>
+            <li>
+              <a onClick={logout} className="cursor-pointer">
+                <span className="icon"><i className="mdi mdi-logout"></i></span>
+                <span className="menu-item-label">{dict.logout}</span>
+              </a>
+            </li>
+          </ul>
+        </div>
+      </aside>
+
+      {/* Mobile overlay */}
+      <div
+        className="sidebar-overlay fixed inset-0 bg-foreground/50 z-40 lg:hidden"
+        onClick={closeMobileSidebar}
+        aria-hidden="true"
+      />
+    </>
   );
 }

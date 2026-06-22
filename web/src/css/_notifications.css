@@ -7,13 +7,13 @@
 }
 
 .notification.blue {
-  @apply bg-blue-500 text-white;
+  @apply bg-primary text-primary-foreground;
 }
 
 .notification.green {
-  @apply bg-green-500 text-white;
+  @apply bg-success text-success-foreground;
 }
 
 .notification.red {
-  @apply bg-red-500 text-white;
+  @apply bg-danger text-danger-foreground;
 }

@@ -1,7 +1,7 @@
 .button {
-  @apply inline-flex items-center bg-white text-black border-gray-50 border cursor-pointer justify-center px-5 py-2.5 text-center text-sm sm:text-base
+  @apply inline-flex items-center bg-card text-foreground border-border border cursor-pointer justify-center px-5 py-2.5 text-center text-sm sm:text-base
     whitespace-nowrap rounded
-    hover:border-gray-500
+    hover:border-muted-foreground
     focus:outline-none
     disabled:opacity-40 disabled:cursor-not-allowed disabled:pointer-events-none;
 }
@@ -23,23 +23,23 @@
 }
 
 .button.active {
-  @apply border-gray-300 hover:border-gray-500;
+  @apply border-muted-foreground hover:border-muted-foreground;
 }
 
 .button.green {
-  @apply bg-green-500 border-green-500 text-white hover:bg-green-600;
+  @apply bg-success border-success text-success-foreground hover:bg-success/90;
 }
 
 .button.red {
-  @apply bg-red-500 border-red-500 text-white hover:bg-red-600;
+  @apply bg-danger border-danger text-danger-foreground hover:bg-danger/90;
 }
 
 .button.blue {
-  @apply bg-blue-500 border-blue-500 text-white hover:bg-blue-600;
+  @apply bg-primary border-primary text-primary-foreground hover:bg-primary/90;
 }
 
 .button.light {
-  @apply bg-gray-100 border-gray-100 hover:bg-gray-200;
+  @apply bg-secondary border-secondary text-secondary-foreground hover:bg-secondary/80;
 }
 
 .buttons {

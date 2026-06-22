@@ -4,7 +4,7 @@
   }
 
   .navbar {
-    @apply top-0 left-0 right-0 fixed flex bg-white h-14 border-b border-gray-100 z-30 w-screen transition-all
+    @apply top-0 left-0 right-0 fixed flex bg-card h-14 border-b border-border z-30 w-screen transition-all
     lg:pl-60 lg:w-auto;
   }
 
@@ -33,11 +33,11 @@
   }
 
   .navbar-item.has-divider {
-    @apply lg:border-r lg:border-gray-100;
+    @apply lg:border-r lg:border-border;
   }
 
   .navbar-item > .navbar-link {
-    @apply bg-gray-100 lg:bg-transparent;
+    @apply bg-secondary lg:bg-transparent;
   }
 
   .navbar-item .icon + span {
@@ -74,7 +74,7 @@
 
   .navbar-menu {
     max-height: calc(100vh - 3.5rem);
-    @apply hidden absolute w-screen top-14 left-0 bg-white border-b border-gray-100 overflow-auto shadow
+    @apply hidden absolute w-screen top-14 left-0 bg-card border-b border-border overflow-auto shadow
     lg:flex lg:flex-grow lg:static lg:border-b-0 lg:overflow-visible lg:shadow-none;
   }
 
@@ -87,8 +87,8 @@
   }
 
   .navbar-item .navbar-dropdown {
-    @apply text-sm lg:border-gray-200 lg:border-t-2
-    lg:bg-white lg:absolute lg:top-full lg:left-0 lg:min-w-full lg:z-20 lg:shadow-md lg:rounded-b;
+    @apply text-sm lg:border-border lg:border-t-2
+    lg:bg-card lg:absolute lg:top-full lg:left-0 lg:min-w-full lg:z-20 lg:shadow-md lg:rounded-b;
   }
 
   .navbar-item:not(.active) .navbar-dropdown {
@@ -96,6 +96,6 @@
   }
 
   .navbar-item.active:not(.dropdown), .navbar-item.active.dropdown > .navbar-link {
-    @apply text-blue-500;
+    @apply text-primary;
   }
 }

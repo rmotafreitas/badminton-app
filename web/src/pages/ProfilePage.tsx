@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef, useCallback, useMemo } from "react";
 import { useParams } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
+import { usePageTitle } from "@/context/PageTitleContext";
 import {
   useProfileService,
   useClubService,
@@ -11,6 +12,7 @@ import type { Language } from "@/i18n";
 import type { Game } from "@/core/domain/game";
 import { Input, Select, Textarea, ImageUpload, Table } from "@/components/ui";
 import type { Column } from "@/components/ui";
+import { ActivityHeatmap } from "@/components/ActivityHeatmap";
 import { getErrorMessage } from "@/lib/errors";
 
 const fallbackAvatar = (seed: string) =>
@@ -79,9 +81,9 @@ export function ProfilePage() {
 
   const dict = useDictionary().profile;
   const gamesDict = useDictionary().games;
-  const navDict = useDictionary().nav;
   const common = useDictionary().common;
   const { lang, setLanguage } = useLanguage();
+  const { setPageTitle } = usePageTitle();
 
   const fetchProfile = useCallback(async () => {
     try {
@@ -116,7 +118,7 @@ export function ProfilePage() {
   }, [user?.clubId, clubService]);
 
   useEffect(() => {
-    if (id && user?.id !== id) {
+    if (id && user?.userId !== id) {
       gameService
         .getGamesByPlayerId(id)
         .then(setGames)
@@ -127,13 +129,22 @@ export function ProfilePage() {
         .then(setGames)
         .catch(() => {});
     }
-  }, [gameService, id, user?.id]);
+  }, [gameService, id, user?.userId]);
 
   useEffect(() => {
     fetchProfile();
   }, [fetchProfile]);
 
-  const isOwnProfile = !id || id === user?.id;
+  const isOwnProfile = !id || id === user?.userId;
+
+  useEffect(() => {
+    if (isOwnProfile) {
+      setPageTitle("");
+    } else if (profile?.name) {
+      setPageTitle(profile.name);
+    }
+    return () => setPageTitle("");
+  }, [isOwnProfile, profile?.name, setPageTitle]);
 
   const handlePhotoCropped = useCallback((file: File | null) => {
     if (photoPreviewRef.current) URL.revokeObjectURL(photoPreviewRef.current);
@@ -227,42 +238,6 @@ export function ProfilePage() {
     return { total: games.length, wins, losses };
   }, [games, user?.userId]);
 
-  const heatmapData = useMemo(() => {
-    const today = new Date();
-    const days = 364; // 52 weeks, ~1 year
-    const userId = user?.userId;
-    const map = new Map<string, { count: number; wins: number }>();
-    for (let i = days - 1; i >= 0; i--) {
-      const d = new Date(today);
-      d.setDate(d.getDate() - i);
-      map.set(d.toISOString().split("T")[0], { count: 0, wins: 0 });
-    }
-    for (const g of games) {
-      const key = new Date(g.playedAt).toISOString().split("T")[0];
-      if (!map.has(key)) continue;
-      const entry = map.get(key)!;
-      entry.count++;
-      const isTeam1 = g.team1PlayerIds.includes(userId!);
-      if (g.winner === (isTeam1 ? "team1" : "team2")) entry.wins++;
-      map.set(key, entry);
-    }
-    const maxVal = Math.max(1, ...Array.from(map.values()).map((e) => e.count));
-    return Array.from(map.entries()).map(([date, { count, wins }]) => ({
-      date,
-      count,
-      wins,
-      level: count === 0 ? 0 : Math.ceil((count / maxVal) * 4),
-    }));
-  }, [games, user?.userId]);
-
-  const heatmapWeeks = useMemo(() => {
-    const weeks: (typeof heatmapData)[] = [];
-    for (let i = 0; i < heatmapData.length; i += 7) {
-      weeks.push(heatmapData.slice(i, i + 7));
-    }
-    return weeks;
-  }, [heatmapData]);
-
   if (loading) {
     return (
       <section className="section main-section">
@@ -275,14 +250,6 @@ export function ProfilePage() {
   const bannerUrl = bannerPreview;
   const displayName = profile?.name || user?.email?.split("@")[0];
 
-  function heatmapColor(level: number) {
-    if (level === 0) return "bg-gray-100";
-    if (level === 1) return "bg-emerald-200";
-    if (level === 2) return "bg-emerald-400";
-    if (level === 3) return "bg-emerald-500";
-    return "bg-emerald-700";
-  }
-
   function playerImg(player: any, cls: string) {
     if (player?.profile?.photo) {
       return <img src={player.profile.photo} alt="" className={cls} />;
@@ -292,7 +259,7 @@ export function ProfilePage() {
       "?")[0].toUpperCase();
     return (
       <span
-        className={`${cls} bg-gray-200 flex items-center justify-center text-[10px] font-medium text-gray-500`}
+        className={`${cls} bg-muted flex items-center justify-center text-[10px] font-medium text-muted-foreground`}
       >
         {initial}
       </span>
@@ -349,12 +316,12 @@ export function ProfilePage() {
         return (
           <div className="flex items-center gap-1">
             <span
-              className={`font-bold text-sm ${won ? "text-emerald-600" : "text-red-500"}`}
+              className={`font-bold text-sm ${won ? "text-success" : "text-destructive"}`}
             >
               {g.resultSummary}
             </span>
             <span
-              className={`text-[10px] uppercase font-semibold px-1 rounded ${g.isQuickMode ? "bg-green-100 text-green-700" : "bg-purple-100 text-purple-700"}`}
+              className={`text-[10px] uppercase font-semibold px-1 rounded ${g.isQuickMode ? "bg-success/10 text-success" : "bg-accent/10 text-accent-foreground"}`}
             >
               {g.isQuickMode ? gamesDict.quickBadge : gamesDict.setsBadge}
             </span>
@@ -366,7 +333,7 @@ export function ProfilePage() {
       header: gamesDict.date,
       accessor: (g) => (
         <small
-          className="text-gray-500 whitespace-nowrap"
+          className="text-muted-foreground whitespace-nowrap"
           title={new Date(g.playedAt).toLocaleString()}
         >
           {new Date(g.playedAt).toLocaleDateString(
@@ -379,20 +346,10 @@ export function ProfilePage() {
 
   return (
     <>
-      <section className="is-title-bar">
-        <div className="flex flex-col md:flex-row items-center justify-between space-y-6 md:space-y-0">
-          <ul>
-            <li>{navDict.admin}</li>
-          </ul>
-        </div>
-      </section>
-
-      <section className="is-hero-bar">
-        <div className="flex flex-col md:flex-row items-center justify-between space-y-6 md:space-y-0">
-          <h1 className="title">
-            {isOwnProfile ? dict.myProfile : profile?.name || "Profile"}
-          </h1>
-          {isOwnProfile && (
+      {isOwnProfile && (
+        <section className="is-hero-bar">
+          <div className="flex flex-col md:flex-row items-center justify-between space-y-6 md:space-y-0">
+            <h1 className="title">{dict.myProfile}</h1>
             <button
               onClick={() => setIsEditing(!isEditing)}
               className={`button ${isEditing ? "light" : "blue"}`}
@@ -404,9 +361,9 @@ export function ProfilePage() {
               </span>
               <span>{isEditing ? dict.viewProfile : dict.editProfile}</span>
             </button>
-          )}
-        </div>
-      </section>
+          </div>
+        </section>
+      )}
 
       <section className="section main-section">
         {notification && (
@@ -548,13 +505,13 @@ export function ProfilePage() {
                     className="w-full h-full object-cover"
                   />
                 ) : (
-                  <div className="w-full h-full bg-gradient-to-r from-blue-100 to-indigo-200" />
+                  <div className="w-full h-full bg-gradient-to-r from-primary/20 to-accent/30" />
                 )}
               </div>
 
-              <div className="absolute bottom-0 left-0 right-0 bg-white px-3 sm:px-6 pb-4 sm:pb-5">
+              <div className="absolute bottom-0 left-0 right-0 bg-card border-b border-border px-3 sm:px-6 pb-4 sm:pb-5">
                 <div className="flex flex-col sm:flex-row items-center sm:items-end gap-4 sm:gap-5">
-                  <div className="w-[90px] h-[90px] sm:w-[120px] sm:h-[120px] rounded-full border-[4px] border-white bg-white shadow-md overflow-hidden flex-shrink-0 -mt-[45px] sm:-mt-[60px] sm:ml-3">
+                  <div className="w-[90px] h-[90px] sm:w-[120px] sm:h-[120px] rounded-full border-[4px] border-card bg-card shadow-md overflow-hidden flex-shrink-0 -mt-[45px] sm:-mt-[60px] sm:ml-3">
                     <img
                       src={avatarUrl}
                       alt={displayName}
@@ -569,20 +526,20 @@ export function ProfilePage() {
 
                   <div className="text-center sm:text-left sm:pb-0.5">
                     <div className="flex items-center gap-2 justify-center sm:justify-start">
-                      <h2 className="text-[1.25rem] sm:text-[1.75rem] font-bold text-gray-800 leading-tight">
+                      <h2 className="text-[1.25rem] sm:text-[1.75rem] font-bold text-foreground leading-tight">
                         {displayName}
                       </h2>
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 text-xs font-bold">
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-warning/10 text-warning-foreground text-xs font-bold">
                         <i className="mdi mdi-trophy text-xs"></i>
-                        {user?.elo ?? 200}
+                        {profile?.elo ?? user?.elo ?? 200}
                       </span>
                     </div>
                     {profile?.bio ? (
-                      <p className="text-sm text-gray-500 italic mt-0.5">
+                      <p className="text-sm text-muted-foreground italic mt-0.5">
                         {profile.bio}
                       </p>
                     ) : (
-                      <p className="text-sm text-gray-400 italic mt-0.5">
+                      <p className="text-sm text-muted-foreground/70 italic mt-0.5">
                         {dict.bio} —
                       </p>
                     )}
@@ -596,24 +553,24 @@ export function ProfilePage() {
               <div className="card-content px-5 sm:px-8 py-5">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="flex items-center gap-3">
-                    <i className="mdi mdi-email-outline text-gray-400 text-lg w-5 text-center"></i>
+                    <i className="mdi mdi-email-outline text-muted-foreground/70 text-lg w-5 text-center"></i>
                     <div>
-                      <p className="text-xs text-gray-400 uppercase tracking-wide">
+                      <p className="text-xs text-muted-foreground/70 uppercase tracking-wide">
                         Email
                       </p>
-                      <p className="text-sm text-gray-700">
+                      <p className="text-sm text-foreground">
                         {user?.email || "—"}
                       </p>
                     </div>
                   </div>
 
                   <div className="flex items-center gap-3">
-                    <i className="mdi mdi-phone text-gray-400 text-lg w-5 text-center"></i>
+                    <i className="mdi mdi-phone text-muted-foreground/70 text-lg w-5 text-center"></i>
                     <div>
-                      <p className="text-xs text-gray-400 uppercase tracking-wide">
+                      <p className="text-xs text-muted-foreground/70 uppercase tracking-wide">
                         {dict.phone}
                       </p>
-                      <p className="text-sm text-gray-700">
+                      <p className="text-sm text-foreground">
                         {user?.phone || "—"}
                       </p>
                     </div>
@@ -621,12 +578,12 @@ export function ProfilePage() {
 
                   {profile?.birthday && (
                     <div className="flex items-center gap-3">
-                      <i className="mdi mdi-cake-variant text-gray-400 text-lg w-5 text-center"></i>
+                      <i className="mdi mdi-cake-variant text-muted-foreground/70 text-lg w-5 text-center"></i>
                       <div>
-                        <p className="text-xs text-gray-400 uppercase tracking-wide">
+                        <p className="text-xs text-muted-foreground/70 uppercase tracking-wide">
                           {dict.birthday}
                         </p>
-                        <p className="text-sm text-gray-700">
+                        <p className="text-sm text-foreground">
                           {new Date(profile.birthday).toLocaleDateString(
                             lang === "pt-PT" ? "pt-PT" : "en-US",
                           )}
@@ -640,12 +597,12 @@ export function ProfilePage() {
 
                   {profile?.sex && (
                     <div className="flex items-center gap-3">
-                      <i className="mdi mdi-gender-male-female text-gray-400 text-lg w-5 text-center"></i>
+                      <i className="mdi mdi-gender-male-female text-muted-foreground/70 text-lg w-5 text-center"></i>
                       <div>
-                        <p className="text-xs text-gray-400 uppercase tracking-wide">
+                        <p className="text-xs text-muted-foreground/70 uppercase tracking-wide">
                           {dict.sex}
                         </p>
-                        <p className="text-sm text-gray-700 capitalize">
+                        <p className="text-sm text-foreground capitalize">
                           {sexLabel(profile.sex)}
                         </p>
                       </div>
@@ -653,12 +610,12 @@ export function ProfilePage() {
                   )}
 
                   <div className="flex items-center gap-3">
-                    <i className="mdi mdi-shield-account text-gray-400 text-lg w-5 text-center"></i>
+                    <i className="mdi mdi-shield-account text-muted-foreground/70 text-lg w-5 text-center"></i>
                     <div>
-                      <p className="text-xs text-gray-400 uppercase tracking-wide">
+                      <p className="text-xs text-muted-foreground/70 uppercase tracking-wide">
                         {dict.roles}
                       </p>
-                      <p className="text-sm text-gray-700">
+                      <p className="text-sm text-foreground">
                         {user?.roles?.length
                           ? user.roles.map(formatRole).join(", ")
                           : "—"}
@@ -667,12 +624,12 @@ export function ProfilePage() {
                   </div>
 
                   <div className="flex items-center gap-3">
-                    <i className="mdi mdi-domain text-gray-400 text-lg w-5 text-center"></i>
+                    <i className="mdi mdi-domain text-muted-foreground/70 text-lg w-5 text-center"></i>
                     <div>
-                      <p className="text-xs text-gray-400 uppercase tracking-wide">
+                      <p className="text-xs text-muted-foreground/70 uppercase tracking-wide">
                         {dict.club}
                       </p>
-                      <p className="text-sm text-gray-700">
+                      <p className="text-sm text-foreground">
                         {clubName ?? dict.noClub}
                       </p>
                     </div>
@@ -680,12 +637,12 @@ export function ProfilePage() {
 
                   {profile?.createdAt && (
                     <div className="flex items-center gap-3">
-                      <i className="mdi mdi-calendar-plus text-gray-400 text-lg w-5 text-center"></i>
+                      <i className="mdi mdi-calendar-plus text-muted-foreground/70 text-lg w-5 text-center"></i>
                       <div>
-                        <p className="text-xs text-gray-400 uppercase tracking-wide">
+                        <p className="text-xs text-muted-foreground/70 uppercase tracking-wide">
                           {dict.joined}
                         </p>
-                        <p className="text-sm text-gray-700">
+                        <p className="text-sm text-foreground">
                           {new Date(profile.createdAt).toLocaleDateString(
                             lang === "pt-PT" ? "pt-PT" : "en-US",
                           )}
@@ -713,26 +670,26 @@ export function ProfilePage() {
                     <div className="card-content px-5 sm:px-8 py-5">
                       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-center">
                         <div>
-                          <p className="text-2xl sm:text-3xl font-bold text-gray-800">
+                          <p className="text-2xl sm:text-3xl font-bold text-foreground">
                             {gameStats.total}
                           </p>
-                          <p className="text-xs text-gray-400 uppercase tracking-wide mt-1">
+                          <p className="text-xs text-muted-foreground/70 uppercase tracking-wide mt-1">
                             {dict.totalGames}
                           </p>
                         </div>
                         <div>
-                          <p className="text-2xl sm:text-3xl font-bold text-emerald-600">
+                          <p className="text-2xl sm:text-3xl font-bold text-success">
                             {gameStats.wins}
                           </p>
-                          <p className="text-xs text-gray-400 uppercase tracking-wide mt-1">
+                          <p className="text-xs text-muted-foreground/70 uppercase tracking-wide mt-1">
                             {dict.wins}
                           </p>
                         </div>
                         <div>
-                          <p className="text-2xl sm:text-3xl font-bold text-red-500">
+                          <p className="text-2xl sm:text-3xl font-bold text-destructive">
                             {gameStats.losses}
                           </p>
-                          <p className="text-xs text-gray-400 uppercase tracking-wide mt-1">
+                          <p className="text-xs text-muted-foreground/70 uppercase tracking-wide mt-1">
                             {dict.losses}
                           </p>
                         </div>
@@ -783,7 +740,7 @@ export function ProfilePage() {
                               %
                             </text>
                           </svg>
-                          <p className="text-xs text-gray-400 uppercase tracking-wide mt-1">
+                          <p className="text-xs text-muted-foreground/70 uppercase tracking-wide mt-1">
                             {dict.winRate}
                           </p>
                         </div>
@@ -800,24 +757,20 @@ export function ProfilePage() {
                         {dict.activity}
                       </p>
                     </header>
-                    <div className="card-content px-3 sm:px-6 py-4 overflow-x-auto">
-                      <div className="flex gap-[3px]">
-                        {heatmapWeeks.map((week, wi) => (
-                          <div key={wi} className="flex flex-col gap-[3px]">
-                            {week.map((day) => (
-                              <div
-                                key={day.date}
-                                title={`${day.date}: ${day.count} game${day.count !== 1 ? "s" : ""}`}
-                                className={`w-[12px] h-[12px] sm:w-[14px] sm:h-[14px] rounded-sm ${heatmapColor(day.level)}`}
-                              />
-                            ))}
-                          </div>
-                        ))}
-                      </div>
-                      <div className="flex justify-between text-[10px] text-gray-400 mt-2 px-0.5">
-                        <span>{heatmapData[0]?.date}</span>
-                        <span>{heatmapData[heatmapData.length - 1]?.date}</span>
-                      </div>
+                    <div className="card-content px-3 sm:px-5 pt-5 pb-4">
+                      <ActivityHeatmap
+                        games={games}
+                        userId={profile?.userId ?? user?.userId ?? ""}
+                        lang={lang}
+                        labels={{
+                          gamesCount: dict.gamesCount,
+                          gamesCountPlural: dict.gamesCountPlural,
+                          winsShort: dict.winsShort,
+                          lossesShort: dict.lossesShort,
+                          legendLess: dict.activityLegendLess,
+                          legendMore: dict.activityLegendMore,
+                        }}
+                      />
                     </div>
                   </div>
                 </div>
@@ -836,7 +789,7 @@ export function ProfilePage() {
 
             {games.length === 0 && (
               <div className="card mt-4">
-                <div className="card-content text-center py-8 text-gray-400 text-sm">
+                <div className="card-content text-center py-8 text-muted-foreground/70 text-sm">
                   <i className="mdi mdi-racquetball text-3xl block mb-2"></i>
                   {dict.noGames}
                 </div>

@@ -127,7 +127,7 @@ export function ImageUpload({ aspect, label, currentImage, onCropped }: ImageUpl
         <div className="field file">
           <div className="flex flex-col sm:flex-row items-start gap-3">
             <div
-              className={`relative border-2 border-dashed border-gray-300 rounded flex items-center justify-center overflow-hidden bg-gray-50 cursor-pointer hover:border-blue-400 transition-colors shrink-0 ${previewClass}`}
+              className={`relative border-2 border-dashed border-border rounded flex items-center justify-center overflow-hidden bg-muted cursor-pointer hover:border-primary transition-colors shrink-0 ${previewClass}`}
               onClick={() => inputRef.current?.click()}
               role="button"
               tabIndex={0}
@@ -145,7 +145,7 @@ export function ImageUpload({ aspect, label, currentImage, onCropped }: ImageUpl
                   }}
                 />
               ) : (
-                <span className="text-gray-400 text-2xl select-none">+</span>
+                <span className="text-muted-foreground/70 text-2xl select-none">+</span>
               )}
             </div>
 
@@ -183,11 +183,10 @@ export function ImageUpload({ aspect, label, currentImage, onCropped }: ImageUpl
 
       {imageSrc && (
         <div
-          className="fixed inset-0 z-[9999] flex items-center justify-center p-4"
-          style={{ backgroundColor: "rgba(0,0,0,0.6)" }}
+          className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-foreground/60"
         >
           <div
-            className="bg-white rounded-lg shadow-2xl flex flex-col w-full overflow-hidden"
+            className="bg-card rounded-lg shadow-2xl flex flex-col w-full overflow-hidden"
             style={{ maxWidth: "600px", height: "min(80vh, 560px)" }}
           >
             <div className="px-4 py-3 border-b font-semibold flex-shrink-0 text-sm sm:text-base">
@@ -208,7 +207,7 @@ export function ImageUpload({ aspect, label, currentImage, onCropped }: ImageUpl
 
             <div className="px-3 sm:px-4 py-2 sm:py-3 border-t flex-shrink-0">
               <div className="flex items-center gap-2 mb-2">
-                <span className="text-xs sm:text-sm text-gray-500 shrink-0">Zoom</span>
+                <span className="text-xs sm:text-sm text-muted-foreground shrink-0">Zoom</span>
                 <input
                   type="range"
                   min={1}

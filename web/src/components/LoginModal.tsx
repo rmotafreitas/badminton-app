@@ -47,7 +47,7 @@ function GoogleLoginButton({
   return (
     <button
       onClick={() => googleLogin()}
-      className="w-full flex items-center justify-center gap-3 px-4 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium"
+      className="w-full flex items-center justify-center gap-3 px-4 py-3 border border-border rounded-lg hover:bg-secondary transition-colors text-sm font-medium"
     >
       <svg className="w-5 h-5" viewBox="0 0 24 24">
         <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4" />
@@ -215,13 +215,13 @@ function LoginModalContent() {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-foreground/60 backdrop-blur-sm"
       onClick={(e) => { if (e.target === e.currentTarget) closeLoginModal(); }}
     >
-      <div className="relative flex w-full max-w-4xl overflow-hidden bg-white shadow-2xl rounded-2xl">
+      <div className="relative flex w-full max-w-4xl overflow-hidden bg-card shadow-2xl rounded-2xl">
         <button
           onClick={closeLoginModal}
-          className="absolute z-10 p-2 text-gray-400 transition-colors top-4 right-4 hover:text-black"
+          className="absolute z-10 p-2 text-muted-foreground/70 transition-colors top-4 right-4 hover:text-foreground"
           aria-label={common.close}
         >
           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -229,17 +229,17 @@ function LoginModalContent() {
           </svg>
         </button>
 
-        <div className="hidden w-1/2 bg-gray-100 md:block">
+        <div className="hidden w-1/2 bg-secondary md:block">
           <img src="/images/login.gif" alt={dict.loginImageAlt} className="object-cover w-full h-full" />
         </div>
 
         <div className="flex flex-col justify-center w-full p-8 md:w-1/2 lg:p-12">
           <div className="mb-8 text-center">
-            <h4 className="text-2xl font-bold text-gray-800">{dict.welcomeBack}</h4>
+            <h4 className="text-2xl font-bold text-foreground">{dict.welcomeBack}</h4>
           </div>
 
           {error && (
-            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-6 text-sm">
+            <div className="bg-destructive/10 border border-destructive/20 text-destructive px-4 py-3 rounded-lg mb-6 text-sm">
               {error}
             </div>
           )}
@@ -248,7 +248,7 @@ function LoginModalContent() {
             <div className="space-y-4">
               <button
                 onClick={() => setStep({ type: "email-input" })}
-                className="flex items-center justify-center w-full py-3 space-x-2 text-white transition-all bg-indigo-600 rounded-lg hover:bg-indigo-700 shadow-md font-medium"
+                className="flex items-center justify-center w-full py-3 space-x-2 text-white transition-all bg-primary rounded-lg hover:bg-primary/90 shadow-md font-medium"
               >
                 <span>✉️</span>
                 <span>{dict.loginWithEmail}</span>
@@ -256,15 +256,15 @@ function LoginModalContent() {
 
               <button
                 onClick={() => setStep({ type: "email-code-input" })}
-                className="w-full flex items-center justify-center gap-3 px-4 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium"
+                className="w-full flex items-center justify-center gap-3 px-4 py-3 border border-border rounded-lg hover:bg-secondary transition-colors text-sm font-medium"
               >
                 <span>🔢</span> {dict.continueWithEmailCode}
               </button>
 
               <div className="relative flex items-center py-2">
-                <div className="flex-grow border-t border-gray-200" />
-                <span className="flex-shrink mx-4 text-sm text-gray-400">{dict.orUse}</span>
-                <div className="flex-grow border-t border-gray-200" />
+                <div className="flex-grow border-t border-border" />
+                <span className="flex-shrink mx-4 text-sm text-muted-foreground/70">{dict.orUse}</span>
+                <div className="flex-grow border-t border-border" />
               </div>
 
               <GoogleErrorBoundary>
@@ -276,14 +276,14 @@ function LoginModalContent() {
 
               <button
                 onClick={() => setStep({ type: "phone-input" })}
-                className="w-full flex items-center justify-center gap-3 px-4 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium"
+                className="w-full flex items-center justify-center gap-3 px-4 py-3 border border-border rounded-lg hover:bg-secondary transition-colors text-sm font-medium"
               >
                 <span>📱</span> {dict.continueWithPhone}
               </button>
 
               <button
                 onClick={() => setStep({ type: "password-input" })}
-                className="w-full flex items-center justify-center gap-3 px-4 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium"
+                className="w-full flex items-center justify-center gap-3 px-4 py-3 border border-border rounded-lg hover:bg-secondary transition-colors text-sm font-medium"
               >
                 <span>🔑</span> {dict.signInWithPassword}
               </button>
@@ -293,20 +293,20 @@ function LoginModalContent() {
           {step.type === "email-input" && (
             <form onSubmit={handleEmailSubmit} className="space-y-4">
               <div>
-                <label htmlFor="login-email" className="block text-sm font-medium text-gray-700 mb-2">
+                <label htmlFor="login-email" className="block text-sm font-medium text-foreground mb-2">
                   {common.emailAddress}
                 </label>
                 <input id="login-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)}
                   required autoFocus
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                   placeholder={common.emailPlaceholder} />
               </div>
               <button type="submit" disabled={isLoading}
-                className="w-full py-3 bg-indigo-600 text-white rounded-lg font-semibold hover:bg-indigo-700 transition-colors disabled:opacity-50">
+                className="w-full py-3 bg-primary text-white rounded-lg font-semibold hover:bg-primary/90 transition-colors disabled:opacity-50">
                 {isLoading ? common.sending : common.sendMagicLink}
               </button>
               <button type="button" onClick={() => setStep({ type: "select" })}
-                className="w-full text-sm text-gray-500 hover:text-gray-700">
+                className="w-full text-sm text-muted-foreground hover:text-foreground">
                 {common.back}
               </button>
             </form>
@@ -315,10 +315,10 @@ function LoginModalContent() {
           {step.type === "email-sent" && (
             <div className="text-center space-y-4">
               <div className="text-5xl">✉️</div>
-              <p className="text-gray-700">{dict.magicLinkSentTo} <strong>{step.email}</strong>.</p>
-              <p className="text-sm text-gray-500">{dict.checkInbox}</p>
+              <p className="text-foreground">{dict.magicLinkSentTo} <strong>{step.email}</strong>.</p>
+              <p className="text-sm text-muted-foreground">{dict.checkInbox}</p>
               <button onClick={() => setStep({ type: "select" })}
-                className="text-sm text-indigo-600 hover:underline">
+                className="text-sm text-primary hover:underline">
                 {common.useDifferentMethod}
               </button>
             </div>
@@ -327,20 +327,20 @@ function LoginModalContent() {
           {step.type === "email-code-input" && (
             <form onSubmit={handleEmailCodeSubmit} className="space-y-4">
               <div>
-                <label htmlFor="login-email-code" className="block text-sm font-medium text-gray-700 mb-2">
+                <label htmlFor="login-email-code" className="block text-sm font-medium text-foreground mb-2">
                   {common.emailAddress}
                 </label>
                 <input id="login-email-code" type="email" value={email} onChange={(e) => setEmail(e.target.value)}
                   required autoFocus
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                   placeholder={common.emailPlaceholder} />
               </div>
               <button type="submit" disabled={isLoading}
-                className="w-full py-3 bg-indigo-600 text-white rounded-lg font-semibold hover:bg-indigo-700 transition-colors disabled:opacity-50">
+                className="w-full py-3 bg-primary text-white rounded-lg font-semibold hover:bg-primary/90 transition-colors disabled:opacity-50">
                 {isLoading ? common.sending : common.sendVerificationCode}
               </button>
               <button type="button" onClick={() => setStep({ type: "select" })}
-                className="w-full text-sm text-gray-500 hover:text-gray-700">
+                className="w-full text-sm text-muted-foreground hover:text-foreground">
                 {common.back}
               </button>
             </form>
@@ -348,20 +348,20 @@ function LoginModalContent() {
 
           {step.type === "email-code-verify" && (
             <form onSubmit={handleEmailCodeVerify} className="space-y-4">
-              <p className="text-sm text-gray-600 text-center">
+              <p className="text-sm text-muted-foreground text-center">
                 {dict.enter4DigitCode} <strong>{step.email}</strong>
               </p>
               <input type="text" inputMode="numeric" pattern="[0-9]{4}" maxLength={4}
                 value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
                 required autoFocus
-                className="w-full px-4 py-3 text-center text-2xl tracking-widest border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                className="w-full px-4 py-3 text-center text-2xl tracking-widest border border-border rounded-lg focus:ring-2 focus:ring-primary"
                 placeholder="0000" />
               <button type="submit" disabled={isLoading || code.length !== 4}
-                className="w-full py-3 bg-indigo-600 text-white rounded-lg font-semibold hover:bg-indigo-700 transition-colors disabled:opacity-50">
+                className="w-full py-3 bg-primary text-white rounded-lg font-semibold hover:bg-primary/90 transition-colors disabled:opacity-50">
                 {isLoading ? common.verifying : common.verifyCode}
               </button>
               <button type="button" onClick={() => { setCode(""); setStep({ type: "email-code-input" }); }}
-                className="w-full text-sm text-gray-500 hover:text-gray-700">
+                className="w-full text-sm text-muted-foreground hover:text-foreground">
                 {common.resendCode}
               </button>
             </form>
@@ -370,20 +370,20 @@ function LoginModalContent() {
           {step.type === "phone-input" && (
             <form onSubmit={handlePhoneSubmit} className="space-y-4">
               <div>
-                <label htmlFor="login-phone" className="block text-sm font-medium text-gray-700 mb-2">
+                <label htmlFor="login-phone" className="block text-sm font-medium text-foreground mb-2">
                   {common.phoneNumber}
                 </label>
                 <input id="login-phone" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)}
                   required autoFocus
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                   placeholder="+1 555 000 0000" />
               </div>
               <button type="submit" disabled={isLoading}
-                className="w-full py-3 bg-indigo-600 text-white rounded-lg font-semibold hover:bg-indigo-700 transition-colors disabled:opacity-50">
+                className="w-full py-3 bg-primary text-white rounded-lg font-semibold hover:bg-primary/90 transition-colors disabled:opacity-50">
                 {isLoading ? common.sending : common.sendCode}
               </button>
               <button type="button" onClick={() => setStep({ type: "select" })}
-                className="w-full text-sm text-gray-500 hover:text-gray-700">
+                className="w-full text-sm text-muted-foreground hover:text-foreground">
                 {common.back}
               </button>
             </form>
@@ -391,20 +391,20 @@ function LoginModalContent() {
 
           {step.type === "phone-code" && (
             <form onSubmit={handleCodeSubmit} className="space-y-4">
-              <p className="text-sm text-gray-600 text-center">
+              <p className="text-sm text-muted-foreground text-center">
                 {dict.enter6DigitCode} <strong>{step.phone}</strong>
               </p>
               <input type="text" inputMode="numeric" pattern="[0-9]{6}" maxLength={6}
                 value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
                 required autoFocus
-                className="w-full px-4 py-3 text-center text-2xl tracking-widest border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                className="w-full px-4 py-3 text-center text-2xl tracking-widest border border-border rounded-lg focus:ring-2 focus:ring-primary"
                 placeholder="000000" />
               <button type="submit" disabled={isLoading || code.length !== 6}
-                className="w-full py-3 bg-indigo-600 text-white rounded-lg font-semibold hover:bg-indigo-700 transition-colors disabled:opacity-50">
+                className="w-full py-3 bg-primary text-white rounded-lg font-semibold hover:bg-primary/90 transition-colors disabled:opacity-50">
                 {isLoading ? common.verifying : common.verifyCode}
               </button>
               <button type="button" onClick={() => setStep({ type: "phone-input" })}
-                className="w-full text-sm text-gray-500 hover:text-gray-700">
+                className="w-full text-sm text-muted-foreground hover:text-foreground">
                 {common.resendCode}
               </button>
             </form>
@@ -413,48 +413,48 @@ function LoginModalContent() {
           {step.type === "password-input" && (
             <form onSubmit={handlePasswordSubmit} className="space-y-4">
               <div>
-                <label htmlFor="login-password-identifier" className="block text-sm font-medium text-gray-700 mb-2">
+                <label htmlFor="login-password-identifier" className="block text-sm font-medium text-foreground mb-2">
                   {common.emailOrPhone}
                 </label>
                 <input id="login-password-identifier" type="text" value={email} onChange={(e) => setEmail(e.target.value)}
                   required autoFocus
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                   placeholder={common.emailOrPhone} />
               </div>
               <div>
-                <label htmlFor="login-password" className="block text-sm font-medium text-gray-700 mb-2">
+                <label htmlFor="login-password" className="block text-sm font-medium text-foreground mb-2">
                   {common.password}
                 </label>
                 <input id="login-password" type="password" value={password} onChange={(e) => setPassword(e.target.value)}
                   required
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                   placeholder={common.passwordPlaceholder} />
               </div>
               <button type="submit" disabled={isLoading || !email || !password}
-                className="w-full py-3 bg-indigo-600 text-white rounded-lg font-semibold hover:bg-indigo-700 transition-colors disabled:opacity-50">
+                className="w-full py-3 bg-primary text-white rounded-lg font-semibold hover:bg-primary/90 transition-colors disabled:opacity-50">
                 {isLoading ? common.signingIn : common.signIn}
               </button>
               <button type="button" onClick={() => setStep({ type: "select" })}
-                className="w-full text-sm text-gray-500 hover:text-gray-700">
+                className="w-full text-sm text-muted-foreground hover:text-foreground">
                 {common.back}
               </button>
             </form>
           )}
 
           <div className="mt-8 text-center">
-            <p className="text-sm text-gray-600">
+            <p className="text-sm text-muted-foreground">
               {dict.noAccountYet}{" "}
-              <span className="font-semibold text-indigo-600 cursor-pointer hover:underline">
+              <span className="font-semibold text-primary cursor-pointer hover:underline">
                 {dict.freeSignUp}
               </span>
             </p>
-            <div className="mt-6 space-y-1 text-[11px] leading-tight text-gray-400">
-              <p>{dict.ageConfirmation} <span className="font-bold text-red-400">{dict.age18Plus}</span>.</p>
+            <div className="mt-6 space-y-1 text-[11px] leading-tight text-muted-foreground/70">
+              <p>{dict.ageConfirmation} <span className="font-bold text-destructive/70">{dict.age18Plus}</span>.</p>
               <p>
                 {dict.dataProtectionConsent}{" "}
-                <a href="/data-protection" className="underline hover:text-gray-600">{common.dataProtection}</a>{" "}
+                <a href="/data-protection" className="underline hover:text-muted-foreground">{common.dataProtection}</a>{" "}
                 and{" "}
-                <a href="/privacy-policy" className="underline hover:text-gray-600">{common.privacyPolicy}</a>.
+                <a href="/privacy-policy" className="underline hover:text-muted-foreground">{common.privacyPolicy}</a>.
               </p>
             </div>
           </div>

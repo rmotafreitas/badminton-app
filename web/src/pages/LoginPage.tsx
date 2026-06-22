@@ -148,7 +148,7 @@ export function LoginPage() {
   };
 
   return (
-    <div className="w-full max-w-4xl bg-white sm:rounded-lg sm:shadow-2xl overflow-hidden flex md:flex-row flex-col min-h-dvh sm:min-h-0">
+    <div className="w-full max-w-4xl bg-card sm:rounded-lg sm:shadow-2xl overflow-hidden flex md:flex-row flex-col min-h-dvh sm:min-h-0">
       {/* Image side */}
       <div className="md:w-1/2 relative h-[200px] md:h-auto md:min-h-[500px]">
         <img
@@ -162,11 +162,11 @@ export function LoginPage() {
       <div className="md:w-1/2 p-6 sm:p-10 flex flex-col flex-1 md:min-h-[500px]">
         <div className="mb-8 flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-gray-800">
+            <h1 className="text-2xl font-bold text-foreground">
               {sidebar.brandName}{" "}
               <span className="font-black">{sidebar.brandApp}</span>
             </h1>
-            <p className="text-sm text-gray-500 mt-0.5">{dict.loginDesc}</p>
+            <p className="text-sm text-muted-foreground mt-0.5">{dict.loginDesc}</p>
           </div>
           <div className="shrink-0">
             <Logo className="w-12 h-12" />
@@ -200,11 +200,11 @@ export function LoginPage() {
                   />
                 </div>
 
-                <div className="mt-4 flex gap-4 text-xs text-gray-400">
-                  <a href="#" className="hover:text-gray-600">
+                <div className="mt-4 flex gap-4 text-xs text-muted-foreground/70">
+                  <a href="#" className="hover:text-muted-foreground">
                     {footer.privacyPolicy}
                   </a>
-                  <a href="#" className="hover:text-gray-600">
+                  <a href="#" className="hover:text-muted-foreground">
                     {footer.termsOfService}
                   </a>
                 </div>
@@ -285,7 +285,7 @@ export function LoginPage() {
 
         {step.type === "email-code-verify" && (
           <form onSubmit={handleEmailCodeVerify}>
-            <p className="text-sm text-gray-600 text-center mb-4">
+            <p className="text-sm text-muted-foreground text-center mb-4">
               {dict.enter4DigitCode} <strong>{step.email}</strong>
             </p>
             <div className="field">
@@ -423,7 +423,7 @@ export function LoginPage() {
 
         {step.type === "phone-code" && (
           <form onSubmit={handleCodeSubmit}>
-            <p className="text-sm text-gray-600 text-center mb-4">
+            <p className="text-sm text-muted-foreground text-center mb-4">
               {dict.enter6DigitCode} <strong>{step.phone}</strong>
             </p>
             <div className="field">
@@ -462,11 +462,11 @@ export function LoginPage() {
           </form>
         )}
 
-        <div className="mt-auto pt-6 flex gap-4 text-xs text-gray-400">
-          <a href="#" className="hover:text-gray-600">
+        <div className="mt-auto pt-6 flex gap-4 text-xs text-muted-foreground/70">
+          <a href="#" className="hover:text-muted-foreground">
             {footer.privacyPolicy}
           </a>
-          <a href="#" className="hover:text-gray-600">
+          <a href="#" className="hover:text-muted-foreground">
             {footer.termsOfService}
           </a>
         </div>

@@ -19,10 +19,10 @@ export function LogoutPage() {
   return (
     <div className="flex items-center justify-center min-h-[50vh]">
       <div className="text-center">
-        <div className="text-2xl font-semibold text-gray-700">
+        <div className="text-2xl font-semibold text-foreground">
           {dict.signingYouOut}
         </div>
-        <p className="text-gray-500 mt-2">{dict.logoutDesc}</p>
+        <p className="text-muted-foreground mt-2">{dict.logoutDesc}</p>
       </div>
     </div>
   );

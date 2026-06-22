@@ -314,5 +314,11 @@ export const enUS = {
     activity: "Activity",
     recentGames: "Recent Games",
     noGames: "No games played yet.",
+    winsShort: "W",
+    lossesShort: "L",
+    gamesCount: "game",
+    gamesCountPlural: "games",
+    activityLegendLess: "Less",
+    activityLegendMore: "More",
   },
 };

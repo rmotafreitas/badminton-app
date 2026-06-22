@@ -1,5 +1,5 @@
 .card {
-  @apply bg-white border border-gray-100 rounded;
+  @apply bg-card border border-border rounded;
 }
 
 .card.has-table .card-content {
@@ -15,11 +15,11 @@
 }
 
 .card.empty .card-content {
-  @apply text-center py-12 text-gray-500;
+  @apply text-center py-12 text-muted-foreground;
 }
 
 .card-header {
-  @apply flex items-stretch border-b border-gray-100;
+  @apply flex items-stretch border-b border-border;
 }
 
 .card-header-title, .card-header-icon {
@@ -35,7 +35,7 @@
 }
 
 .widget-label h3 {
-  @apply text-lg leading-tight text-gray-500;
+  @apply text-lg leading-tight text-muted-foreground;
 }
 
 .widget-label h1 {
