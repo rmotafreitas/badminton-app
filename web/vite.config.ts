@@ -16,8 +16,9 @@ export default defineConfig(({ mode }) => {
 
     server: {
       port: 5173,
-      // HTTPS is handled entirely by vite-plugin-mkcert (see plugins above).
-      // The plugin generates & trusts certs via mkcert and injects them automatically.
+      watch: {
+        ignored: ["**/.env*"],
+      },
 
       proxy: {
         "/api": {

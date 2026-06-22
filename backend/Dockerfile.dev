@@ -12,4 +12,5 @@ RUN bunx prisma generate
 COPY . .
 
 EXPOSE 3000
-CMD ["bun", "run", "--watch", "src/index.ts"]
+RUN chmod +x scripts/dev-entrypoint.sh
+CMD ["scripts/dev-entrypoint.sh"]

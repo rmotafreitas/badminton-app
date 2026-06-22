@@ -46,23 +46,9 @@ services:
     volumes:
       - ./backend/src:/app/src          # hot-reload source
       - ./backend/certs:/app/certs      # local HTTPS certs (mkcert)
-    environment:
-      IN_DEV: ${IN_DEV:-local}
-      DATABASE_URL: mongodb://mongo:27017/avatarlabs?replicaSet=rs0&directConnection=true
-      JWT_SECRET: ${JWT_SECRET:-dev-secret-change-in-production-min-32}
-      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
-      SMTP_HOST: ${SMTP_HOST:-smtp.gmail.com}
-      SMTP_PORT: ${SMTP_PORT:-587}
-      SMTP_SECURE: ${SMTP_SECURE:-false}
-      SMTP_USERNAME: ${SMTP_USERNAME:-}
-      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
-      SMTP_FROM: ${SMTP_FROM:-}
-      APP_URL: ${APP_URL:-https://localhost:5173}
-      TWILIO_ACCOUNT_SID: ${TWILIO_ACCOUNT_SID:-}
-      TWILIO_AUTH_TOKEN: ${TWILIO_AUTH_TOKEN:-}
-      TWILIO_FROM_NUMBER: ${TWILIO_FROM_NUMBER:-}
-      FRONTEND_URL: ${FRONTEND_URL:-https://localhost:5173}
-      ENABLE_LOCAL_HTTPS: ${ENABLE_LOCAL_HTTPS:-false}
+      - ./.env:/app/.env                # mounted so entrypoint can watch for changes
+    env_file:
+      - .env
     ports:
       - "3000:3000"
 
