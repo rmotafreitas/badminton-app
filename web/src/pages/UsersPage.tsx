@@ -22,7 +22,7 @@ export function UsersPage() {
   const clubId = user?.clubId ?? "";
 
   // Roster lives on the club object — shares the cache with Dashboard/Games.
-  const { data: clubData, isLoading: rosterLoading } = useQuery<Club>(
+  const { data: clubData, isLoading: rosterLoading, refetch: refetchRoster, isFetching: rosterFetching } = useQuery<Club>(
     ["club", clubId],
     () => clubService.getClubById(clubId),
     { enabled: !!clubId, staleTime: 60_000, persist: true },
@@ -262,6 +262,8 @@ export function UsersPage() {
           emptyMessage={dict.noUsersFound}
           loadingMessage={common.loading}
           skeletonRows={<SkeletonRows rows={5} cols={5} />}
+          refetch={refetchRoster}
+          isFetching={rosterFetching}
         />
       </section>
     </>

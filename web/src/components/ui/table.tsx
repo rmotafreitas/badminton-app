@@ -1,4 +1,5 @@
 import React from "react";
+import { useDictionary } from "@/i18n";
 
 export interface Column<T> {
   header: string;
@@ -17,6 +18,10 @@ interface TableProps<T> {
   loadingMessage?: string;
   /** Optional skeleton rows to render instead of the plain loading text. */
   skeletonRows?: React.ReactNode;
+  /** When provided, renders a Refresh button in the header top-right. */
+  refetch?: () => void;
+  /** Shows a spinning state on the refresh icon. */
+  isFetching?: boolean;
 }
 
 export function Table<T extends { id?: string }>({
@@ -28,7 +33,11 @@ export function Table<T extends { id?: string }>({
   emptyMessage = "No data found.",
   loadingMessage = "Loading...",
   skeletonRows,
+  refetch,
+  isFetching = false,
 }: TableProps<T>) {
+  const common = useDictionary().common;
+
   return (
     <div className="card has-table">
       <header className="card-header">
@@ -36,6 +45,21 @@ export function Table<T extends { id?: string }>({
           {titleIcon && <span className="icon"><i className={`mdi ${titleIcon}`}></i></span>}
           {title}
         </p>
+        {refetch && (
+          <button
+            type="button"
+            className="card-header-icon button small light"
+            onClick={refetch}
+            disabled={isFetching}
+            title={common.refresh}
+            aria-label={common.refresh}
+          >
+            <span className="icon">
+              <i className={`mdi mdi-reload ${isFetching ? "animate-spin" : ""}`}></i>
+            </span>
+            <span className="hidden sm:inline">{common.refresh}</span>
+          </button>
+        )}
       </header>
       <div className="card-content">
         {loading ? (

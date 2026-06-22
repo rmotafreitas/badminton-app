@@ -53,7 +53,7 @@ export function GamesPage() {
   );
 
   const gamesKey = view === "mine" ? (["games", "mine"] as const) : (["games", "recent", clubId] as const);
-  const { data: games, isLoading: gamesLoading } = useQuery<Game[]>(
+  const { data: games, isLoading: gamesLoading, refetch: refetchGames, isFetching: gamesFetching } = useQuery<Game[]>(
     gamesKey,
     () =>
       view === "mine"
@@ -248,6 +248,8 @@ export function GamesPage() {
           emptyMessage={dict.noGamesFound}
           loadingMessage={common.loading}
           skeletonRows={<SkeletonRows rows={5} cols={7} />}
+          refetch={refetchGames}
+          isFetching={gamesFetching}
         />
       </section>
     </>

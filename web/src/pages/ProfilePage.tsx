@@ -12,7 +12,7 @@ import type { Language } from "@/i18n";
 import type { Game } from "@/core/domain/game";
 import type { Profile } from "@/core/domain/profile";
 import type { Club } from "@/core/domain/club";
-import { Input, Select, Textarea, ImageUpload, Table, ProfileSkeleton } from "@/components/ui";
+import { Input, Select, Textarea, ImageUpload, Table, ProfileSkeleton, SkeletonRows, Skeleton } from "@/components/ui";
 import { useQuery, useMutation, invalidateQueries } from "@/hooks/useQuery";
 import type { Column } from "@/components/ui";
 import { ActivityHeatmap } from "@/components/ActivityHeatmap";
@@ -110,17 +110,32 @@ export function ProfilePage() {
         ? "systemAdmin"
         : "player";
 
-  const { data: myGamesData } = useQuery<Game[]>(
+  const {
+    data: myGamesData,
+    isLoading: myGamesLoading,
+    refetch: refetchMyGames,
+    isFetching: myGamesFetching,
+  } = useQuery<Game[]>(
     ["games", "mine"],
     () => gameService.getMyGames(),
     { enabled: mode === "own", staleTime: 30_000, persist: true },
   );
-  const { data: sharedGamesData } = useQuery<Game[]>(
+  const {
+    data: sharedGamesData,
+    isLoading: sharedGamesLoading,
+    refetch: refetchSharedGames,
+    isFetching: sharedGamesFetching,
+  } = useQuery<Game[]>(
     ["games", "shared", id ?? ""],
     () => gameService.getSharedGames(id!),
     { enabled: (mode === "coachAdmin" || mode === "player") && !!id, staleTime: 30_000, persist: true },
   );
-  const { data: allPlayerGamesData } = useQuery<Game[]>(
+  const {
+    data: allPlayerGamesData,
+    isLoading: allPlayerGamesLoading,
+    refetch: refetchAllPlayerGames,
+    isFetching: allPlayerGamesFetching,
+  } = useQuery<Game[]>(
     ["games", "player", id ?? ""],
     () => gameService.getGamesByPlayerId(id!),
     { enabled: (mode === "coachAdmin" || mode === "systemAdmin") && !!id, staleTime: 30_000, persist: true },
@@ -257,6 +272,16 @@ export function ProfilePage() {
     if (mode === "coachAdmin" || mode === "systemAdmin") return allPlayerGames;
     return sharedGames;
   }, [mode, myGames, allPlayerGames, sharedGames]);
+
+  // Whether the primary games query for the current mode is on its very first
+  // fetch with no cached data yet. Used to show skeletons instead of the
+  // "No games played" empty state while loading.
+  const primaryGamesLoading =
+    mode === "own"
+      ? myGamesLoading
+      : mode === "player"
+        ? sharedGamesLoading
+        : allPlayerGamesLoading;
 
   const hasAnyGames = primaryGames.length > 0 || sharedGames.length > 0;
 
@@ -688,8 +713,33 @@ export function ProfilePage() {
               </div>
             </div>
 
-            {/* Stats + Activity row */}
-            {primaryGames.length > 0 && (
+            {/* Stats + Activity row — show when we have games data, or a
+                skeleton while games are loading for the first time. */}
+            {primaryGamesLoading && primaryGames.length === 0 ? (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4">
+                <div className="card">
+                  <div className="card-content px-5 sm:px-8 py-5">
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-center">
+                      {Array.from({ length: 4 }).map((_, i) => (
+                        <div key={i} className="flex flex-col items-center gap-2">
+                          <Skeleton className="h-9 w-12" />
+                          <Skeleton className="h-3 w-16" />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+                <div className="card">
+                  <div className="card-content px-3 sm:px-5 pt-5 pb-4">
+                    <div className="flex flex-wrap gap-1">
+                      {Array.from({ length: 53 * 7 }).map((_, i) => (
+                        <Skeleton key={i} className="h-3 w-3 rounded-sm" />
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : primaryGames.length > 0 && (
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4">
                 <div className="card">
                   <header className="card-header">
@@ -810,7 +860,19 @@ export function ProfilePage() {
             )}
 
             {/* Games tables */}
-            {hasAnyGames ? (
+            {primaryGamesLoading && !hasAnyGames ? (
+              <div className="mt-4">
+                <Table
+                  title={dict.recentGames}
+                  titleIcon="mdi-history"
+                  columns={gameColumns}
+                  data={[]}
+                  loading
+                  loadingMessage={common.loading}
+                  skeletonRows={<SkeletonRows rows={4} cols={5} />}
+                />
+              </div>
+            ) : hasAnyGames ? (
               <div className="mt-4 space-y-4">
                 {mode === "coachAdmin" ? (
                   <>
@@ -819,14 +881,24 @@ export function ProfilePage() {
                       titleIcon="mdi-sword-cross"
                       columns={gameColumns}
                       data={sharedGames}
+                      loading={sharedGamesLoading && sharedGames.length === 0}
                       emptyMessage={dict.noSharedGames}
+                      loadingMessage={common.loading}
+                      skeletonRows={<SkeletonRows rows={4} cols={5} />}
+                      refetch={refetchSharedGames}
+                      isFetching={sharedGamesFetching}
                     />
                     <Table
                       title={dict.allPlayerGames}
                       titleIcon="mdi-history"
                       columns={gameColumns}
                       data={allPlayerGames}
+                      loading={allPlayerGamesLoading && allPlayerGames.length === 0}
                       emptyMessage={dict.noGames}
+                      loadingMessage={common.loading}
+                      skeletonRows={<SkeletonRows rows={4} cols={5} />}
+                      refetch={refetchAllPlayerGames}
+                      isFetching={allPlayerGamesFetching}
                     />
                   </>
                 ) : (
@@ -839,10 +911,27 @@ export function ProfilePage() {
                     titleIcon="mdi-history"
                     columns={gameColumns}
                     data={primaryGames}
+                    loading={primaryGamesLoading && primaryGames.length === 0}
                     emptyMessage={
                       mode === "own" || mode === "systemAdmin"
                         ? dict.noGames
                         : dict.noSharedGames
+                    }
+                    loadingMessage={common.loading}
+                    skeletonRows={<SkeletonRows rows={4} cols={5} />}
+                    refetch={
+                      mode === "own"
+                        ? refetchMyGames
+                        : mode === "player"
+                          ? refetchSharedGames
+                          : refetchAllPlayerGames
+                    }
+                    isFetching={
+                      mode === "own"
+                        ? myGamesFetching
+                        : mode === "player"
+                          ? sharedGamesFetching
+                          : allPlayerGamesFetching
                     }
                   />
                 )}

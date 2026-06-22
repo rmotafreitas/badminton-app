@@ -48,7 +48,7 @@ export function DashboardPage() {
     { enabled: !!clubId, staleTime: 60_000, persist: true },
   );
 
-  const { data: recentGamesData, isLoading: gamesLoading } = useQuery<Game[]>(
+  const { data: recentGamesData, isLoading: gamesLoading, refetch: refetchGames, isFetching: gamesFetching } = useQuery<Game[]>(
     ["games", "recent", clubId],
     () => gameService.getRecentGames(clubId),
     { enabled: !!clubId, staleTime: 30_000, persist: true },
@@ -223,6 +223,8 @@ export function DashboardPage() {
           emptyMessage={dict.noRecentGames}
           loadingMessage={common.loading}
           skeletonRows={<SkeletonRows rows={5} cols={5} />}
+          refetch={refetchGames}
+          isFetching={gamesFetching}
         />
       </section>
     </>

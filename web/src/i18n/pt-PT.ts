@@ -41,6 +41,7 @@ export const ptPT = {
     updating: "A atualizar…",
     deleting: "A eliminar…",
     refreshing: "A atualizar…",
+    refresh: "Atualizar",
   },
 
   landing: {

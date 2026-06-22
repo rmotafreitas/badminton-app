@@ -41,6 +41,7 @@ export const enUS = {
     updating: "Updating…",
     deleting: "Deleting…",
     refreshing: "Refreshing…",
+    refresh: "Refresh",
   },
 
   landing: {
