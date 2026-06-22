@@ -64,3 +64,10 @@ td.image-cell .image {
 .table-pagination {
   @apply px-4 sm:px-6 py-3 border-t border-border;
 }
+
+.table-refresh {
+  @apply border-none bg-transparent text-muted-foreground cursor-pointer
+    transition-colors hover:text-foreground hover:bg-secondary
+    focus:outline-none focus:text-foreground
+    disabled:opacity-40 disabled:cursor-not-allowed;
+}

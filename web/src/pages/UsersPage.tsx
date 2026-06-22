@@ -89,10 +89,7 @@ export function UsersPage() {
       accessor: (u) => (
         <div className="image">
           <img
-            src={
-              u.profile?.photo ||
-              `https://api.dicebear.com/9.x/initials/svg?seed=${encodeURIComponent(u.email || u.id)}`
-            }
+            src={u.profile?.photo ?? ""}
             className="rounded-full"
             alt=""
           />

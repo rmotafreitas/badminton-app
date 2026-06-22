@@ -17,9 +17,7 @@ import { useQuery, useMutation, invalidateQueries } from "@/hooks/useQuery";
 import type { Column } from "@/components/ui";
 import { ActivityHeatmap } from "@/components/ActivityHeatmap";
 import { getErrorMessage } from "@/lib/errors";
-
-const fallbackAvatar = (seed: string) =>
-  `https://api.dicebear.com/9.x/initials/svg?seed=${encodeURIComponent(seed)}`;
+import { fallbackAvatar } from "@/lib/avatar-utils";
 
 const sexOptions = [
   { value: "", label: "--" },
@@ -305,7 +303,7 @@ export function ProfilePage() {
     );
   }
 
-  const avatarUrl = photoPreview || fallbackAvatar(user?.email || "user");
+  const avatarUrl = photoPreview || fallbackAvatar(profile?.name, user?.email, user?.userId);
   const bannerUrl = bannerPreview;
   const displayName = profile?.name || user?.email?.split("@")[0];
   const elo = user?.elo ?? 200;
@@ -577,7 +575,9 @@ export function ProfilePage() {
                       className="w-full h-full object-cover rounded-full"
                       onError={(e) => {
                         (e.target as HTMLImageElement).src = fallbackAvatar(
-                          user?.email || "user",
+                          profile?.name,
+                          user?.email,
+                          user?.userId,
                         );
                       }}
                     />

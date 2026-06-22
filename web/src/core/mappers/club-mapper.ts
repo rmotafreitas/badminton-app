@@ -1,6 +1,7 @@
 import type { Club } from "@/core/domain/club";
 import type { ClubView } from "@/core/views/club.view";
 import { safeImageUrl } from "@/lib/image-utils";
+import { fallbackAvatar } from "@/lib/avatar-utils";
 
 export class ClubMapper {
   static toDomain(view: ClubView): Club {
@@ -15,7 +16,12 @@ export class ClubMapper {
       users: view.users?.map((u) => ({
         ...u,
         profile: u.profile
-          ? { ...u.profile, photo: safeImageUrl(u.profile.photo) }
+          ? {
+              ...u.profile,
+              photo:
+                safeImageUrl(u.profile.photo) ??
+                fallbackAvatar(u.profile.name, u.email, u.id),
+            }
           : null,
       })),
     };

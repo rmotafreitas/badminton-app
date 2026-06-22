@@ -3,6 +3,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { usePageTitle } from "@/context/PageTitleContext";
 import { useDictionary } from "@/i18n";
 import { protectedRoutes } from "@/routes/routes.config";
+import { fallbackAvatar } from "@/lib/avatar-utils";
 import { useMemo, useState } from "react";
 
 export function Navbar() {
@@ -57,7 +58,7 @@ export function Navbar() {
             <div className="navbar-item dropdown has-divider has-user-avatar group hover:is-active">
               <a className="navbar-link">
                 <div className="user-avatar">
-                  <img src={`https://api.dicebear.com/9.x/initials/svg?seed=${encodeURIComponent(user.email ?? "user")}`} alt={user.email ?? undefined} className="rounded-full" />
+                  <img src={fallbackAvatar(null, user.email, user.userId)} alt={user.email ?? undefined} className="rounded-full" />
                 </div>
                 <div className="is-user-name"><span>{user.email?.split("@")[0]}</span></div>
                 <span className="icon"><i className="mdi mdi-chevron-down"></i></span>

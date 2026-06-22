@@ -18,7 +18,7 @@ interface TableProps<T> {
   loadingMessage?: string;
   /** Optional skeleton rows to render instead of the plain loading text. */
   skeletonRows?: React.ReactNode;
-  /** When provided, renders a Refresh button in the header top-right. */
+  /** When provided, renders a refresh icon in the header top-right. */
   refetch?: () => void;
   /** Shows a spinning state on the refresh icon. */
   isFetching?: boolean;
@@ -48,7 +48,7 @@ export function Table<T extends { id?: string }>({
         {refetch && (
           <button
             type="button"
-            className="card-header-icon button small light"
+            className="card-header-icon table-refresh"
             onClick={refetch}
             disabled={isFetching}
             title={common.refresh}
@@ -57,7 +57,6 @@ export function Table<T extends { id?: string }>({
             <span className="icon">
               <i className={`mdi mdi-reload ${isFetching ? "animate-spin" : ""}`}></i>
             </span>
-            <span className="hidden sm:inline">{common.refresh}</span>
           </button>
         )}
       </header>
