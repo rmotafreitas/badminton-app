@@ -1,7 +1,8 @@
 import { useAuth } from "@/hooks/useAuth";
 import React, { useEffect } from "react";
 import { Navigate } from "react-router-dom";
-import { LoadingSpinner } from "@/components/ui/loading-spinner";
+import { FullPageLoader } from "@/components/ui";
+import { useDictionary } from "@/i18n";
 import { type Role } from "@/core/domain/roles";
 
 interface ProtectedRouteProps {
@@ -13,18 +14,15 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   children,
   allowedRoles,
 }) => {
-  const { user, loading, openLoginModal } = useAuth();
+  const { user, loading, authPhase, openLoginModal } = useAuth();
+  const common = useDictionary().common;
 
   useEffect(() => {
     if (!loading && !user) openLoginModal();
   }, [loading, user, openLoginModal]);
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-screen">
-        <LoadingSpinner />
-      </div>
-    );
+  if (loading || authPhase === "restoring") {
+    return <FullPageLoader label={common.restoringSession} />;
   }
 
   if (!user) {

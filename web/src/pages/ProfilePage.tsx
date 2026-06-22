@@ -10,7 +10,10 @@ import {
 import { useDictionary, useLanguage } from "@/i18n";
 import type { Language } from "@/i18n";
 import type { Game } from "@/core/domain/game";
-import { Input, Select, Textarea, ImageUpload, Table } from "@/components/ui";
+import type { Profile } from "@/core/domain/profile";
+import type { Club } from "@/core/domain/club";
+import { Input, Select, Textarea, ImageUpload, Table, ProfileSkeleton } from "@/components/ui";
+import { useQuery, useMutation, invalidateQueries } from "@/hooks/useQuery";
 import type { Column } from "@/components/ui";
 import { ActivityHeatmap } from "@/components/ActivityHeatmap";
 import { getErrorMessage } from "@/lib/errors";
@@ -47,16 +50,10 @@ function getAge(birthday: string): number {
 
 export function ProfilePage() {
   const { id } = useParams<{ id: string }>();
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth();
   const profileService = useProfileService();
   const clubService = useClubService();
   const gameService = useGameService();
-  const [profile, setProfile] = useState<any>(null);
-  const [clubName, setClubName] = useState<string | null>(null);
-  const [sharedGames, setSharedGames] = useState<Game[]>([]);
-  const [allPlayerGames, setAllPlayerGames] = useState<Game[]>([]);
-  const [myGames, setMyGames] = useState<Game[]>([]);
-  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
 
@@ -67,12 +64,8 @@ export function ProfilePage() {
 
   const photoFile = useRef<File | null | undefined>(undefined);
   const bannerFile = useRef<File | null | undefined>(undefined);
-  const [photoPreview, setPhotoPreview] = useState<string | undefined>(
-    undefined,
-  );
-  const [bannerPreview, setBannerPreview] = useState<string | undefined>(
-    undefined,
-  );
+  const [photoPreview, setPhotoPreview] = useState<string | undefined>(undefined);
+  const [bannerPreview, setBannerPreview] = useState<string | undefined>(undefined);
   const photoPreviewRef = useRef<string | undefined>(undefined);
   const bannerPreviewRef = useRef<string | undefined>(undefined);
 
@@ -87,97 +80,72 @@ export function ProfilePage() {
   const { lang, setLanguage } = useLanguage();
   const { setPageTitle } = usePageTitle();
 
-  const fetchProfile = useCallback(async () => {
-    try {
-      const data = id
-        ? await profileService.getProfile(id)
-        : await profileService.getMyProfile();
-      setProfile(data);
-      setName(data.name || "");
-      setBirthday(
-        data.birthday
-          ? new Date(data.birthday).toISOString().split("T")[0]
-          : "",
-      );
-      setSex(data.sex || "");
-      setBio(data.bio || "");
-      setPhotoPreview(data.photo || undefined);
-      setBannerPreview(data.banner || undefined);
-    } catch (err) {
-      console.error("Failed to fetch profile", err);
-    } finally {
-      setLoading(false);
-    }
-  }, [profileService, id]);
-
-  useEffect(() => {
-    if (user?.clubId) {
-      clubService
-        .getClubById(user.clubId)
-        .then((c) => setClubName(c.name))
-        .catch(() => {});
-    }
-  }, [user?.clubId, clubService]);
-
   const isOwnProfile = !id || id === user?.userId;
   const viewedUserId = id ?? user?.userId ?? "";
   const isCoachOrAdmin =
     !!user?.roles?.includes("CLUB_ADMIN") || !!user?.roles?.includes("COACH");
   const isSystemAdmin = !!user?.roles?.includes("SYSTEM_ADMIN");
 
-  useEffect(() => {
-    let cancelled = false;
-    if (isOwnProfile) {
-      gameService
-        .getMyGames()
-        .then((data) => {
-          if (cancelled) return;
-          setMyGames(data);
-          setSharedGames([]);
-          setAllPlayerGames([]);
-        })
-        .catch(() => {});
-    } else if (isCoachOrAdmin) {
-      Promise.all([
-        gameService.getSharedGames(id!),
-        gameService.getGamesByPlayerId(id!),
-      ])
-        .then(([shared, all]) => {
-          if (cancelled) return;
-          setSharedGames(shared);
-          setAllPlayerGames(all);
-          setMyGames([]);
-        })
-        .catch(() => {});
-    } else if (isSystemAdmin) {
-      gameService
-        .getGamesByPlayerId(id!)
-        .then((data) => {
-          if (cancelled) return;
-          setAllPlayerGames(data);
-          setMyGames([]);
-          setSharedGames([]);
-        })
-        .catch(() => {});
-    } else {
-      gameService
-        .getSharedGames(id!)
-        .then((data) => {
-          if (cancelled) return;
-          setSharedGames(data);
-          setMyGames([]);
-          setAllPlayerGames([]);
-        })
-        .catch(() => {});
-    }
-    return () => {
-      cancelled = true;
-    };
-  }, [gameService, id, isOwnProfile, isCoachOrAdmin, isSystemAdmin]);
+  const profileKey = id ?? "me";
+  const { data: profile, isLoading: profileLoading } = useQuery<Profile>(
+    ["profile", profileKey],
+    () => (id ? profileService.getProfile(id) : profileService.getMyProfile()),
+    { staleTime: 60_000, persist: true },
+  );
 
+  const myClubId = user?.clubId ?? "";
+  const { data: myClub } = useQuery<Club>(
+    ["club", myClubId],
+    () => clubService.getClubById(myClubId),
+    { enabled: !!myClubId, staleTime: 60_000, persist: true },
+  );
+  const clubName = myClub?.name ?? null;
+
+  // Role-based games fetching — mirrors the original branch priority.
+  const mode: "own" | "coachAdmin" | "systemAdmin" | "player" = isOwnProfile
+    ? "own"
+    : isCoachOrAdmin
+      ? "coachAdmin"
+      : isSystemAdmin
+        ? "systemAdmin"
+        : "player";
+
+  const { data: myGamesData } = useQuery<Game[]>(
+    ["games", "mine"],
+    () => gameService.getMyGames(),
+    { enabled: mode === "own", staleTime: 30_000, persist: true },
+  );
+  const { data: sharedGamesData } = useQuery<Game[]>(
+    ["games", "shared", id ?? ""],
+    () => gameService.getSharedGames(id!),
+    { enabled: (mode === "coachAdmin" || mode === "player") && !!id, staleTime: 30_000, persist: true },
+  );
+  const { data: allPlayerGamesData } = useQuery<Game[]>(
+    ["games", "player", id ?? ""],
+    () => gameService.getGamesByPlayerId(id!),
+    { enabled: (mode === "coachAdmin" || mode === "systemAdmin") && !!id, staleTime: 30_000, persist: true },
+  );
+
+  const myGames = useMemo(() => myGamesData ?? [], [myGamesData]);
+  const sharedGames = useMemo(() => sharedGamesData ?? [], [sharedGamesData]);
+  const allPlayerGames = useMemo(() => allPlayerGamesData ?? [], [allPlayerGamesData]);
+
+  // Sync form fields + previews whenever the fetched profile changes. The
+  // setStates are intentional: they seed editable form fields from external
+  // (cached) data, and only run when `profile` actually changes.
   useEffect(() => {
-    fetchProfile();
-  }, [fetchProfile]);
+    if (!profile) return;
+    /* eslint-disable react-hooks/set-state-in-effect */
+    setName(profile.name || "");
+    setBirthday(
+      profile.birthday ? new Date(profile.birthday).toISOString().split("T")[0] : "",
+    );
+    setSex(profile.sex || "");
+    setBio(profile.bio || "");
+    setPhotoPreview(profile.photo || undefined);
+    setBannerPreview(profile.banner || undefined);
+    /* eslint-enable react-hooks/set-state-in-effect */
+  }, [profile]);
 
   useEffect(() => {
     if (isOwnProfile) {
@@ -216,17 +184,34 @@ export function ProfilePage() {
     }
   }, []);
 
+  const updateMutation = useMutation(
+    (payload: {
+      name?: string;
+      birthday?: string;
+      sex?: string;
+      bio?: string;
+      photo?: File | null;
+      banner?: File | null;
+    }) => profileService.updateMyProfile(payload),
+    {
+      onSuccess: async () => {
+        // Profile header + club roster (name/photo) + auth user (name/photo/elo
+        // in future) must resync.
+        invalidateQueries(["profile", "me"], ["club", myClubId]);
+        await refreshUser();
+      },
+    },
+  );
+
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
     try {
       const payload: any = { name, birthday: birthday || undefined, sex, bio };
-
       if (photoFile.current !== undefined) payload.photo = photoFile.current;
       if (bannerFile.current !== undefined) payload.banner = bannerFile.current;
 
-      const updated = await profileService.updateMyProfile(payload);
-      setProfile(updated);
+      const updated = await updateMutation.mutate(payload);
       setPhotoPreview(updated.photo || undefined);
       setBannerPreview(updated.banner || undefined);
 
@@ -252,26 +237,26 @@ export function ProfilePage() {
   };
 
   const handleCancelEdit = () => {
-    fetchProfile().then(() => {
-      photoFile.current = undefined;
-      bannerFile.current = undefined;
-      if (photoPreviewRef.current) {
-        URL.revokeObjectURL(photoPreviewRef.current);
-        photoPreviewRef.current = undefined;
-      }
-      if (bannerPreviewRef.current) {
-        URL.revokeObjectURL(bannerPreviewRef.current);
-        bannerPreviewRef.current = undefined;
-      }
-      setIsEditing(false);
-    });
+    // Re-sync from cache (refetch profile) and discard local image previews.
+    invalidateQueries(["profile", "me"]);
+    photoFile.current = undefined;
+    bannerFile.current = undefined;
+    if (photoPreviewRef.current) {
+      URL.revokeObjectURL(photoPreviewRef.current);
+      photoPreviewRef.current = undefined;
+    }
+    if (bannerPreviewRef.current) {
+      URL.revokeObjectURL(bannerPreviewRef.current);
+      bannerPreviewRef.current = undefined;
+    }
+    setIsEditing(false);
   };
 
   const primaryGames = useMemo(() => {
-    if (isOwnProfile) return myGames;
-    if (isCoachOrAdmin || isSystemAdmin) return allPlayerGames;
+    if (mode === "own") return myGames;
+    if (mode === "coachAdmin" || mode === "systemAdmin") return allPlayerGames;
     return sharedGames;
-  }, [isOwnProfile, isCoachOrAdmin, isSystemAdmin, myGames, allPlayerGames, sharedGames]);
+  }, [mode, myGames, allPlayerGames, sharedGames]);
 
   const hasAnyGames = primaryGames.length > 0 || sharedGames.length > 0;
 
@@ -287,10 +272,10 @@ export function ProfilePage() {
     return { total: primaryGames.length, wins, losses };
   }, [primaryGames, viewedUserId]);
 
-  if (loading) {
+  if (profileLoading && !profile) {
     return (
       <section className="section main-section">
-        <div className="p-8 text-center">{common.loading}</div>
+        <ProfileSkeleton />
       </section>
     );
   }
@@ -298,6 +283,7 @@ export function ProfilePage() {
   const avatarUrl = photoPreview || fallbackAvatar(user?.email || "user");
   const bannerUrl = bannerPreview;
   const displayName = profile?.name || user?.email?.split("@")[0];
+  const elo = user?.elo ?? 200;
 
   function playerImg(player: any, cls: string) {
     if (player?.profile?.photo) {
@@ -329,7 +315,7 @@ export function ProfilePage() {
   const typeLabel = (type: string) =>
     type === "SINGLES" ? gamesDict.singles : gamesDict.doubles;
 
-  const gameColumns: Column<any>[] = [
+  const gameColumns: Column<Game>[] = [
     {
       header: gamesDict.type,
       accessor: (g) => (
@@ -340,7 +326,7 @@ export function ProfilePage() {
       header: gamesDict.team1,
       accessor: (g) => (
         <div className="flex flex-col gap-0.5">
-          {g.team1Players?.map((p: any) => (
+          {g.team1Players?.map((p) => (
             <span key={p.id}>{playerLine(p)}</span>
           ))}
         </div>
@@ -350,7 +336,7 @@ export function ProfilePage() {
       header: gamesDict.team2,
       accessor: (g) => (
         <div className="flex flex-col gap-0.5">
-          {g.team2Players?.map((p: any) => (
+          {g.team2Players?.map((p) => (
             <span key={p.id}>{playerLine(p)}</span>
           ))}
         </div>
@@ -579,7 +565,7 @@ export function ProfilePage() {
                       </h2>
                       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-warning/10 text-warning-foreground text-xs font-bold">
                         <i className="mdi mdi-trophy text-xs"></i>
-                        {profile?.elo ?? user?.elo ?? 200}
+                        {elo}
                       </span>
                     </div>
                     {profile?.bio ? (
@@ -826,7 +812,7 @@ export function ProfilePage() {
             {/* Games tables */}
             {hasAnyGames ? (
               <div className="mt-4 space-y-4">
-                {!isOwnProfile && isCoachOrAdmin ? (
+                {mode === "coachAdmin" ? (
                   <>
                     <Table
                       title={dict.sharedGames}
@@ -846,7 +832,7 @@ export function ProfilePage() {
                 ) : (
                   <Table
                     title={
-                      isOwnProfile || isSystemAdmin
+                      mode === "own" || mode === "systemAdmin"
                         ? dict.recentGames
                         : dict.sharedGames
                     }
@@ -854,7 +840,7 @@ export function ProfilePage() {
                     columns={gameColumns}
                     data={primaryGames}
                     emptyMessage={
-                      isOwnProfile || isSystemAdmin
+                      mode === "own" || mode === "systemAdmin"
                         ? dict.noGames
                         : dict.noSharedGames
                     }

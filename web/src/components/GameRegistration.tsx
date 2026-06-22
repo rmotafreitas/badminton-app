@@ -2,9 +2,10 @@ import React, { useState, useMemo } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useGameService } from "@/di/container";
 import { useDictionary } from "@/i18n";
+import { useMutation, invalidateQueries } from "@/hooks/useQuery";
 import { PlayerSelect } from "@/components/ui";
 import { checkScore } from "@/lib/score-utils";
-import type { GameType } from "@/core/domain/game";
+import type { GameType, RegisterGameParams } from "@/core/domain/game";
 
 type GameSet = { team1Score: number; team2Score: number };
 
@@ -72,7 +73,7 @@ export function GameRegistration({
   clubPlayers: any[];
   onGameRegistered?: () => void;
 }) {
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth();
   const gameService = useGameService();
   const [gameType, setGameType] = useState<GameType>("SINGLES");
   const [team1Players, setTeam1Players] = useState<string[]>(() => {
@@ -86,6 +87,17 @@ export function GameRegistration({
   const [success, setSuccess] = useState(false);
   const dict = useDictionary().games;
   const common = useDictionary().common;
+
+  const registerMutation = useMutation(
+    (params: RegisterGameParams) => gameService.registerGame(params),
+    {
+      onSuccess: async () => {
+        // A new game changes rankings/ELO, profile stats, and every games list.
+        invalidateQueries(["games"], ["profile"]);
+        await refreshUser();
+      },
+    },
+  );
 
   const playerLabels = {
     select: dict.selectPlayer,
@@ -152,7 +164,7 @@ export function GameRegistration({
 
     try {
       setLoading(true);
-      await gameService.registerGame({
+      await registerMutation.mutate({
         clubId,
         type: gameType,
         team1PlayerIds: team1Players,

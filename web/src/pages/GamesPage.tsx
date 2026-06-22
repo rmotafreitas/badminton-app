@@ -1,11 +1,15 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useGameService, useClubService } from "@/di/container";
 import { useAuth } from "@/hooks/useAuth";
 import { useDictionary } from "@/i18n";
 import { GameRegistration } from "@/components/GameRegistration";
 import { Table } from "@/components/ui";
+import { SkeletonRows, Skeleton } from "@/components/ui";
+import { useQuery, useMutation, invalidateQueries } from "@/hooks/useQuery";
 import type { Column } from "@/components/ui";
+import type { Club } from "@/core/domain/club";
+import type { Game } from "@/core/domain/game";
 
 function playerImg(player: any, cls: string) {
   if (player?.profile?.photo) {
@@ -29,81 +33,70 @@ function playerLine(player: any) {
 }
 
 export function GamesPage() {
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth();
   const gameService = useGameService();
   const clubService = useClubService();
-  const [games, setGames] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [clubData, setClubData] = useState<any>(null);
-  const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
-  const [deleting, setDeleting] = useState(false);
   const [view, setView] = useState<"mine" | "all">("all");
+  const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const dict = useDictionary().games;
   const common = useDictionary().common;
 
   const canToggle =
     !!user?.roles?.includes("CLUB_ADMIN") || !!user?.roles?.includes("COACH");
 
-  const fetchGames = async () => {
-    setLoading(true);
-    try {
-      if (view === "mine") {
-        const data = await gameService.getMyGames();
-        setGames(data);
-      } else {
-        if (!user?.clubId) {
-          setGames([]);
-          return;
-        }
-        const data = await gameService.getRecentGames(user.clubId);
-        setGames(data);
-      }
-    } catch (err) {
-      console.error("Failed to fetch games", err);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const clubId = user?.clubId ?? "";
 
-  useEffect(() => {
-    fetchGames();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.clubId, gameService, view]);
+  const { data: clubData, isLoading: clubLoading } = useQuery<Club>(
+    ["club", clubId],
+    () => clubService.getClubById(clubId),
+    { enabled: !!clubId, staleTime: 60_000, persist: true },
+  );
 
-  useEffect(() => {
-    const fetchClub = async () => {
-      if (!user?.clubId) return;
-      try {
-        const data = await clubService.getClubById(user.clubId);
-        setClubData(data);
-      } catch (err) {
-        console.error("Failed to fetch club", err);
-      }
-    };
-    fetchClub();
-  }, [user?.clubId, clubService]);
+  const gamesKey = view === "mine" ? (["games", "mine"] as const) : (["games", "recent", clubId] as const);
+  const { data: games, isLoading: gamesLoading } = useQuery<Game[]>(
+    gamesKey,
+    () =>
+      view === "mine"
+        ? gameService.getMyGames()
+        : gameService.getRecentGames(clubId),
+    {
+      enabled: view === "mine" || !!clubId,
+      staleTime: 30_000,
+      persist: true,
+      keepPreviousData: true,
+    },
+  );
+
+  const gamesList = games ?? [];
+
+  const deleteMutation = useMutation(
+    (gameId: string) => gameService.deleteGame(gameId),
+    {
+      onSuccess: async () => {
+        // ELO / stats may have changed — resync dependent data.
+        invalidateQueries(["games"], ["profile"]);
+        await refreshUser();
+      },
+    },
+  );
 
   const handleDelete = async (gameId: string) => {
-    setDeleting(true);
     try {
-      await gameService.deleteGame(gameId);
+      await deleteMutation.mutate(gameId);
       setDeleteConfirm(null);
-      await fetchGames();
     } catch (err) {
       console.error("Failed to delete game", err);
-    } finally {
-      setDeleting(false);
     }
   };
 
-  const handleGameRegistered = () => {
-    setLoading(true);
-    fetchGames();
-  };
+  // After a game is registered, GameRegistration's own mutation invalidates
+  // ["games"] + ["profile"] and refreshes the auth user (ELO). The games query
+  // subscribed here refetches automatically, so nothing else is needed.
+  const handleGameRegistered = () => {};
 
   const typeLabel = (type: string) => type === "SINGLES" ? dict.singles : dict.doubles;
 
-  const columns: Column<any>[] = [
+  const columns: Column<Game>[] = [
     {
       header: dict.type,
       accessor: (g) => (
@@ -114,7 +107,7 @@ export function GamesPage() {
       header: dict.team1,
       accessor: (g) => (
         <div className="flex flex-col gap-0.5">
-          {g.team1Players?.map((p: any) => (
+          {g.team1Players?.map((p) => (
             <span key={p.id}>{playerLine(p)}</span>
           ))}
         </div>
@@ -124,7 +117,7 @@ export function GamesPage() {
       header: dict.team2,
       accessor: (g) => (
         <div className="flex flex-col gap-0.5">
-          {g.team2Players?.map((p: any) => (
+          {g.team2Players?.map((p) => (
             <span key={p.id}>{playerLine(p)}</span>
           ))}
         </div>
@@ -135,8 +128,8 @@ export function GamesPage() {
       accessor: (g) => {
         if (!g.winner) return <span className="text-muted-foreground/70 text-xs">—</span>;
         const names = g.winner === "team1"
-          ? g.team1Players?.map((p: any) => p.profile?.name || p.email?.split("@")[0] || "?").join(" & ")
-          : g.team2Players?.map((p: any) => p.profile?.name || p.email?.split("@")[0] || "?").join(" & ");
+          ? g.team1Players?.map((p) => p.profile?.name || p.email?.split("@")[0] || "?").join(" & ")
+          : g.team2Players?.map((p) => p.profile?.name || p.email?.split("@")[0] || "?").join(" & ");
         const color = g.winner === "team1" ? "text-primary" : "text-destructive";
         return <span className={`font-semibold text-xs ${color}`}>{names}</span>;
       },
@@ -166,8 +159,8 @@ export function GamesPage() {
       accessor: (g) =>
         deleteConfirm === g.id ? (
           <div className="buttons right nowrap">
-            <button className="button small red" onClick={() => handleDelete(g.id)} disabled={deleting}>
-              {deleting ? common.loading : dict.yes}
+            <button className="button small red" onClick={() => handleDelete(g.id)} disabled={deleteMutation.isPending}>
+              {deleteMutation.isPending ? common.loading : dict.yes}
             </button>
             <button className="button small light" onClick={() => setDeleteConfirm(null)}>
               {dict.no}
@@ -188,6 +181,8 @@ export function GamesPage() {
         ),
     },
   ];
+
+  const registrationReady = !!clubData || !clubLoading;
 
   return (
     <>
@@ -220,22 +215,40 @@ export function GamesPage() {
       </section>
 
       <section className="section main-section">
-        <GameRegistration
-          clubId={clubData?.id}
-          clubPlayers={clubData?.users || []}
-          onGameRegistered={handleGameRegistered}
-        />
+        {registrationReady ? (
+          <GameRegistration
+            clubId={clubData?.id ?? clubId}
+            clubPlayers={clubData?.users || []}
+            onGameRegistered={handleGameRegistered}
+          />
+        ) : (
+          <div className="card mb-6">
+            <header className="card-header">
+              <p className="card-header-title">
+                <span className="icon"><i className="mdi mdi-badminton"></i></span>
+                {dict.registerGame}
+              </p>
+            </header>
+            <div className="card-content space-y-4">
+              <Skeleton className="h-9 w-40" />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <Skeleton className="h-24 w-full" />
+                <Skeleton className="h-24 w-full" />
+              </div>
+            </div>
+          </div>
+        )}
 
         <Table
           title={view === "mine" ? dict.myGames : dict.matchHistory}
           titleIcon={view === "mine" ? "mdi-account" : "mdi-badminton"}
           columns={columns}
-          data={games}
-          loading={loading}
+          data={gamesList}
+          loading={gamesLoading && gamesList.length === 0}
           emptyMessage={dict.noGamesFound}
           loadingMessage={common.loading}
+          skeletonRows={<SkeletonRows rows={5} cols={7} />}
         />
-
       </section>
     </>
   );

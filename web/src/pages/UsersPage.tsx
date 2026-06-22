@@ -1,72 +1,77 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useClubService, useUserService } from "@/di/container";
 import { useDictionary } from "@/i18n";
 import { Link } from "react-router-dom";
 import { Table } from "@/components/ui";
+import { SkeletonRows } from "@/components/ui";
+import { useQuery, useMutation, invalidateQueries } from "@/hooks/useQuery";
 import type { Column } from "@/components/ui";
+import type { Club } from "@/core/domain/club";
+import type { UserView } from "@/core/repositories/interfaces/user-repo";
 
 export function UsersPage() {
   const { user } = useAuth();
   const clubService = useClubService();
   const userService = useUserService();
-  const [users, setUsers] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  const [allUsers, setAllUsers] = useState<any[]>([]);
-  const [allClubs, setAllClubs] = useState<any[]>([]);
-  const [selectedUserId, setSelectedUserId] = useState("");
-  const [selectedClubId, setSelectedClubId] = useState("");
-  const [assigning, setAssigning] = useState(false);
-  const [notification, setNotification] = useState<{
-    type: "green" | "red";
-    message: string;
-  } | null>(null);
-  const [showAssignForm, setShowAssignForm] = useState(false);
 
   const dict = useDictionary().users;
   const common = useDictionary().common;
 
   const isSystemAdmin = user?.roles?.includes("SYSTEM_ADMIN");
+  const clubId = user?.clubId ?? "";
 
-  useEffect(() => {
-    const fetchUsers = async () => {
-      if (!user?.clubId) return;
-      try {
-        const data = await clubService.getClubById(user.clubId);
-        setUsers(data?.users || []);
-      } catch (err) {
-        console.error("Failed to fetch users", err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchUsers();
-  }, [user?.clubId, clubService]);
+  // Roster lives on the club object — shares the cache with Dashboard/Games.
+  const { data: clubData, isLoading: rosterLoading } = useQuery<Club>(
+    ["club", clubId],
+    () => clubService.getClubById(clubId),
+    { enabled: !!clubId, staleTime: 60_000, persist: true },
+  );
 
-  useEffect(() => {
-    if (!isSystemAdmin) return;
-    const fetchAssignData = async () => {
-      try {
-        const [usersData, clubsData] = await Promise.all([
-          userService.getAllUsers(),
-          clubService.getAllClubs(),
-        ]);
-        setAllUsers(usersData);
-        setAllClubs(clubsData);
-      } catch (err) {
-        console.error("Failed to fetch assignment data", err);
-      }
-    };
-    fetchAssignData();
-  }, [isSystemAdmin, userService, clubService]);
+  const { data: allUsers } = useQuery<UserView[]>(
+    ["users"],
+    () => userService.getAllUsers(),
+    { enabled: isSystemAdmin, staleTime: 60_000, persist: true },
+  );
+
+  const { data: allClubs } = useQuery<Club[]>(
+    ["clubs"],
+    () => clubService.getAllClubs(),
+    { enabled: isSystemAdmin, staleTime: 60_000, persist: true },
+  );
+
+  const users = clubData?.users ?? [];
+
+  const [selectedUserId, setSelectedUserId] = useState("");
+  const [selectedClubId, setSelectedClubId] = useState("");
+  const [showAssignForm, setShowAssignForm] = useState(false);
+  const [notification, setNotification] = useState<{
+    type: "green" | "red";
+    message: string;
+  } | null>(null);
+
+  const assignMutation = useMutation(
+    (vars: { userId: string; clubId: string }) =>
+      clubService.assignUserToClub(vars.userId, vars.clubId),
+    {
+      onSuccess: async () => {
+        // Roster (both the target club and the admin's own club) + user/club
+        // lists must resync so the newly assigned user appears.
+        invalidateQueries(
+          ["clubs"],
+          ["users"],
+          ["club", selectedClubId],
+          ["club", clubId],
+        );
+      },
+    },
+  );
 
   const handleAssign = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedUserId || !selectedClubId) return;
-    setAssigning(true);
     try {
-      await clubService.assignUserToClub(selectedUserId, selectedClubId);
+      await assignMutation.mutate({ userId: selectedUserId, clubId: selectedClubId });
       setNotification({ type: "green", message: dict.userAssigned });
       setSelectedUserId("");
       setSelectedClubId("");
@@ -74,8 +79,6 @@ export function UsersPage() {
     } catch (err) {
       console.error("Failed to assign user", err);
       setNotification({ type: "red", message: dict.assignFailed });
-    } finally {
-      setAssigning(false);
     }
   };
 
@@ -191,7 +194,7 @@ export function UsersPage() {
                           onChange={(e) => setSelectedUserId(e.target.value)}
                         >
                           <option value="">{dict.selectUser}</option>
-                          {allUsers.map((u) => (
+                          {(allUsers ?? []).map((u) => (
                             <option key={u.id} value={u.id}>
                               {u.profile?.name || u.email} (
                               {u.clubId ? "Assigned" : "Unassigned"})
@@ -207,7 +210,7 @@ export function UsersPage() {
                           onChange={(e) => setSelectedClubId(e.target.value)}
                         >
                           <option value="">{dict.selectClub}</option>
-                          {allClubs.map((c) => (
+                          {(allClubs ?? []).map((c) => (
                             <option key={c.id} value={c.id}>
                               {c.name}
                             </option>
@@ -219,9 +222,9 @@ export function UsersPage() {
                       <button
                         type="submit"
                         className="button blue"
-                        disabled={assigning}
+                        disabled={assignMutation.isPending}
                       >
-                        {assigning ? dict.assigning : dict.assign}
+                        {assignMutation.isPending ? dict.assigning : dict.assign}
                       </button>
                     </div>
                     <div className="control">
@@ -255,9 +258,10 @@ export function UsersPage() {
           titleIcon="mdi-account-multiple"
           columns={columns}
           data={users}
-          loading={loading}
+          loading={rosterLoading && users.length === 0}
           emptyMessage={dict.noUsersFound}
           loadingMessage={common.loading}
+          skeletonRows={<SkeletonRows rows={5} cols={5} />}
         />
       </section>
     </>

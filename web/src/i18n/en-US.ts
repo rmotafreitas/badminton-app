@@ -35,6 +35,12 @@ export const enUS = {
     privacyPolicy: "Privacy Policy",
     termsOfService: "Terms of Service",
     dataProtection: "Data Protection",
+    restoringSession: "Restoring session…",
+    restoringSessionDesc: "Picking up where you left off.",
+    loadingData: "Loading data…",
+    updating: "Updating…",
+    deleting: "Deleting…",
+    refreshing: "Refreshing…",
   },
 
   landing: {

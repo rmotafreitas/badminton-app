@@ -4,7 +4,11 @@ import { useAuth } from "@/hooks/useAuth";
 import { useClubService, useGameService } from "@/di/container";
 import { useDictionary } from "@/i18n";
 import { Table } from "@/components/ui";
+import { WidgetSkeleton, SkeletonRows } from "@/components/ui";
+import { useQuery } from "@/hooks/useQuery";
 import type { Column } from "@/components/ui";
+import type { Club } from "@/core/domain/club";
+import type { Game } from "@/core/domain/game";
 
 function playerImg(player: any, cls: string) {
   if (player?.profile?.photo) {
@@ -32,68 +36,49 @@ export function DashboardPage() {
   const clubService = useClubService();
   const gameService = useGameService();
   const [greeting, setGreeting] = useState("");
-  const [clubData, setClubData] = useState<any>(null);
-  const [recentGames, setRecentGames] = useState<any[]>([]);
-  const [loadingGames, setLoadingGames] = useState(true);
   const dict = useDictionary().dashboard;
   const gameDict = useDictionary().games;
   const common = useDictionary().common;
 
-  useEffect(() => {
-    const fetchClubData = async () => {
-      if (!user?.clubId) return;
-      try {
-        const data = await clubService.getClubById(user.clubId);
-        setClubData(data);
-      } catch (err) {
-        console.error("Failed to fetch club", err);
-      }
-    };
-    fetchClubData();
-  }, [user?.clubId, clubService]);
+  const clubId = user?.clubId ?? "";
+
+  const { data: clubData, isLoading: clubLoading } = useQuery<Club>(
+    ["club", clubId],
+    () => clubService.getClubById(clubId),
+    { enabled: !!clubId, staleTime: 60_000, persist: true },
+  );
+
+  const { data: recentGamesData, isLoading: gamesLoading } = useQuery<Game[]>(
+    ["games", "recent", clubId],
+    () => gameService.getRecentGames(clubId),
+    { enabled: !!clubId, staleTime: 30_000, persist: true },
+  );
+
+  const recentGames = (recentGamesData ?? []).slice(0, 10);
 
   useEffect(() => {
-    const fetchGames = async () => {
-      if (!user?.clubId) {
-        setLoadingGames(false);
-        return;
-      }
-      try {
-        const games = await gameService.getRecentGames(user.clubId);
-        setRecentGames(games.slice(0, 10));
-      } catch (err) {
-        console.error("Failed to fetch games", err);
-      } finally {
-        setLoadingGames(false);
-      }
+    const compute = () => {
+      const hour = new Date().getHours();
+      const next =
+        hour < 12 ? dict.goodMorning : hour < 18 ? dict.goodAfternoon : dict.goodEvening;
+      setGreeting((prev) => (prev === next ? prev : next));
     };
-    fetchGames();
-  }, [user?.clubId, gameService]);
-
-  useEffect(() => {
-    const updateTimeAndGreeting = () => {
-      const now = new Date();
-      const hour = now.getHours();
-      if (hour < 12) setGreeting(dict.goodMorning);
-      else if (hour < 18) setGreeting(dict.goodAfternoon);
-      else setGreeting(dict.goodEvening);
-    };
-    updateTimeAndGreeting();
-    const interval = setInterval(updateTimeAndGreeting, 1000);
+    compute();
+    const interval = setInterval(compute, 60_000);
     return () => clearInterval(interval);
   }, [dict]);
 
   const clubMembers = clubData?.users?.length ?? 0;
   const totalGames = recentGames.length;
   const myGames = recentGames.filter(
-    (g: any) =>
-      g.team1PlayerIds?.includes(user?.userId) ||
-      g.team2PlayerIds?.includes(user?.userId),
+    (g) =>
+      g.team1PlayerIds?.includes(user?.userId ?? "") ||
+      g.team2PlayerIds?.includes(user?.userId ?? ""),
   ).length;
 
   const typeLabel = (type: string) => type === "SINGLES" ? gameDict.singles : gameDict.doubles;
 
-  const gameColumns: Column<any>[] = [
+  const gameColumns: Column<Game>[] = [
     {
       header: gameDict.type,
       accessor: (g) => <span className="text-xs font-medium">{typeLabel(g.type)}</span>,
@@ -102,7 +87,7 @@ export function DashboardPage() {
       header: gameDict.team1,
       accessor: (g) => (
         <div className="flex flex-col gap-0.5">
-          {g.team1Players?.map((p: any) => <span key={p.id}>{playerLine(p)}</span>)}
+          {g.team1Players?.map((p) => <span key={p.id}>{playerLine(p)}</span>)}
         </div>
       ),
     },
@@ -110,7 +95,7 @@ export function DashboardPage() {
       header: gameDict.team2,
       accessor: (g) => (
         <div className="flex flex-col gap-0.5">
-          {g.team2Players?.map((p: any) => <span key={p.id}>{playerLine(p)}</span>)}
+          {g.team2Players?.map((p) => <span key={p.id}>{playerLine(p)}</span>)}
         </div>
       ),
     },
@@ -135,6 +120,9 @@ export function DashboardPage() {
     },
   ];
 
+  const widgetsLoading = clubLoading && !clubData;
+  const isPlayer = user?.roles?.includes("PLAYER") || user?.roles?.includes("COACH");
+
   return (
     <>
       <section className="is-hero-bar">
@@ -147,56 +135,66 @@ export function DashboardPage() {
 
       <section className="section main-section">
         <div className="grid gap-4 sm:gap-6 grid-cols-1 md:grid-cols-3 mb-4 sm:mb-6">
-          <div className="card">
-            <div className="card-content">
-              <div className="flex items-center justify-between">
-                <div className="widget-label">
-                  <h3>{clubData?.name || dict.clubMembers}</h3>
-                  <h1>{clubMembers}</h1>
-                </div>
-                <span className="icon widget-icon text-primary">
-                  <i className="mdi mdi-account-group mdi-48px"></i>
-                </span>
-              </div>
-            </div>
-          </div>
-
-          <div className="card">
-            <div className="card-content">
-              <div className="flex items-center justify-between">
-                <div className="widget-label">
-                  <h3>{dict.totalGames}</h3>
-                  <h1>{totalGames}</h1>
-                </div>
-                <span className="icon widget-icon text-success">
-                  <i className="mdi mdi-badminton mdi-48px"></i>
-                </span>
-              </div>
-            </div>
-          </div>
-
-          <div className="card">
-            <div className="card-content">
-              <div className="flex items-center justify-between">
-                {user?.roles?.includes("PLAYER") || user?.roles?.includes("COACH") ? (
-                  <div className="widget-label">
-                    <h3>{dict.yourGameCount}</h3>
-                    <h1>{myGames}</h1>
+          {widgetsLoading ? (
+            <>
+              <WidgetSkeleton />
+              <WidgetSkeleton />
+              <WidgetSkeleton />
+            </>
+          ) : (
+            <>
+              <div className="card">
+                <div className="card-content">
+                  <div className="flex items-center justify-between">
+                    <div className="widget-label">
+                      <h3>{clubData?.name || dict.clubMembers}</h3>
+                      <h1>{clubMembers}</h1>
+                    </div>
+                    <span className="icon widget-icon text-primary">
+                      <i className="mdi mdi-account-group mdi-48px"></i>
+                    </span>
                   </div>
-                ) : (
-                  <div className="widget-label">
-                    <h3>{dict.role}</h3>
-                    <h1 className="text-xl">
-                      {user?.roles?.map((r: string) => r.replace("_", " ")).join(", ")}
-                    </h1>
-                  </div>
-                )}
-                <span className="icon widget-icon text-accent">
-                  <i className="mdi mdi-trophy mdi-48px"></i>
-                </span>
+                </div>
               </div>
-            </div>
-          </div>
+
+              <div className="card">
+                <div className="card-content">
+                  <div className="flex items-center justify-between">
+                    <div className="widget-label">
+                      <h3>{dict.totalGames}</h3>
+                      <h1>{totalGames}</h1>
+                    </div>
+                    <span className="icon widget-icon text-success">
+                      <i className="mdi mdi-badminton mdi-48px"></i>
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="card">
+                <div className="card-content">
+                  <div className="flex items-center justify-between">
+                    {isPlayer ? (
+                      <div className="widget-label">
+                        <h3>{dict.yourGameCount}</h3>
+                        <h1>{myGames}</h1>
+                      </div>
+                    ) : (
+                      <div className="widget-label">
+                        <h3>{dict.role}</h3>
+                        <h1 className="text-xl">
+                          {user?.roles?.map((r) => r.replace("_", " ")).join(", ")}
+                        </h1>
+                      </div>
+                    )}
+                    <span className="icon widget-icon text-accent">
+                      <i className="mdi mdi-trophy mdi-48px"></i>
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
         </div>
 
         <div className="card mb-4 sm:mb-6">
@@ -221,9 +219,10 @@ export function DashboardPage() {
           titleIcon="mdi-history"
           columns={gameColumns}
           data={recentGames}
-          loading={loadingGames}
+          loading={gamesLoading && recentGames.length === 0}
           emptyMessage={dict.noRecentGames}
           loadingMessage={common.loading}
+          skeletonRows={<SkeletonRows rows={5} cols={5} />}
         />
       </section>
     </>

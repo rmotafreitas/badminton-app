@@ -1,62 +1,71 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useClubService } from "@/di/container";
 import { useAuth } from "@/hooks/useAuth";
 import { useDictionary } from "@/i18n";
+import { Skeleton } from "@/components/ui";
+import { useQuery, useMutation, invalidateQueries } from "@/hooks/useQuery";
+import type { Club } from "@/core/domain/club";
 
 export function ClubsPage() {
   const { user } = useAuth();
   const clubService = useClubService();
-  const [clubs, setClubs] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  const [newClubName, setNewClubName] = useState("");
-  const [newClubLocation, setNewClubLocation] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-
-  const [editingClub, setEditingClub] = useState<any>(null);
-  const [editName, setEditName] = useState("");
-  const [editLocation, setEditLocation] = useState("");
-  const [updating, setUpdating] = useState(false);
-
-  const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
-  const [deleting, setDeleting] = useState(false);
-
-  const [notification, setNotification] = useState<{ type: "green" | "red"; message: string } | null>(null);
 
   const dict = useDictionary().clubs;
   const gameDict = useDictionary().games;
   const common = useDictionary().common;
 
-  useEffect(() => {
-    fetchClubs();
-  }, [clubService]);
+  const { data: clubs, isLoading } = useQuery<Club[]>(
+    ["clubs"],
+    () => clubService.getAllClubs(),
+    { staleTime: 60_000, persist: true },
+  );
+  const clubsList = clubs ?? [];
 
-  const fetchClubs = async () => {
-    try {
-      const data = await clubService.getAllClubs();
-      setClubs(data);
-    } catch (err) {
-      console.error("Failed to fetch clubs", err);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const [newClubName, setNewClubName] = useState("");
+  const [newClubLocation, setNewClubLocation] = useState("");
+
+  const [editingClub, setEditingClub] = useState<Club | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editLocation, setEditLocation] = useState("");
+
+  const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+
+  const [notification, setNotification] = useState<{ type: "green" | "red"; message: string } | null>(null);
+
+  const createMutation = useMutation(
+    (vars: { name: string; location?: string }) => clubService.createClub(vars),
+    {
+      onSuccess: () => invalidateQueries(["clubs"]),
+    },
+  );
+
+  const updateMutation = useMutation(
+    (vars: { id: string; data: { name?: string; location?: string } }) =>
+      clubService.updateClub(vars.id, vars.data),
+    {
+      onSuccess: (_d, vars) =>
+        invalidateQueries(["clubs"], ["club", vars.id]),
+    },
+  );
+
+  const deleteMutation = useMutation(
+    (id: string) => clubService.deleteClub(id),
+    {
+      onSuccess: (_d, id) => invalidateQueries(["clubs"], ["club", id]),
+    },
+  );
 
   const handleCreateClub = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newClubName) return;
     try {
-      setSubmitting(true);
-      await clubService.createClub({ name: newClubName, location: newClubLocation });
+      await createMutation.mutate({ name: newClubName, location: newClubLocation });
       setNewClubName("");
       setNewClubLocation("");
-      await fetchClubs();
       setNotification({ type: "green", message: dict.success || "Club created." });
     } catch (err) {
       console.error("Failed to create club", err);
       setNotification({ type: "red", message: common.somethingWentWrong });
-    } finally {
-      setSubmitting(false);
     }
   };
 
@@ -64,31 +73,26 @@ export function ClubsPage() {
     e.preventDefault();
     if (!editingClub) return;
     try {
-      setUpdating(true);
-      await clubService.updateClub(editingClub.id, { name: editName, location: editLocation });
+      await updateMutation.mutate({
+        id: editingClub.id,
+        data: { name: editName, location: editLocation },
+      });
       setEditingClub(null);
-      await fetchClubs();
       setNotification({ type: "green", message: dict.clubUpdated });
     } catch (err) {
       console.error("Failed to update club", err);
       setNotification({ type: "red", message: common.somethingWentWrong });
-    } finally {
-      setUpdating(false);
     }
   };
 
   const handleDeleteClub = async (clubId: string) => {
-    setDeleting(true);
     try {
-      await clubService.deleteClub(clubId);
+      await deleteMutation.mutate(clubId);
       setDeleteConfirm(null);
-      await fetchClubs();
       setNotification({ type: "green", message: dict.clubDeleted });
     } catch (err) {
       console.error("Failed to delete club", err);
       setNotification({ type: "red", message: common.somethingWentWrong });
-    } finally {
-      setDeleting(false);
     }
   };
 
@@ -159,10 +163,10 @@ export function ClubsPage() {
                   />
                 </div>
                 <div className="control">
-                  <button type="submit" className="button blue" disabled={submitting || updating}>
+                  <button type="submit" className="button blue" disabled={createMutation.isPending || updateMutation.isPending}>
                     {editingClub
-                      ? (updating ? dict.updating : dict.updateClub)
-                      : (submitting ? dict.creating : dict.createClub)}
+                      ? (updateMutation.isPending ? dict.updating : dict.updateClub)
+                      : (createMutation.isPending ? dict.creating : dict.createClub)}
                   </button>
                 </div>
                 {editingClub && (
@@ -185,9 +189,13 @@ export function ClubsPage() {
             </p>
           </header>
           <div className="card-content">
-            {loading ? (
-              <div className="p-4 text-center">{common.loading}</div>
-            ) : clubs.length === 0 ? (
+            {isLoading && clubsList.length === 0 ? (
+              <div className="p-4 space-y-3">
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <Skeleton key={i} className="h-10 w-full" />
+                ))}
+              </div>
+            ) : clubsList.length === 0 ? (
               <div className="p-4 text-center text-muted-foreground">{dict.noClubsFound}</div>
             ) : (
               <table>
@@ -200,7 +208,7 @@ export function ClubsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {clubs.map((club) => (
+                  {clubsList.map((club) => (
                     <tr key={club.id}>
                       <td data-label={dict.name} className="font-bold">{club.name}</td>
                       <td data-label={dict.location}>{club.location || "-"}</td>
@@ -223,8 +231,8 @@ export function ClubsPage() {
                           </button>
                           {deleteConfirm === club.id ? (
                             <>
-                              <button className="button small red" onClick={() => handleDeleteClub(club.id)} disabled={deleting}>
-                                {deleting ? common.loading : gameDict.yes}
+                              <button className="button small red" onClick={() => handleDeleteClub(club.id)} disabled={deleteMutation.isPending}>
+                                {deleteMutation.isPending ? common.loading : gameDict.yes}
                               </button>
                               <button className="button small light" onClick={() => setDeleteConfirm(null)}>
                                 {gameDict.no}

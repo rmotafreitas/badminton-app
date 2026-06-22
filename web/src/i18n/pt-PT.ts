@@ -35,6 +35,12 @@ export const ptPT = {
     privacyPolicy: "Política de Privacidade",
     termsOfService: "Termos de Serviço",
     dataProtection: "Proteção de Dados",
+    restoringSession: "A restaurar sessão…",
+    restoringSessionDesc: "A retomar de onde deixaste.",
+    loadingData: "A carregar dados…",
+    updating: "A atualizar…",
+    deleting: "A eliminar…",
+    refreshing: "A atualizar…",
   },
 
   landing: {

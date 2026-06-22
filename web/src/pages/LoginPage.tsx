@@ -6,6 +6,7 @@ import { useDictionary } from "@/i18n";
 import { getErrorMessage } from "@/lib/errors";
 import type { Dictionary } from "@/i18n";
 import { Logo } from "@/components/Logo";
+import { FullPageLoader } from "@/components/ui";
 
 type Step =
   | { type: "select" }
@@ -28,7 +29,7 @@ export function LoginPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [searchParams] = useSearchParams();
 
-  const { initiateAuth, completeAuth, isAuthenticated, loading } = useAuth();
+  const { initiateAuth, completeAuth, isAuthenticated, loading, authPhase } = useAuth();
   const navigate = useNavigate();
   const dict = useDictionary().auth;
   const common = useDictionary().common;
@@ -43,6 +44,12 @@ export function LoginPage() {
     const err = searchParams.get("error");
     if (err === "invalid-token") setError(dict.invalidToken);
   }, [searchParams, dict.invalidToken]);
+
+  // While the session is being resolved (no cached snapshot, probing /auth/me),
+  // never paint the login form — that is what causes the login-page flash.
+  if (authPhase === "restoring") {
+    return <FullPageLoader label={common.restoringSession} />;
+  }
 
   function translateAuthError(
     raw: string,

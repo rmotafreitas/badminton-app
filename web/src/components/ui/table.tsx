@@ -15,6 +15,8 @@ interface TableProps<T> {
   loading?: boolean;
   emptyMessage?: string;
   loadingMessage?: string;
+  /** Optional skeleton rows to render instead of the plain loading text. */
+  skeletonRows?: React.ReactNode;
 }
 
 export function Table<T extends { id?: string }>({
@@ -25,6 +27,7 @@ export function Table<T extends { id?: string }>({
   loading = false,
   emptyMessage = "No data found.",
   loadingMessage = "Loading...",
+  skeletonRows,
 }: TableProps<T>) {
   return (
     <div className="card has-table">
@@ -36,7 +39,20 @@ export function Table<T extends { id?: string }>({
       </header>
       <div className="card-content">
         {loading ? (
-          <div className="p-4 text-center">{loadingMessage}</div>
+          skeletonRows ? (
+            <table>
+              <thead>
+                <tr>
+                  {columns.map((col, i) => (
+                    <th key={i} className={col.headerClassName}>{col.header}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>{skeletonRows}</tbody>
+            </table>
+          ) : (
+            <div className="p-4 text-center">{loadingMessage}</div>
+          )
         ) : data.length === 0 ? (
           <div className="p-4 text-center text-muted-foreground">{emptyMessage}</div>
         ) : (

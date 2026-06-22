@@ -1,10 +1,14 @@
 import { useEffect, useState, useMemo } from "react";
 import { useParams, useSearchParams, Link } from "react-router-dom";
 import { useGameService, useClubService } from "@/di/container";
+import { useAuth } from "@/hooks/useAuth";
 import { useDictionary } from "@/i18n";
-import { PlayerSelect } from "@/components/ui";
+import { PlayerSelect, Skeleton, ProfileSkeleton } from "@/components/ui";
+import { useQuery, useMutation, invalidateQueries, setQueryData } from "@/hooks/useQuery";
 import { checkScore } from "@/lib/score-utils";
 import type { GameType } from "@/core/domain/game";
+import type { Game } from "@/core/domain/game";
+import type { Club } from "@/core/domain/club";
 
 type GameSet = { team1Score: number; team2Score: number };
 
@@ -47,6 +51,7 @@ export function GameDetailPage() {
 
   const gameService = useGameService();
   const clubService = useClubService();
+  const { refreshUser } = useAuth();
   const dict = useDictionary().games;
   const common = useDictionary().common;
 
@@ -58,9 +63,18 @@ export function GameDetailPage() {
     noAvailable: dict.noPlayersAvailable,
   };
 
-  const [game, setGame] = useState<any>(null);
-  const [clubData, setClubData] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
+  const { data: game, isLoading: gameLoading } = useQuery<Game>(
+    ["game", id ?? ""],
+    () => gameService.getGameById(id!),
+    { enabled: !!id, staleTime: 60_000 },
+  );
+
+  const { data: clubData } = useQuery<Club>(
+    ["club", game?.clubId ?? ""],
+    () => clubService.getClubById(game!.clubId),
+    { enabled: !!game?.clubId, staleTime: 60_000, persist: true },
+  );
+
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
@@ -79,31 +93,21 @@ export function GameDetailPage() {
   const [origSets, setOrigSets] = useState<GameSet[]>([]);
   const [origDate, setOrigDate] = useState("");
 
+  // Sync form state whenever the fetched game changes. The setStates here are
+  // intentional: they seed editable form fields from external (cached) data,
+  // and only run when `game` actually changes — no cascading renders.
   useEffect(() => {
-    if (!id) return;
-    (async () => {
-      try {
-        const g = await gameService.getGameById(id);
-        setGame(g);
-        setGameType(g.type); setOrigType(g.type);
-        setTeam1Players([...g.team1PlayerIds]); setOrigTeam1([...g.team1PlayerIds]);
-        setTeam2Players([...g.team2PlayerIds]); setOrigTeam2([...g.team2PlayerIds]);
-        const s = g.sets?.length > 0 ? [...g.sets] : [{ team1Score: 0, team2Score: 0 }];
-        setSets(s); setOrigSets(s.map((x: GameSet) => ({ ...x })));
-        const d = g.playedAt ? new Date(g.playedAt).toISOString().slice(0, 10) : "";
-        setPlayedAt(d); setOrigDate(d);
-
-        if (g.clubId) {
-          const club = await clubService.getClubById(g.clubId);
-          setClubData(club);
-        }
-      } catch (err) {
-        console.error("Failed to load game", err);
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, [id, gameService, clubService]);
+    if (!game) return;
+    /* eslint-disable react-hooks/set-state-in-effect */
+    setGameType(game.type); setOrigType(game.type);
+    setTeam1Players([...game.team1PlayerIds]); setOrigTeam1([...game.team1PlayerIds]);
+    setTeam2Players([...game.team2PlayerIds]); setOrigTeam2([...game.team2PlayerIds]);
+    const s = game.sets?.length > 0 ? [...game.sets] : [{ team1Score: 0, team2Score: 0 }];
+    setSets(s); setOrigSets(s.map((x) => ({ ...x })));
+    const d = game.playedAt ? new Date(game.playedAt).toISOString().slice(0, 10) : "";
+    setPlayedAt(d); setOrigDate(d);
+    /* eslint-enable react-hooks/set-state-in-effect */
+  }, [game]);
 
   const maxPerSide = gameType === "SINGLES" ? 1 : 2;
 
@@ -141,6 +145,17 @@ export function GameDetailPage() {
     setError(null);
   };
 
+  const updateMutation = useMutation(
+    (vars: { id: string; payload: any }) => gameService.updateGame(vars.id, vars.payload),
+    {
+      onSuccess: async () => {
+        // ELO / stats / games lists may have changed — resync dependent data.
+        invalidateQueries(["games"], ["profile"]);
+        await refreshUser();
+      },
+    },
+  );
+
   const handleSave = async () => {
     setError(null);
     setSuccess(false);
@@ -159,8 +174,10 @@ export function GameDetailPage() {
       const payload: any = { type: gameType, team1PlayerIds: team1Players, team2PlayerIds: team2Players, sets };
       if (playedAt) payload.playedAt = new Date(playedAt).toISOString();
 
-      const updated = await gameService.updateGame(id!, payload);
-      setGame(updated);
+      const updated = await updateMutation.mutate({ id: id!, payload });
+      // Optimistically update the cached game so the view card reflects the
+      // edit immediately (the invalidation above refreshes dependent lists).
+      setQueryData(["game", id ?? ""], updated);
       setOrigType(gameType);
       setOrigTeam1([...team1Players]);
       setOrigTeam2([...team2Players]);
@@ -179,10 +196,16 @@ export function GameDetailPage() {
   const sideBLabel = gameType === "SINGLES" ? dict.opponentLabel : dict.pairB;
   const typeLabel = (t: string) => t === "SINGLES" ? dict.singles : dict.doubles;
 
-  if (loading) {
+  if (gameLoading && !game) {
     return (
       <section className="section main-section">
-        <div className="p-8 text-center">{common.loading}</div>
+        <div className="card mb-4 sm:mb-6">
+          <div className="card-content space-y-4">
+            <Skeleton className="h-6 w-40" />
+            <Skeleton className="h-40 w-full" />
+          </div>
+        </div>
+        <ProfileSkeleton />
       </section>
     );
   }
@@ -339,11 +362,11 @@ export function GameDetailPage() {
                 </div>
                 <div>
                   <p className="text-sm text-primary font-medium mb-1">{dict.team1}</p>
-                  {game.team1Players?.map((p: any, i: number) => <div key={i} className="mb-0.5">{playerLine(p)}</div>)}
+                  {game.team1Players?.map((p: any, i: number) => <div key={i}>{playerLine(p)}</div>)}
                 </div>
                 <div>
                   <p className="text-sm text-destructive font-medium mb-1">{dict.team2}</p>
-                  {game.team2Players?.map((p: any, i: number) => <div key={i} className="mb-0.5">{playerLine(p)}</div>)}
+                  {game.team2Players?.map((p: any, i: number) => <div key={i}>{playerLine(p)}</div>)}
                 </div>
               </div>
               <div className="space-y-3">
