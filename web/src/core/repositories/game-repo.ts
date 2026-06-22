@@ -34,6 +34,11 @@ export class GameRepoImpl implements GameRepo {
     return data.map(GameMapper.toDomain);
   }
 
+  async getSharedGames(playerId: string): Promise<Game[]> {
+    const { data } = await api.get<GameView[]>(`/games/shared/${playerId}`);
+    return data.map(GameMapper.toDomain);
+  }
+
   async getById(gameId: string): Promise<Game> {
     const { data } = await api.get<GameView>(`/games/${gameId}`);
     return GameMapper.toDomain(data);

@@ -41,6 +41,14 @@ export class GameController {
     return games.map(GameMapper.toView);
   }
 
+  async getSharedGames(
+    currentUser: { sub: string; roles: string[] },
+    playerId: string,
+  ): Promise<GameView[]> {
+    const games = await this.gameService.getSharedGames(currentUser, playerId);
+    return games.map(GameMapper.toView);
+  }
+
   async getGamesByPlayerId(
     currentUser: { sub: string; roles: string[] },
     playerId: string,

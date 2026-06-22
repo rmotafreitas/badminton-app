@@ -10,6 +10,7 @@ export interface GameService {
   getRecentGames(clubId: string): Promise<Game[]>;
   getMyGames(): Promise<Game[]>;
   getGamesByPlayerId(playerId: string): Promise<Game[]>;
+  getSharedGames(playerId: string): Promise<Game[]>;
   getGameById(gameId: string): Promise<Game>;
   updateGame(
     gameId: string,

@@ -10,6 +10,7 @@ export interface GameRepo {
   getRecentByClub(clubId: string): Promise<Game[]>;
   getMyGames(): Promise<Game[]>;
   getGamesByPlayerId(playerId: string): Promise<Game[]>;
+  getSharedGames(playerId: string): Promise<Game[]>;
   getById(gameId: string): Promise<Game>;
   update(gameId: string, params: Partial<RegisterGameParams>): Promise<Game>;
   delete(gameId: string): Promise<void>;

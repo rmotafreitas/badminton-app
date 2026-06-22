@@ -210,4 +210,74 @@ describe("Games", () => {
       expect(data).toBeArray();
     });
   });
+
+  // ── Shared games ───────────────────────────────────────────────────────
+  describe("GET /games/shared/:playerId", () => {
+    it("returns games where both current user and target player participated", async () => {
+      const api = createAuthedApi(["PLAYER"]);
+      await (api.games as any).post({
+        clubId: "club-1",
+        type: "SINGLES",
+        team1PlayerIds: ["user-1"],
+        team2PlayerIds: ["player-2"],
+        sets: [{ team1Score: 21, team2Score: 19 }],
+      });
+
+      const { data, status } = await (api.games as any)
+        .shared({ playerId: "player-2" })
+        .get();
+      expect(status).toBe(200);
+      expect(data).toBeArray();
+      expect(data!.length).toBeGreaterThan(0);
+      for (const g of data!) {
+        const hasUser =
+          g.team1PlayerIds.includes("user-1") ||
+          g.team2PlayerIds.includes("user-1");
+        const hasTarget =
+          g.team1PlayerIds.includes("player-2") ||
+          g.team2PlayerIds.includes("player-2");
+        expect(hasUser && hasTarget).toBe(true);
+      }
+    });
+
+    it("excludes games the current user did not participate in", async () => {
+      const api = createAuthedApi(["CLUB_ADMIN"]);
+      // Shared game (current user + target)
+      await (api.games as any).post({
+        clubId: "club-1",
+        type: "SINGLES",
+        team1PlayerIds: ["user-1"],
+        team2PlayerIds: ["player-2"],
+        sets: [{ team1Score: 21, team2Score: 19 }],
+      });
+      // Game without current user
+      await (api.games as any).post({
+        clubId: "club-1",
+        type: "SINGLES",
+        team1PlayerIds: ["player-1"],
+        team2PlayerIds: ["player-2"],
+        sets: [{ team1Score: 21, team2Score: 19 }],
+      });
+
+      const { data, status } = await (api.games as any)
+        .shared({ playerId: "player-2" })
+        .get();
+      expect(status).toBe(200);
+      expect(data).toBeArray();
+      for (const g of data!) {
+        expect(
+          g.team1PlayerIds.includes("user-1") ||
+            g.team2PlayerIds.includes("user-1"),
+        ).toBe(true);
+      }
+    });
+
+    it("returns 401 without auth", async () => {
+      const api = createUnauthedApi();
+      const { status } = await (api.games as any)
+        .shared({ playerId: "player-2" })
+        .get();
+      expect(status).toBe(401);
+    });
+  });
 });

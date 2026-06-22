@@ -76,6 +76,19 @@ export const gameRoutes = (ctrl: GameController, jwtService: JwtService) =>
     )
 
     .get(
+      "/shared/:playerId",
+      ({ currentUser, params }) =>
+        ctrl.getSharedGames(currentUser, params.playerId),
+      {
+        detail: {
+          tags: ["Games"],
+          summary:
+            "Get games shared between the current user and a specific player",
+        },
+      },
+    )
+
+    .get(
       "/:gameId",
       ({ currentUser, params }) => ctrl.getGameById(currentUser, params.gameId),
       {

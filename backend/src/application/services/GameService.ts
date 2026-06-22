@@ -93,6 +93,13 @@ export class GameService {
     return this.gameRepo.findByPlayerId(currentUser.sub);
   }
 
+  async getSharedGames(
+    currentUser: { sub: string; roles: string[] },
+    targetPlayerId: string,
+  ): Promise<Game[]> {
+    return this.gameRepo.findSharedBetween(currentUser.sub, targetPlayerId);
+  }
+
   async getGamesByPlayerId(
     currentUser: { sub: string; roles: string[] },
     targetPlayerId: string,

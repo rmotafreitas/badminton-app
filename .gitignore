@@ -42,3 +42,5 @@ backend/certs/local/*.pem
 *.zip
 *.tar.gz
 *.tgz
+
+aefa-main

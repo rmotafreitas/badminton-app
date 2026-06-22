@@ -37,14 +37,27 @@ export function GamesPage() {
   const [clubData, setClubData] = useState<any>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [view, setView] = useState<"mine" | "all">("all");
   const dict = useDictionary().games;
   const common = useDictionary().common;
 
+  const canToggle =
+    !!user?.roles?.includes("CLUB_ADMIN") || !!user?.roles?.includes("COACH");
+
   const fetchGames = async () => {
-    if (!user?.clubId) return;
+    setLoading(true);
     try {
-      const data = await gameService.getRecentGames(user.clubId);
-      setGames(data);
+      if (view === "mine") {
+        const data = await gameService.getMyGames();
+        setGames(data);
+      } else {
+        if (!user?.clubId) {
+          setGames([]);
+          return;
+        }
+        const data = await gameService.getRecentGames(user.clubId);
+        setGames(data);
+      }
     } catch (err) {
       console.error("Failed to fetch games", err);
     } finally {
@@ -54,7 +67,8 @@ export function GamesPage() {
 
   useEffect(() => {
     fetchGames();
-  }, [user?.clubId, gameService]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.clubId, gameService, view]);
 
   useEffect(() => {
     const fetchClub = async () => {
@@ -180,6 +194,28 @@ export function GamesPage() {
       <section className="is-hero-bar">
         <div className="flex flex-col md:flex-row items-center justify-between space-y-6 md:space-y-0">
           <h1 className="title">{dict.registerGame}</h1>
+          {canToggle && (
+            <div className="buttons">
+              <button
+                className={`button small ${view === "all" ? "blue" : "light"}`}
+                onClick={() => setView("all")}
+              >
+                <span className="icon">
+                  <i className="mdi mdi-account-group"></i>
+                </span>
+                <span>{dict.allClubGames}</span>
+              </button>
+              <button
+                className={`button small ${view === "mine" ? "blue" : "light"}`}
+                onClick={() => setView("mine")}
+              >
+                <span className="icon">
+                  <i className="mdi mdi-account"></i>
+                </span>
+                <span>{dict.myGames}</span>
+              </button>
+            </div>
+          )}
         </div>
       </section>
 
@@ -191,8 +227,8 @@ export function GamesPage() {
         />
 
         <Table
-          title={dict.matchHistory}
-          titleIcon="mdi-badminton"
+          title={view === "mine" ? dict.myGames : dict.matchHistory}
+          titleIcon={view === "mine" ? "mdi-account" : "mdi-badminton"}
           columns={columns}
           data={games}
           loading={loading}

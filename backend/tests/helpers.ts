@@ -98,6 +98,14 @@ export function mockGameRepo(): IGameRepo {
     },
     findRecentByClub: async () => games.slice(0, 10),
     findByPlayerId: async () => games,
+    findSharedBetween: async (playerIdA, playerIdB) =>
+      games.filter(
+        (g) =>
+          (g.team1PlayerIds.includes(playerIdA) ||
+            g.team2PlayerIds.includes(playerIdA)) &&
+          (g.team1PlayerIds.includes(playerIdB) ||
+            g.team2PlayerIds.includes(playerIdB)),
+      ),
     findById: async (id) => games.find((g) => g.id === id) ?? null,
     update: async (id, data) => {
       const game = games.find((g) => g.id === id);

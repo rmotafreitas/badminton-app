@@ -33,6 +33,10 @@ export class GameServiceImpl implements GameService {
     return this.gameRepo.getGamesByPlayerId(playerId);
   }
 
+  async getSharedGames(playerId: string): Promise<Game[]> {
+    return this.gameRepo.getSharedGames(playerId);
+  }
+
   async getGameById(gameId: string): Promise<Game> {
     return this.gameRepo.getById(gameId);
   }

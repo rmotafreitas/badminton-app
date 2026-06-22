@@ -53,7 +53,9 @@ export function ProfilePage() {
   const gameService = useGameService();
   const [profile, setProfile] = useState<any>(null);
   const [clubName, setClubName] = useState<string | null>(null);
-  const [games, setGames] = useState<Game[]>([]);
+  const [sharedGames, setSharedGames] = useState<Game[]>([]);
+  const [allPlayerGames, setAllPlayerGames] = useState<Game[]>([]);
+  const [myGames, setMyGames] = useState<Game[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -117,25 +119,65 @@ export function ProfilePage() {
     }
   }, [user?.clubId, clubService]);
 
+  const isOwnProfile = !id || id === user?.userId;
+  const viewedUserId = id ?? user?.userId ?? "";
+  const isCoachOrAdmin =
+    !!user?.roles?.includes("CLUB_ADMIN") || !!user?.roles?.includes("COACH");
+  const isSystemAdmin = !!user?.roles?.includes("SYSTEM_ADMIN");
+
   useEffect(() => {
-    if (id && user?.userId !== id) {
+    let cancelled = false;
+    if (isOwnProfile) {
       gameService
-        .getGamesByPlayerId(id)
-        .then(setGames)
+        .getMyGames()
+        .then((data) => {
+          if (cancelled) return;
+          setMyGames(data);
+          setSharedGames([]);
+          setAllPlayerGames([]);
+        })
+        .catch(() => {});
+    } else if (isCoachOrAdmin) {
+      Promise.all([
+        gameService.getSharedGames(id!),
+        gameService.getGamesByPlayerId(id!),
+      ])
+        .then(([shared, all]) => {
+          if (cancelled) return;
+          setSharedGames(shared);
+          setAllPlayerGames(all);
+          setMyGames([]);
+        })
+        .catch(() => {});
+    } else if (isSystemAdmin) {
+      gameService
+        .getGamesByPlayerId(id!)
+        .then((data) => {
+          if (cancelled) return;
+          setAllPlayerGames(data);
+          setMyGames([]);
+          setSharedGames([]);
+        })
         .catch(() => {});
     } else {
       gameService
-        .getMyGames()
-        .then(setGames)
+        .getSharedGames(id!)
+        .then((data) => {
+          if (cancelled) return;
+          setSharedGames(data);
+          setMyGames([]);
+          setAllPlayerGames([]);
+        })
         .catch(() => {});
     }
-  }, [gameService, id, user?.userId]);
+    return () => {
+      cancelled = true;
+    };
+  }, [gameService, id, isOwnProfile, isCoachOrAdmin, isSystemAdmin]);
 
   useEffect(() => {
     fetchProfile();
   }, [fetchProfile]);
-
-  const isOwnProfile = !id || id === user?.userId;
 
   useEffect(() => {
     if (isOwnProfile) {
@@ -225,18 +267,25 @@ export function ProfilePage() {
     });
   };
 
+  const primaryGames = useMemo(() => {
+    if (isOwnProfile) return myGames;
+    if (isCoachOrAdmin || isSystemAdmin) return allPlayerGames;
+    return sharedGames;
+  }, [isOwnProfile, isCoachOrAdmin, isSystemAdmin, myGames, allPlayerGames, sharedGames]);
+
+  const hasAnyGames = primaryGames.length > 0 || sharedGames.length > 0;
+
   const gameStats = useMemo(() => {
-    const userId = user?.userId;
-    const wins = games.filter((g) =>
+    const wins = primaryGames.filter((g) =>
       g.winner === "team1"
-        ? g.team1PlayerIds.includes(userId!)
+        ? g.team1PlayerIds.includes(viewedUserId)
         : g.winner === "team2"
-          ? g.team2PlayerIds.includes(userId!)
+          ? g.team2PlayerIds.includes(viewedUserId)
           : false,
     ).length;
-    const losses = games.length - wins;
-    return { total: games.length, wins, losses };
-  }, [games, user?.userId]);
+    const losses = primaryGames.length - wins;
+    return { total: primaryGames.length, wins, losses };
+  }, [primaryGames, viewedUserId]);
 
   if (loading) {
     return (
@@ -310,8 +359,7 @@ export function ProfilePage() {
     {
       header: gamesDict.result,
       accessor: (g) => {
-        const userId = user?.userId;
-        const isTeam1 = g.team1PlayerIds.includes(userId!);
+        const isTeam1 = g.team1PlayerIds.includes(viewedUserId);
         const won = g.winner === (isTeam1 ? "team1" : "team2");
         return (
           <div className="flex items-center gap-1">
@@ -655,139 +703,165 @@ export function ProfilePage() {
             </div>
 
             {/* Stats + Activity row */}
-            {games.length > 0 && (
-              <>
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4">
-                  <div className="card">
-                    <header className="card-header">
-                      <p className="card-header-title">
-                        <span className="icon">
-                          <i className="mdi mdi-chart-bar"></i>
-                        </span>
-                        {dict.stats}
-                      </p>
-                    </header>
-                    <div className="card-content px-5 sm:px-8 py-5">
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-center">
-                        <div>
-                          <p className="text-2xl sm:text-3xl font-bold text-foreground">
-                            {gameStats.total}
-                          </p>
-                          <p className="text-xs text-muted-foreground/70 uppercase tracking-wide mt-1">
-                            {dict.totalGames}
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-2xl sm:text-3xl font-bold text-success">
-                            {gameStats.wins}
-                          </p>
-                          <p className="text-xs text-muted-foreground/70 uppercase tracking-wide mt-1">
-                            {dict.wins}
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-2xl sm:text-3xl font-bold text-destructive">
-                            {gameStats.losses}
-                          </p>
-                          <p className="text-xs text-muted-foreground/70 uppercase tracking-wide mt-1">
-                            {dict.losses}
-                          </p>
-                        </div>
-                        <div className="flex flex-col items-center">
-                          <svg
-                            width="52"
-                            height="52"
-                            viewBox="0 0 52 52"
-                            className="-my-1"
+            {primaryGames.length > 0 && (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4">
+                <div className="card">
+                  <header className="card-header">
+                    <p className="card-header-title">
+                      <span className="icon">
+                        <i className="mdi mdi-chart-bar"></i>
+                      </span>
+                      {dict.stats}
+                    </p>
+                  </header>
+                  <div className="card-content px-5 sm:px-8 py-5">
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-center">
+                      <div>
+                        <p className="text-2xl sm:text-3xl font-bold text-foreground">
+                          {gameStats.total}
+                        </p>
+                        <p className="text-xs text-muted-foreground/70 uppercase tracking-wide mt-1">
+                          {dict.totalGames}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-2xl sm:text-3xl font-bold text-success">
+                          {gameStats.wins}
+                        </p>
+                        <p className="text-xs text-muted-foreground/70 uppercase tracking-wide mt-1">
+                          {dict.wins}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-2xl sm:text-3xl font-bold text-destructive">
+                          {gameStats.losses}
+                        </p>
+                        <p className="text-xs text-muted-foreground/70 uppercase tracking-wide mt-1">
+                          {dict.losses}
+                        </p>
+                      </div>
+                      <div className="flex flex-col items-center">
+                        <svg
+                          width="52"
+                          height="52"
+                          viewBox="0 0 52 52"
+                          className="-my-1"
+                        >
+                          <circle
+                            cx="26"
+                            cy="26"
+                            r="22"
+                            fill="none"
+                            stroke="#e5e7eb"
+                            strokeWidth="5"
+                          />
+                          <circle
+                            cx="26"
+                            cy="26"
+                            r="22"
+                            fill="none"
+                            stroke={
+                              gameStats.total > 0
+                                ? gameStats.wins >= gameStats.losses
+                                  ? "#10b981"
+                                  : "#ef4444"
+                                : "#e5e7eb"
+                            }
+                            strokeWidth="5"
+                            strokeLinecap="round"
+                            strokeDasharray={`${(gameStats.total > 0 ? gameStats.wins / gameStats.total : 0) * 138.23} 138.23`}
+                            transform="rotate(-90 26 26)"
+                          />
+                          <text
+                            x="26"
+                            y="28"
+                            textAnchor="middle"
+                            className="text-xs font-bold"
+                            fill="#374151"
                           >
-                            <circle
-                              cx="26"
-                              cy="26"
-                              r="22"
-                              fill="none"
-                              stroke="#e5e7eb"
-                              strokeWidth="5"
-                            />
-                            <circle
-                              cx="26"
-                              cy="26"
-                              r="22"
-                              fill="none"
-                              stroke={
-                                gameStats.total > 0
-                                  ? gameStats.wins >= gameStats.losses
-                                    ? "#10b981"
-                                    : "#ef4444"
-                                  : "#e5e7eb"
-                              }
-                              strokeWidth="5"
-                              strokeLinecap="round"
-                              strokeDasharray={`${(gameStats.total > 0 ? gameStats.wins / gameStats.total : 0) * 138.23} 138.23`}
-                              transform="rotate(-90 26 26)"
-                            />
-                            <text
-                              x="26"
-                              y="28"
-                              textAnchor="middle"
-                              className="text-xs font-bold"
-                              fill="#374151"
-                            >
-                              {gameStats.total > 0
-                                ? Math.round(
-                                    (gameStats.wins / gameStats.total) * 100,
-                                  )
-                                : 0}
-                              %
-                            </text>
-                          </svg>
-                          <p className="text-xs text-muted-foreground/70 uppercase tracking-wide mt-1">
-                            {dict.winRate}
-                          </p>
-                        </div>
+                            {gameStats.total > 0
+                              ? Math.round(
+                                  (gameStats.wins / gameStats.total) * 100,
+                                )
+                              : 0}
+                            %
+                          </text>
+                        </svg>
+                        <p className="text-xs text-muted-foreground/70 uppercase tracking-wide mt-1">
+                          {dict.winRate}
+                        </p>
                       </div>
                     </div>
                   </div>
+                </div>
 
-                  <div className="card">
-                    <header className="card-header">
-                      <p className="card-header-title">
-                        <span className="icon">
-                          <i className="mdi mdi-calendar-check"></i>
-                        </span>
-                        {dict.activity}
-                      </p>
-                    </header>
-                    <div className="card-content px-3 sm:px-5 pt-5 pb-4">
-                      <ActivityHeatmap
-                        games={games}
-                        userId={profile?.userId ?? user?.userId ?? ""}
-                        lang={lang}
-                        labels={{
-                          gamesCount: dict.gamesCount,
-                          gamesCountPlural: dict.gamesCountPlural,
-                          winsShort: dict.winsShort,
-                          lossesShort: dict.lossesShort,
-                          legendLess: dict.activityLegendLess,
-                          legendMore: dict.activityLegendMore,
-                        }}
-                      />
-                    </div>
+                <div className="card">
+                  <header className="card-header">
+                    <p className="card-header-title">
+                      <span className="icon">
+                        <i className="mdi mdi-calendar-check"></i>
+                      </span>
+                      {dict.activity}
+                    </p>
+                  </header>
+                  <div className="card-content px-3 sm:px-5 pt-5 pb-4">
+                    <ActivityHeatmap
+                      games={primaryGames}
+                      userId={viewedUserId}
+                      lang={lang}
+                      labels={{
+                        gamesCount: dict.gamesCount,
+                        gamesCountPlural: dict.gamesCountPlural,
+                        winsShort: dict.winsShort,
+                        lossesShort: dict.lossesShort,
+                        legendLess: dict.activityLegendLess,
+                        legendMore: dict.activityLegendMore,
+                      }}
+                    />
                   </div>
                 </div>
-
-                {/* Recent games */}
-                <div className="mt-4">
-                  <Table
-                    title={dict.recentGames}
-                    titleIcon="mdi-history"
-                    columns={gameColumns}
-                    data={games}
-                  />
-                </div>
-              </>
+              </div>
             )}
 
-            {games.length === 0 && (
+            {/* Games tables */}
+            {hasAnyGames ? (
+              <div className="mt-4 space-y-4">
+                {!isOwnProfile && isCoachOrAdmin ? (
+                  <>
+                    <Table
+                      title={dict.sharedGames}
+                      titleIcon="mdi-sword-cross"
+                      columns={gameColumns}
+                      data={sharedGames}
+                      emptyMessage={dict.noSharedGames}
+                    />
+                    <Table
+                      title={dict.allPlayerGames}
+                      titleIcon="mdi-history"
+                      columns={gameColumns}
+                      data={allPlayerGames}
+                      emptyMessage={dict.noGames}
+                    />
+                  </>
+                ) : (
+                  <Table
+                    title={
+                      isOwnProfile || isSystemAdmin
+                        ? dict.recentGames
+                        : dict.sharedGames
+                    }
+                    titleIcon="mdi-history"
+                    columns={gameColumns}
+                    data={primaryGames}
+                    emptyMessage={
+                      isOwnProfile || isSystemAdmin
+                        ? dict.noGames
+                        : dict.noSharedGames
+                    }
+                  />
+                )}
+              </div>
+            ) : (
               <div className="card mt-4">
                 <div className="card-content text-center py-8 text-muted-foreground/70 text-sm">
                   <i className="mdi mdi-racquetball text-3xl block mb-2"></i>

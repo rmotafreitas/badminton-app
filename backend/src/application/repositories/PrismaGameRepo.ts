@@ -64,6 +64,32 @@ export class PrismaGameRepo implements IGameRepo {
     return Promise.all(records.map((r) => this.populatePlayers(r)));
   }
 
+  async findSharedBetween(
+    playerIdA: string,
+    playerIdB: string,
+  ): Promise<Game[]> {
+    const records = await this.prisma.game.findMany({
+      where: {
+        AND: [
+          {
+            OR: [
+              { team1PlayerIds: { has: playerIdA } },
+              { team2PlayerIds: { has: playerIdA } },
+            ],
+          },
+          {
+            OR: [
+              { team1PlayerIds: { has: playerIdB } },
+              { team2PlayerIds: { has: playerIdB } },
+            ],
+          },
+        ],
+      },
+      orderBy: { playedAt: "desc" },
+    });
+    return Promise.all(records.map((r) => this.populatePlayers(r)));
+  }
+
   async findById(id: string): Promise<Game | null> {
     const record = await this.prisma.game.findUnique({ where: { id } });
     if (!record) return null;
