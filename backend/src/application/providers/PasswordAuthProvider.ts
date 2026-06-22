@@ -1,3 +1,4 @@
+import bcrypt from "bcryptjs";
 import type { AuthInitView } from "@/application/views/auth.view";
 import type {
   IAuthProvider,
@@ -35,7 +36,7 @@ export class PasswordAuthProvider implements IAuthProvider {
     if (!user) throw new Error("Invalid credentials");
     if (!user.passwordHash) throw new Error("No password set for this account");
 
-    const isValid = await Bun.password.verify(cleanPassword, user.passwordHash);
+    const isValid = await bcrypt.compare(cleanPassword, user.passwordHash);
     if (!isValid) throw new Error("Invalid credentials");
 
     return {
@@ -46,6 +47,6 @@ export class PasswordAuthProvider implements IAuthProvider {
   }
 
   static async hashPassword(password: string): Promise<string> {
-    return Bun.password.hash(password);
+    return bcrypt.hash(password, 10);
   }
 }

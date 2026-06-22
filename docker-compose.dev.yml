@@ -47,6 +47,7 @@ services:
       - ./backend/src:/app/src          # hot-reload source
       - ./backend/certs:/app/certs      # local HTTPS certs (mkcert)
     environment:
+      IN_DEV: ${IN_DEV:-local}
       DATABASE_URL: mongodb://mongo:27017/avatarlabs?replicaSet=rs0&directConnection=true
       JWT_SECRET: ${JWT_SECRET:-dev-secret-change-in-production-min-32}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}

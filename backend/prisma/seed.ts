@@ -1,4 +1,5 @@
 import { PrismaClient } from "@prisma/client";
+import bcrypt from "bcryptjs";
 import { normalizePhone } from "../src/application/utils/normalizePhone";
 
 const prisma = new PrismaClient();
@@ -68,13 +69,33 @@ const members: Member[] = [
       "data:image/webp;base64,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",
   },
   {
+    name: "Bernardo Santos",
+    phone: "+351 918 765 725",
+    roles: ["PLAYER"],
+  },
+  {
     name: "Fernanda Santos",
     phone: "+351 965 479 876",
     roles: ["PLAYER"],
   },
   {
+    name: "Fred",
+    phone: "+351 913 304 834",
+    roles: ["PLAYER"],
+  },
+  {
+    name: "Marta",
+    phone: "+351 935 115 094",
+    roles: ["PLAYER"],
+  },
+  {
     name: "Filipe Cardoso",
     phone: "+351 912 810 267",
+    roles: ["PLAYER"],
+  },
+  {
+    name: "Yuri Damasceno",
+    phone: "+351 934 356 415",
     roles: ["PLAYER"],
   },
 ];
@@ -95,7 +116,7 @@ async function main() {
   });
   console.log(`  Created club: ${club.name} (${club.id})`);
 
-  const passwordHash = await Bun.password.hash("password");
+  const passwordHash = await bcrypt.hash("password", 10);
 
   const sysAdmin = await prisma.user.create({
     data: {
@@ -115,7 +136,9 @@ async function main() {
       },
     },
   });
-  console.log(`  Created system admin: ${sysAdmin.email} (${sysAdmin.id}) [SYSTEM_ADMIN]`);
+  console.log(
+    `  Created system admin: ${sysAdmin.email} (${sysAdmin.id}) [SYSTEM_ADMIN]`,
+  );
 
   for (const m of members) {
     console.log(`  Creating ${m.roles.join("/")}: ${m.name}...`);

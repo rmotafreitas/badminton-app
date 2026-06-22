@@ -13,7 +13,7 @@ function closeMobileSidebar() {
 }
 
 export function Sidebar() {
-  const { logout, user } = useAuth();
+  const { user } = useAuth();
   const location = useLocation();
   const dict = useDictionary().sidebar;
 
@@ -70,10 +70,10 @@ export function Sidebar() {
               </Link>
             </li>
             <li>
-              <a onClick={logout} className="cursor-pointer">
+              <Link to="/logout" onClick={closeMobileSidebar}>
                 <span className="icon"><i className="mdi mdi-logout"></i></span>
                 <span className="menu-item-label">{dict.logout}</span>
-              </a>
+              </Link>
             </li>
           </ul>
         </div>
