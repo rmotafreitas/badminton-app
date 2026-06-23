@@ -13,11 +13,20 @@ import type { Game } from "@/core/domain/game";
 import type { Profile } from "@/core/domain/profile";
 import type { Club } from "@/core/domain/club";
 import { Input, Select, Textarea, ImageUpload, Table, ProfileSkeleton, SkeletonRows, Skeleton } from "@/components/ui";
+import {
+  WinLossDonut,
+  EloLineChart,
+  ActivityBarChart,
+  EloGauge,
+  TypeSplitChart,
+  RecentFormPills,
+} from "@/components/ui";
 import { useQuery, useMutation, invalidateQueries } from "@/hooks/useQuery";
 import type { Column } from "@/components/ui";
 import { ActivityHeatmap } from "@/components/ActivityHeatmap";
 import { getErrorMessage } from "@/lib/errors";
 import { fallbackAvatar } from "@/lib/avatar-utils";
+import { computePlayerStats } from "@/lib/stats-utils";
 
 const sexOptions = [
   { value: "", label: "--" },
@@ -294,6 +303,18 @@ export function ProfilePage() {
     const losses = primaryGames.length - wins;
     return { total: primaryGames.length, wins, losses };
   }, [primaryGames, viewedUserId]);
+
+  const locale = lang === "pt-PT" ? "pt-PT" : "en-US";
+  const playerStats = useMemo(
+    () =>
+      computePlayerStats(
+        primaryGames,
+        viewedUserId,
+        user?.elo ?? 200,
+        locale,
+      ),
+    [primaryGames, viewedUserId, user?.elo, locale],
+  );
 
   if (profileLoading && !profile) {
     return (
@@ -713,26 +734,178 @@ export function ProfilePage() {
               </div>
             </div>
 
-            {/* Stats + Activity row — show when we have games data, or a
-                skeleton while games are loading for the first time. */}
+            {/* Stats overview — 4 stat cards */}
+            {primaryGamesLoading && primaryGames.length === 0 ? (
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-4">
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <div key={i} className="card">
+                    <div className="card-content flex flex-col items-center gap-2">
+                      <Skeleton className="h-9 w-16" />
+                      <Skeleton className="h-3 w-20" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : primaryGames.length > 0 && (
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-4">
+                <div className="card">
+                  <div className="card-content text-center py-4">
+                    <p className="text-2xl sm:text-3xl font-bold text-foreground">{gameStats.total}</p>
+                    <p className="text-xs text-muted-foreground/70 uppercase tracking-wide mt-1">{dict.totalGames}</p>
+                  </div>
+                </div>
+                <div className="card">
+                  <div className="card-content text-center py-4">
+                    <p className="text-2xl sm:text-3xl font-bold text-success">{gameStats.wins}</p>
+                    <p className="text-xs text-muted-foreground/70 uppercase tracking-wide mt-1">{dict.wins}</p>
+                  </div>
+                </div>
+                <div className="card">
+                  <div className="card-content text-center py-4">
+                    <p className="text-2xl sm:text-3xl font-bold text-destructive">{gameStats.losses}</p>
+                    <p className="text-xs text-muted-foreground/70 uppercase tracking-wide mt-1">{dict.losses}</p>
+                  </div>
+                </div>
+                <div className="card">
+                  <div className="card-content text-center py-4">
+                    <p className="text-2xl sm:text-3xl font-bold text-primary">
+                      {playerStats.currentStreak.count}
+                    </p>
+                    <p className="text-xs text-muted-foreground/70 uppercase tracking-wide mt-1">
+                      {playerStats.currentStreak.type === "W" ? dict.streakWin : dict.streakLoss}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Charts row 1: Win/Loss donut + ELO gauge + Game types */}
+            {primaryGamesLoading && primaryGames.length === 0 ? (
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mt-4">
+                {Array.from({ length: 3 }).map((_, i) => (
+                  <div key={i} className="card">
+                    <div className="card-content flex items-center justify-center py-12">
+                      <Skeleton className="h-32 w-32 rounded-full" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : primaryGames.length > 0 && (
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mt-4">
+                {/* Win/Loss donut */}
+                <div className="card">
+                  <header className="card-header">
+                    <p className="card-header-title">
+                      <span className="icon"><i className="mdi mdi-chart-donut"></i></span>
+                      {dict.winRate}
+                    </p>
+                  </header>
+                  <div className="card-content flex flex-col items-center justify-center py-6">
+                    <WinLossDonut wins={gameStats.wins} losses={gameStats.losses} size={170} />
+                  </div>
+                </div>
+
+                {/* ELO gauge */}
+                <div className="card">
+                  <header className="card-header">
+                    <p className="card-header-title">
+                      <span className="icon"><i className="mdi mdi-trophy-variant"></i></span>
+                      ELO
+                    </p>
+                  </header>
+                  <div className="card-content flex flex-col items-center justify-center py-6">
+                    <EloGauge elo={user?.elo ?? 200} min={0} max={1000} size={160} />
+                    <div className="mt-3 text-center">
+                      <p className="text-xs text-muted-foreground">
+                        {dict.bestStreak}: <span className="font-bold text-success">{playerStats.bestStreak}</span>
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {dict.avgScorePerGame}: <span className="font-bold text-foreground">{playerStats.avgScorePerGame}</span>
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Game type split */}
+                <div className="card">
+                  <header className="card-header">
+                    <p className="card-header-title">
+                      <span className="icon"><i className="mdi mdi-chart-bar"></i></span>
+                      {dict.gameTypes}
+                    </p>
+                  </header>
+                  <div className="card-content py-4">
+                    <TypeSplitChart
+                      singles={playerStats.byType.SINGLES.total}
+                      doubles={playerStats.byType.DOUBLES.total}
+                      height={170}
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Charts row 2: ELO progression line + Monthly activity bars */}
+            {primaryGamesLoading && primaryGames.length === 0 ? (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4">
+                {Array.from({ length: 2 }).map((_, i) => (
+                  <div key={i} className="card">
+                    <div className="card-content py-8">
+                      <Skeleton className="h-40 w-full" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : primaryGames.length > 0 && (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4">
+                {/* ELO progression line */}
+                <div className="card">
+                  <header className="card-header">
+                    <p className="card-header-title">
+                      <span className="icon"><i className="mdi mdi-chart-line"></i></span>
+                      {dict.eloProgression}
+                    </p>
+                  </header>
+                  <div className="card-content py-4">
+                    <EloLineChart data={playerStats.eloProgression} height={200} />
+                  </div>
+                </div>
+
+                {/* Monthly activity bar chart */}
+                <div className="card">
+                  <header className="card-header">
+                    <p className="card-header-title">
+                      <span className="icon"><i className="mdi mdi-chart-bar"></i></span>
+                      {dict.monthlyActivity}
+                    </p>
+                  </header>
+                  <div className="card-content py-4">
+                    <ActivityBarChart
+                      data={playerStats.monthlyActivity}
+                      height={200}
+                      showSplit
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Charts row 3: Recent form + Activity heatmap */}
             {primaryGamesLoading && primaryGames.length === 0 ? (
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4">
                 <div className="card">
-                  <div className="card-content px-5 sm:px-8 py-5">
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-center">
-                      {Array.from({ length: 4 }).map((_, i) => (
-                        <div key={i} className="flex flex-col items-center gap-2">
-                          <Skeleton className="h-9 w-12" />
-                          <Skeleton className="h-3 w-16" />
-                        </div>
+                  <div className="card-content py-8">
+                    <div className="flex gap-2">
+                      {Array.from({ length: 10 }).map((_, i) => (
+                        <Skeleton key={i} className="h-8 w-8 rounded-full" />
                       ))}
                     </div>
                   </div>
                 </div>
                 <div className="card">
-                  <div className="card-content px-3 sm:px-5 pt-5 pb-4">
+                  <div className="card-content py-5">
                     <div className="flex flex-wrap gap-1">
-                      {Array.from({ length: 53 * 7 }).map((_, i) => (
+                      {Array.from({ length: 60 }).map((_, i) => (
                         <Skeleton key={i} className="h-3 w-3 rounded-sm" />
                       ))}
                     </div>
@@ -741,102 +914,24 @@ export function ProfilePage() {
               </div>
             ) : primaryGames.length > 0 && (
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4">
+                {/* Recent form pills */}
                 <div className="card">
                   <header className="card-header">
                     <p className="card-header-title">
-                      <span className="icon">
-                        <i className="mdi mdi-chart-bar"></i>
-                      </span>
-                      {dict.stats}
+                      <span className="icon"><i className="mdi mdi-fire"></i></span>
+                      {dict.recentForm}
                     </p>
                   </header>
-                  <div className="card-content px-5 sm:px-8 py-5">
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-center">
-                      <div>
-                        <p className="text-2xl sm:text-3xl font-bold text-foreground">
-                          {gameStats.total}
-                        </p>
-                        <p className="text-xs text-muted-foreground/70 uppercase tracking-wide mt-1">
-                          {dict.totalGames}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-2xl sm:text-3xl font-bold text-success">
-                          {gameStats.wins}
-                        </p>
-                        <p className="text-xs text-muted-foreground/70 uppercase tracking-wide mt-1">
-                          {dict.wins}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-2xl sm:text-3xl font-bold text-destructive">
-                          {gameStats.losses}
-                        </p>
-                        <p className="text-xs text-muted-foreground/70 uppercase tracking-wide mt-1">
-                          {dict.losses}
-                        </p>
-                      </div>
-                      <div className="flex flex-col items-center">
-                        <svg
-                          width="52"
-                          height="52"
-                          viewBox="0 0 52 52"
-                          className="-my-1"
-                        >
-                          <circle
-                            cx="26"
-                            cy="26"
-                            r="22"
-                            fill="none"
-                            stroke="#e5e7eb"
-                            strokeWidth="5"
-                          />
-                          <circle
-                            cx="26"
-                            cy="26"
-                            r="22"
-                            fill="none"
-                            stroke={
-                              gameStats.total > 0
-                                ? gameStats.wins >= gameStats.losses
-                                  ? "#10b981"
-                                  : "#ef4444"
-                                : "#e5e7eb"
-                            }
-                            strokeWidth="5"
-                            strokeLinecap="round"
-                            strokeDasharray={`${(gameStats.total > 0 ? gameStats.wins / gameStats.total : 0) * 138.23} 138.23`}
-                            transform="rotate(-90 26 26)"
-                          />
-                          <text
-                            x="26"
-                            y="28"
-                            textAnchor="middle"
-                            className="text-xs font-bold"
-                            fill="#374151"
-                          >
-                            {gameStats.total > 0
-                              ? Math.round(
-                                  (gameStats.wins / gameStats.total) * 100,
-                                )
-                              : 0}
-                            %
-                          </text>
-                        </svg>
-                        <p className="text-xs text-muted-foreground/70 uppercase tracking-wide mt-1">
-                          {dict.winRate}
-                        </p>
-                      </div>
-                    </div>
+                  <div className="card-content py-5">
+                    <RecentFormPills form={playerStats.recentForm} />
                   </div>
                 </div>
 
+                {/* Activity heatmap */}
                 <div className="card">
                   <header className="card-header">
                     <p className="card-header-title">
-                      <span className="icon">
-                        <i className="mdi mdi-calendar-check"></i>
-                      </span>
+                      <span className="icon"><i className="mdi mdi-calendar-check"></i></span>
                       {dict.activity}
                     </p>
                   </header>

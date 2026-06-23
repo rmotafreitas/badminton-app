@@ -1,11 +1,18 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useClubService, useGameService } from "@/di/container";
-import { useDictionary } from "@/i18n";
-import { Table } from "@/components/ui";
-import { WidgetSkeleton, SkeletonRows } from "@/components/ui";
+import { useDictionary, useLanguage } from "@/i18n";
+import { Table, WidgetSkeleton, SkeletonRows } from "@/components/ui";
+import {
+  WinLossDonut,
+  ActivityBarChart,
+  EloGauge,
+  TopPlayersChart,
+  TypeSplitChart,
+} from "@/components/ui";
 import { useQuery } from "@/hooks/useQuery";
+import { computePlayerStats, computeClubStats } from "@/lib/stats-utils";
 import type { Column } from "@/components/ui";
 import type { Club } from "@/core/domain/club";
 import type { Game } from "@/core/domain/game";
@@ -31,6 +38,34 @@ function playerLine(player: any) {
   );
 }
 
+function StatCard({
+  label,
+  value,
+  icon,
+  color,
+}: {
+  label: string;
+  value: string | number;
+  icon: string;
+  color: string;
+}) {
+  return (
+    <div className="card">
+      <div className="card-content">
+        <div className="flex items-center justify-between">
+          <div className="widget-label">
+            <h3>{label}</h3>
+            <h1>{value}</h1>
+          </div>
+          <span className={`icon widget-icon ${color}`}>
+            <i className={`mdi ${icon} mdi-48px`}></i>
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function DashboardPage() {
   const { user } = useAuth();
   const clubService = useClubService();
@@ -39,6 +74,8 @@ export function DashboardPage() {
   const dict = useDictionary().dashboard;
   const gameDict = useDictionary().games;
   const common = useDictionary().common;
+  const { lang } = useLanguage();
+  const locale = lang === "pt-PT" ? "pt-PT" : "en-US";
 
   const clubId = user?.clubId ?? "";
 
@@ -54,7 +91,26 @@ export function DashboardPage() {
     { enabled: !!clubId, staleTime: 30_000, persist: true },
   );
 
-  const recentGames = (recentGamesData ?? []).slice(0, 10);
+  // Also fetch the user's own games for personal stats
+  const { data: myGamesData } = useQuery<Game[]>(
+    ["games", "mine"],
+    () => gameService.getMyGames(),
+    { staleTime: 30_000, persist: true },
+  );
+
+  const allClubGames = recentGamesData ?? [];
+  const recentGames = allClubGames.slice(0, 10);
+  const myGames = myGamesData ?? [];
+
+  const playerStats = useMemo(
+    () => computePlayerStats(myGames, user?.userId ?? "", user?.elo ?? 200, locale),
+    [myGames, user?.userId, user?.elo, locale],
+  );
+
+  const clubStats = useMemo(
+    () => computeClubStats(allClubGames, locale),
+    [allClubGames, locale],
+  );
 
   useEffect(() => {
     const compute = () => {
@@ -69,12 +125,8 @@ export function DashboardPage() {
   }, [dict]);
 
   const clubMembers = clubData?.users?.length ?? 0;
-  const totalGames = recentGames.length;
-  const myGames = recentGames.filter(
-    (g) =>
-      g.team1PlayerIds?.includes(user?.userId ?? "") ||
-      g.team2PlayerIds?.includes(user?.userId ?? ""),
-  ).length;
+  const isPlayer = user?.roles?.includes("PLAYER") || user?.roles?.includes("COACH");
+  const dataReady = !gamesLoading || allClubGames.length > 0;
 
   const typeLabel = (type: string) => type === "SINGLES" ? gameDict.singles : gameDict.doubles;
 
@@ -121,7 +173,6 @@ export function DashboardPage() {
   ];
 
   const widgetsLoading = clubLoading && !clubData;
-  const isPlayer = user?.roles?.includes("PLAYER") || user?.roles?.includes("COACH");
 
   return (
     <>
@@ -134,6 +185,7 @@ export function DashboardPage() {
       </section>
 
       <section className="section main-section">
+        {/* Stat cards */}
         <div className="grid gap-4 sm:gap-6 grid-cols-1 md:grid-cols-3 mb-4 sm:mb-6">
           {widgetsLoading ? (
             <>
@@ -143,60 +195,132 @@ export function DashboardPage() {
             </>
           ) : (
             <>
-              <div className="card">
-                <div className="card-content">
-                  <div className="flex items-center justify-between">
-                    <div className="widget-label">
-                      <h3>{clubData?.name || dict.clubMembers}</h3>
-                      <h1>{clubMembers}</h1>
-                    </div>
-                    <span className="icon widget-icon text-primary">
-                      <i className="mdi mdi-account-group mdi-48px"></i>
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="card">
-                <div className="card-content">
-                  <div className="flex items-center justify-between">
-                    <div className="widget-label">
-                      <h3>{dict.totalGames}</h3>
-                      <h1>{totalGames}</h1>
-                    </div>
-                    <span className="icon widget-icon text-success">
-                      <i className="mdi mdi-badminton mdi-48px"></i>
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="card">
-                <div className="card-content">
-                  <div className="flex items-center justify-between">
-                    {isPlayer ? (
-                      <div className="widget-label">
-                        <h3>{dict.yourGameCount}</h3>
-                        <h1>{myGames}</h1>
-                      </div>
-                    ) : (
-                      <div className="widget-label">
-                        <h3>{dict.role}</h3>
-                        <h1 className="text-xl">
-                          {user?.roles?.map((r) => r.replace("_", " ")).join(", ")}
-                        </h1>
-                      </div>
-                    )}
-                    <span className="icon widget-icon text-accent">
-                      <i className="mdi mdi-trophy mdi-48px"></i>
-                    </span>
-                  </div>
-                </div>
-              </div>
+              <StatCard
+                label={clubData?.name || dict.clubMembers}
+                value={clubMembers}
+                icon="mdi-account-group"
+                color="text-primary"
+              />
+              <StatCard
+                label={dict.totalGames}
+                value={clubStats.totalGames}
+                icon="mdi-badminton"
+                color="text-success"
+              />
+              <StatCard
+                label={isPlayer ? dict.yourGameCount : dict.role}
+                value={isPlayer ? playerStats.total : (user?.roles?.map((r) => r.replace("_", " ")).join(", ") ?? "—")}
+                icon="mdi-trophy"
+                color="text-accent"
+              />
             </>
           )}
         </div>
 
+        {/* Charts row 1: Personal ELO gauge + Win/Loss donut + Game types */}
+        <div className="grid gap-4 sm:gap-6 grid-cols-1 lg:grid-cols-3 mb-4 sm:mb-6">
+          <div className="card">
+            <header className="card-header">
+              <p className="card-header-title">
+                <span className="icon"><i className="mdi mdi-trophy-variant"></i></span>
+                {dict.yourElo}
+              </p>
+            </header>
+            <div className="card-content flex flex-col items-center justify-center py-6">
+              {dataReady ? (
+                <>
+                  <EloGauge elo={user?.elo ?? 200} min={0} max={1000} size={160} />
+                  <div className="mt-3 flex items-center gap-4 text-center">
+                    <div>
+                      <p className="text-lg font-bold text-success">{playerStats.wins}</p>
+                      <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{dict.winLossRatio.split("/")[0].trim()}</p>
+                    </div>
+                    <div className="w-px h-8 bg-border" />
+                    <div>
+                      <p className="text-lg font-bold text-destructive">{playerStats.losses}</p>
+                      <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{dict.winLossRatio.split("/")[1].trim()}</p>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <WidgetSkeleton />
+              )}
+            </div>
+          </div>
+
+          <div className="card">
+            <header className="card-header">
+              <p className="card-header-title">
+                <span className="icon"><i className="mdi mdi-chart-donut"></i></span>
+                {dict.winLossRatio}
+              </p>
+            </header>
+            <div className="card-content flex flex-col items-center justify-center py-6">
+              {dataReady ? (
+                <WinLossDonut wins={playerStats.wins} losses={playerStats.losses} size={170} />
+              ) : (
+                <WidgetSkeleton />
+              )}
+            </div>
+          </div>
+
+          <div className="card">
+            <header className="card-header">
+              <p className="card-header-title">
+                <span className="icon"><i className="mdi mdi-chart-bar"></i></span>
+                {dict.gameTypes}
+              </p>
+            </header>
+            <div className="card-content py-4">
+              {dataReady ? (
+                <TypeSplitChart
+                  singles={playerStats.byType.SINGLES.total}
+                  doubles={playerStats.byType.DOUBLES.total}
+                  height={170}
+                />
+              ) : (
+                <WidgetSkeleton />
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Charts row 2: Club activity + Top players */}
+        <div className="grid gap-4 sm:gap-6 grid-cols-1 lg:grid-cols-2 mb-4 sm:mb-6">
+          <div className="card">
+            <header className="card-header">
+              <p className="card-header-title">
+                <span className="icon"><i className="mdi mdi-chart-line"></i></span>
+                {dict.monthlyActivity}
+              </p>
+            </header>
+            <div className="card-content py-4">
+              {dataReady ? (
+                <ActivityBarChart data={clubStats.monthlyActivity} height={200} />
+              ) : (
+                <WidgetSkeleton />
+              )}
+            </div>
+          </div>
+
+          <div className="card">
+            <header className="card-header">
+              <p className="card-header-title">
+                <span className="icon"><i className="mdi mdi-podium"></i></span>
+                {dict.topPlayers}
+              </p>
+            </header>
+            <div className="card-content py-4">
+              {dataReady ? (
+                <TopPlayersChart data={clubStats.topPlayers} height={200} />
+              ) : (
+                <WidgetSkeleton />
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Quick actions */}
         <div className="card mb-4 sm:mb-6">
           <header className="card-header">
             <p className="card-header-title">
@@ -210,10 +334,15 @@ export function DashboardPage() {
                 <span className="icon"><i className="mdi mdi-badminton"></i></span>
                 <span>{dict.registerNewGame}</span>
               </Link>
+              <Link to="/profile" className="button light">
+                <span className="icon"><i className="mdi mdi-account-circle"></i></span>
+                <span>{dict.yourElo}</span>
+              </Link>
             </div>
           </div>
         </div>
 
+        {/* Recent games table */}
         <Table
           title={dict.recentGames}
           titleIcon="mdi-history"
