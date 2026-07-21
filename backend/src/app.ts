@@ -58,16 +58,12 @@ export interface AppDependencies {
 export function createApp(deps: AppDependencies = {}) {
   const prisma = deps.prisma ?? new PrismaClient();
 
-  const userRepo =
-    deps.userRepo ?? new PrismaUserRepo(prisma);
+  const userRepo = deps.userRepo ?? new PrismaUserRepo(prisma);
   const magicTokenRepo =
     deps.magicTokenRepo ?? new PrismaMagicTokenRepo(prisma);
-  const clubRepo =
-    deps.clubRepo ?? new PrismaClubRepo(prisma);
-  const profileRepo =
-    deps.profileRepo ?? new PrismaProfileRepo(prisma);
-  const gameRepo =
-    deps.gameRepo ?? new PrismaGameRepo(prisma);
+  const clubRepo = deps.clubRepo ?? new PrismaClubRepo(prisma);
+  const profileRepo = deps.profileRepo ?? new PrismaProfileRepo(prisma);
+  const gameRepo = deps.gameRepo ?? new PrismaGameRepo(prisma);
 
   const jwtService = new JwtService(
     deps.jwtSecret ?? process.env.JWT_SECRET ?? "unsafe-default-for-tests-only",
@@ -92,18 +88,17 @@ export function createApp(deps: AppDependencies = {}) {
       ),
     ]);
 
-  const authProviders =
-    deps.authProviders ?? [
-      new GoogleAuthProvider(process.env.GOOGLE_CLIENT_ID!),
-      new EmailMagicProvider(
-        magicTokenRepo,
-        communicationService,
-        process.env.APP_URL!,
-      ),
-      new EmailCodeProvider(magicTokenRepo, communicationService),
-      new PhoneSmsProvider(magicTokenRepo, communicationService),
-      new PasswordAuthProvider(userRepo),
-    ];
+  const authProviders = deps.authProviders ?? [
+    new GoogleAuthProvider(process.env.GOOGLE_CLIENT_ID!),
+    new EmailMagicProvider(
+      magicTokenRepo,
+      communicationService,
+      process.env.APP_URL!,
+    ),
+    new EmailCodeProvider(magicTokenRepo, communicationService),
+    new PhoneSmsProvider(magicTokenRepo, communicationService),
+    new PasswordAuthProvider(userRepo),
+  ];
 
   const clubService = new ClubService(clubRepo);
   const profileService = new ProfileService(profileRepo);
@@ -111,7 +106,12 @@ export function createApp(deps: AppDependencies = {}) {
 
   const enableRegistration = process.env.ENABLE_REGISTRATION !== "0";
 
-  const authService = new AuthService(userRepo, jwtService, authProviders, enableRegistration);
+  const authService = new AuthService(
+    userRepo,
+    jwtService,
+    authProviders,
+    enableRegistration,
+  );
   const authController = new AuthController(authService);
   const profileController = new ProfileController(profileService);
   const clubController = new ClubController(clubService, userRepo as any);
@@ -124,9 +124,9 @@ export function createApp(deps: AppDependencies = {}) {
         path: "/swagger",
         documentation: {
           info: {
-            title: "Avatar Labs API",
+            title: "Badminton Buddy API",
             version: "2.0.0",
-            description: "Backend API for Avatar Labs",
+            description: "Backend API for Badminton Buddy",
           },
           tags: [
             { name: "Health", description: "Health check" },

@@ -22,4 +22,4 @@ export {
   TypeSplitChart,
   RecentFormPills,
   TopPlayersChart,
-} from "@/components/ui/charts";
+} from "@/components/ui/charts.lazy";

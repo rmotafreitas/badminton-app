@@ -98,9 +98,9 @@ export function DashboardPage() {
     { staleTime: 30_000, persist: true },
   );
 
-  const allClubGames = recentGamesData ?? [];
-  const recentGames = allClubGames.slice(0, 10);
-  const myGames = myGamesData ?? [];
+  const allClubGames = useMemo(() => recentGamesData ?? [], [recentGamesData]);
+  const recentGames = useMemo(() => allClubGames.slice(0, 10), [allClubGames]);
+  const myGames = useMemo(() => myGamesData ?? [], [myGamesData]);
 
   const playerStats = useMemo(
     () => computePlayerStats(myGames, user?.userId ?? "", user?.elo ?? 200, locale),
