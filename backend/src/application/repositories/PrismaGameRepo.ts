@@ -46,7 +46,7 @@ export class PrismaGameRepo implements IGameRepo {
     const records = await this.prisma.game.findMany({
       where: { clubId },
       orderBy: { createdAt: "desc" },
-      take: 20,
+      take: 200,
     });
     return Promise.all(records.map((r) => this.populatePlayers(r)));
   }
