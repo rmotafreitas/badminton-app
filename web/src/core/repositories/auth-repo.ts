@@ -31,6 +31,10 @@ export class AuthRepoImpl implements AuthRepo {
     return AuthMapper.toAuthUserInfo(data);
   }
 
+  async refreshAuth(): Promise<void> {
+    await api.post("/auth/refresh");
+  }
+
   async logout(): Promise<void> {
     await api.post("/auth/logout");
   }

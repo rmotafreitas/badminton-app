@@ -53,6 +53,7 @@ export interface AppDependencies {
   jwtSecret?: string;
   communicationService?: CommunicationService;
   authProviders?: IAuthProvider[];
+  enableRegistration?: boolean;
 }
 
 export function createApp(deps: AppDependencies = {}) {
@@ -104,7 +105,7 @@ export function createApp(deps: AppDependencies = {}) {
   const profileService = new ProfileService(profileRepo, userRepo);
   const gameService = new GameService(gameRepo, userRepo);
 
-  const enableRegistration = process.env.ENABLE_REGISTRATION !== "0";
+  const enableRegistration = deps.enableRegistration ?? (process.env.ENABLE_REGISTRATION !== "0");
 
   const authService = new AuthService(
     userRepo,

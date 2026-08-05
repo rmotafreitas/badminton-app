@@ -14,7 +14,7 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   children,
   allowedRoles,
 }) => {
-  const { user, loading, authPhase, openLoginModal } = useAuth();
+  const { user, loading, authPhase, isReconnecting, openLoginModal } = useAuth();
   const common = useDictionary().common;
 
   useEffect(() => {
@@ -23,6 +23,10 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
 
   if (loading || authPhase === "restoring") {
     return <FullPageLoader label={common.restoringSession} />;
+  }
+
+  if (isReconnecting && user) {
+    return <FullPageLoader label={common.reconnecting} />;
   }
 
   if (!user) {

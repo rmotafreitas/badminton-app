@@ -39,16 +39,25 @@ export const authRoutes = (ctrl: AuthController, jwtService: JwtService) =>
           tags: ["Auth"],
           summary: "Complete auth flow",
           description:
-            "Verify the credential / token and issue an httpOnly session cookie.",
+            "Verify the credential / token and issue httpOnly access + refresh cookies.",
         },
       },
     )
+
+    .post("/refresh", ({ set, cookie }) => ctrl.refresh(set, cookie), {
+      detail: {
+        tags: ["Auth"],
+        summary: "Refresh session",
+        description:
+          "Validate the refresh_token cookie and issue a new access_token cookie.",
+      },
+    })
 
     .post("/logout", ({ set, cookie }) => ctrl.logout(set, cookie), {
       detail: {
         tags: ["Auth"],
         summary: "Logout",
-        description: "Clear the session cookie.",
+        description: "Clear the session cookies.",
       },
     })
 

@@ -27,6 +27,10 @@ export class AuthServiceImpl implements AuthService {
     return this.authRepo.completeAuth(provider, input);
   }
 
+  async refreshAuth(): Promise<void> {
+    await this.authRepo.refreshAuth();
+  }
+
   async logout(): Promise<void> {
     await this.authRepo.logout();
   }

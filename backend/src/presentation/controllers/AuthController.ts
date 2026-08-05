@@ -2,7 +2,7 @@ import type { Cookie } from "elysia";
 import type { IAuthService } from "@/application/interfaces/IAuthService";
 import type { InitiateAuthDto, CompleteAuthDto } from "@/application/dtos/auth.dto";
 import type { AuthInitView, AuthUserView } from "@/application/views/auth.view";
-import { COOKIE_OPTS } from "@/presentation/middleware/auth.guard";
+import { AUTH_COOKIE_OPTS, REFRESH_COOKIE_OPTS } from "@/presentation/middleware/auth.guard";
 
 export class AuthController {
   constructor(private readonly authService: IAuthService) {}
@@ -25,11 +25,33 @@ export class AuthController {
     cookie: Record<string, Cookie<unknown>>,
   ): Promise<AuthUserView | { error: string }> {
     try {
-      const { user, token } = await this.authService.complete(
+      const { user, accessToken, refreshToken } = await this.authService.complete(
         dto.provider,
         dto.input,
       );
-      cookie["auth_token"].set({ value: token, ...COOKIE_OPTS });
+      cookie["auth_token"].set({ value: accessToken, ...AUTH_COOKIE_OPTS });
+      cookie["refresh_token"].set({ value: refreshToken, ...REFRESH_COOKIE_OPTS });
+      return user;
+    } catch (e: unknown) {
+      set.status = 401;
+      return { error: (e as Error).message };
+    }
+  }
+
+  async refresh(
+    set: { status?: number | string },
+    cookie: Record<string, Cookie<unknown>>,
+  ): Promise<AuthUserView | { error: string }> {
+    const refreshToken = cookie["refresh_token"]?.value as string | undefined;
+    if (!refreshToken) {
+      set.status = 401;
+      return { error: "No refresh token" };
+    }
+    try {
+      const { user, accessToken, refreshToken: newRefreshToken } =
+        await this.authService.refreshSession(refreshToken);
+      cookie["auth_token"].set({ value: accessToken, ...AUTH_COOKIE_OPTS });
+      cookie["refresh_token"].set({ value: newRefreshToken, ...REFRESH_COOKIE_OPTS });
       return user;
     } catch (e: unknown) {
       set.status = 401;
@@ -41,7 +63,8 @@ export class AuthController {
     set: { status?: number | string },
     cookie: Record<string, Cookie<unknown>>,
   ) {
-    cookie["auth_token"].set({ value: "", ...COOKIE_OPTS, maxAge: 0 });
+    cookie["auth_token"].set({ value: "", ...AUTH_COOKIE_OPTS, maxAge: 0 });
+    cookie["refresh_token"].set({ value: "", ...REFRESH_COOKIE_OPTS, maxAge: 0 });
     set.status = 204;
     return null;
   }
