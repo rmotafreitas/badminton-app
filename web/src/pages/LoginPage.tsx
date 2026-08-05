@@ -29,7 +29,7 @@ export function LoginPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [searchParams] = useSearchParams();
 
-  const { initiateAuth, completeAuth, isAuthenticated, loading, authPhase } = useAuth();
+  const { initiateAuth, completeAuth, isAuthenticated, loading, authPhase, isReconnecting } = useAuth();
   const navigate = useNavigate();
   const dict = useDictionary().auth;
   const common = useDictionary().common;
@@ -49,6 +49,12 @@ export function LoginPage() {
   // never paint the login form — that is what causes the login-page flash.
   if (authPhase === "restoring") {
     return <FullPageLoader label={common.restoringSession} />;
+  }
+
+  // Server is asleep / network issue — we have a cached session, retrying with backoff.
+  // Don't flash the login form; show a reconnecting message instead.
+  if (isReconnecting) {
+    return <FullPageLoader label={common.reconnecting} />;
   }
 
   function translateAuthError(

@@ -1,10 +1,25 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { AxiosError } from "axios";
 import {
   queryCache,
   type CacheOptions,
   type Fetcher,
   type QueryKey,
 } from "@/lib/query-cache";
+
+const QUERY_RETRY_BACKOFF = [2000, 5000, 15000] as const;
+
+function isNetworkError(err: unknown): boolean {
+  if (err instanceof AxiosError) {
+    return (
+      err.code === "ECONNABORTED" ||
+      err.code === "ETIMEDOUT" ||
+      err.code === "ERR_NETWORK" ||
+      err.message === "Network Error"
+    );
+  }
+  return false;
+}
 
 export interface UseQueryOptions extends CacheOptions {
   /** When false, the query is paused (no fetch, no subscription). Default true. */
@@ -124,6 +139,23 @@ export function useQuery<T>(
           setState({ data: d, error: undefined, isFetching: false });
         })
         .catch((err) => {
+          // Network / timeout errors — retry with backoff; don't permanently cache.
+          if (isNetworkError(err)) {
+            const retryCount = (err as any).__queryRetryCount ?? 0;
+            if (retryCount < QUERY_RETRY_BACKOFF.length) {
+              (err as any).__queryRetryCount = retryCount + 1;
+              const delay = QUERY_RETRY_BACKOFF[retryCount]!;
+              setTimeout(() => {
+                // Only re-fetch if still enabled and the key hasn't changed
+                if (enabledRef.current) runFetch();
+              }, delay);
+              setState((prev) => ({
+                ...prev,
+                isFetching: false,
+              }));
+              return;
+            }
+          }
           setState((prev) => ({ data: prev.data, error: err, isFetching: false }));
           onErrorRef.current?.(err);
         });

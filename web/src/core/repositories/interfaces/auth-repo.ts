@@ -15,6 +15,8 @@ export interface AuthRepo {
     input: Record<string, string>,
   ): Promise<AuthUserInfo>;
 
+  refreshAuth(): Promise<void>;
+
   logout(): Promise<void>;
 
   getCurrentUser(): Promise<AuthUserInfo | null>;

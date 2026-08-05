@@ -24,6 +24,14 @@ export class AuthService implements IAuthService {
     return provider;
   }
 
+  private signTokens(userId: string, roles: string[]) {
+    const payload = { sub: userId, roles };
+    return {
+      accessToken: this.jwtService.sign(payload),
+      refreshToken: this.jwtService.signRefresh(payload),
+    };
+  }
+
   async initiate(
     provider: string,
     input: Record<string, string>,
@@ -55,7 +63,7 @@ export class AuthService implements IAuthService {
   async complete(
     provider: string,
     input: Record<string, string>,
-  ): Promise<{ user: AuthUserView; token: string }> {
+  ): Promise<{ user: AuthUserView; accessToken: string; refreshToken: string }> {
     const identity = await this.getProvider(provider).complete(input);
 
     // Find existing user linked to this provider identity
@@ -95,17 +103,30 @@ export class AuthService implements IAuthService {
 
     if (!user.isActive) throw new Error("Account is deactivated");
 
-    const token = this.jwtService.sign({ sub: user.id, roles: user.roles });
+    const tokens = this.signTokens(user.id, user.roles);
 
-    return { user: AuthMapper.toView(user), token };
+    return { user: AuthMapper.toView(user), ...tokens };
   }
 
   async validateSession(token: string): Promise<AuthUserView> {
-    const payload = this.jwtService.verify(token);
+    const payload = this.jwtService.verify(token, "access");
 
     const user = await this.userRepo.findById(payload.sub);
     if (!user || !user.isActive) throw new Error("User not found or inactive");
 
     return AuthMapper.toView(user);
+  }
+
+  async refreshSession(
+    refreshToken: string,
+  ): Promise<{ user: AuthUserView; accessToken: string; refreshToken: string }> {
+    const payload = this.jwtService.verify(refreshToken, "refresh");
+
+    const user = await this.userRepo.findById(payload.sub);
+    if (!user || !user.isActive) throw new Error("User not found or inactive");
+
+    const tokens = this.signTokens(user.id, user.roles);
+
+    return { user: AuthMapper.toView(user), ...tokens };
   }
 }

@@ -14,15 +14,6 @@ import type {
 import { useAuthService } from "@/di/container";
 import { queryCache } from "@/lib/query-cache";
 
-/**
- * Auth phases (replaces the old boolean `loading`):
- *   - "restoring"     : no local session yet, probing /auth/me (cookie may still be valid)
- *   - "authenticated" : a session is active (optimistically from cache, or confirmed by backend)
- *   - "unauthenticated": confirmed no session
- *
- * The login page must NEVER render its form while the phase is unresolved,
- * so an authenticated user doesn't see the login screen flash during a cold start.
- */
 export type AuthPhase = "restoring" | "authenticated" | "unauthenticated";
 
 const AUTH_USER_STORAGE_KEY = "badminton-auth-user";
@@ -34,7 +25,6 @@ function readPersistedUser(): AuthUserInfo | null {
     if (!raw) return null;
     const parsed = JSON.parse(raw) as AuthUserInfo;
     if (!parsed?.userId || !Array.isArray(parsed.roles)) return null;
-    // Migrate legacy single-ELO snapshots
     if (typeof (parsed as any).eloSingles !== "number") {
       (parsed as any).eloSingles = (parsed as any).elo ?? 200;
       (parsed as any).eloDoubles = (parsed as any).elo ?? 200;
@@ -62,6 +52,7 @@ export interface AuthContextType {
   loading: boolean;
   authPhase: AuthPhase;
   isAuthenticated: boolean;
+  isReconnecting: boolean;
   loginModalOpen: boolean;
   openLoginModal: () => void;
   closeLoginModal: () => void;
@@ -79,53 +70,74 @@ export interface AuthContextType {
 
 export const AuthContext = createContext<AuthContextType | null>(null);
 
+const RECONNECT_BACKOFF = [1000, 2000, 4000, 8000] as const;
+const RECONNECT_MAX_ATTEMPTS = RECONNECT_BACKOFF.length;
+
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
   const authService = useAuthService();
   const [user, setUser] = useState<AuthUserInfo | null>(() => readPersistedUser());
-  // Optimistic restore: if we have a cached snapshot, start "authenticated".
   const [authPhase, setAuthPhase] = useState<AuthPhase>(() =>
     readPersistedUser() ? "authenticated" : "restoring",
   );
+  const [isReconnecting, setIsReconnecting] = useState(false);
   const [loginModalOpen, setLoginModalOpen] = useState(false);
   const didInitRef = useRef(false);
+  const reconnectRef = useRef(0);
 
   const openLoginModal = useCallback(() => setLoginModalOpen(true), []);
   const closeLoginModal = useCallback(() => setLoginModalOpen(false), []);
 
-  /**
-   * Revalidate the session against /auth/me. Updates the cache + persisted
-   * snapshot. Returns the user or null. Does NOT flip the phase to "restoring".
-   */
   const refreshUser = useCallback(async (): Promise<AuthUserInfo | null> => {
-    const currentUser = await authService.getCurrentUser();
-    if (currentUser) {
-      setUser(currentUser);
-      persistUser(currentUser);
-      queryCache.set(AUTH_QUERY_KEY, currentUser, { persist: false });
-      setAuthPhase("authenticated");
-    } else {
+    try {
+      const currentUser = await authService.getCurrentUser();
+      if (currentUser) {
+        setUser(currentUser);
+        persistUser(currentUser);
+        queryCache.set(AUTH_QUERY_KEY, currentUser, { persist: false });
+        setAuthPhase("authenticated");
+        setIsReconnecting(false);
+        reconnectRef.current = 0;
+        return currentUser;
+      }
+      // getCurrentUser returned null — this means a 401 that the interceptor
+      // couldn't refresh (both tokens dead). Don't retry — user needs login.
       setUser(null);
       persistUser(null);
       queryCache.remove(AUTH_QUERY_KEY);
       setAuthPhase("unauthenticated");
+      setIsReconnecting(false);
+      return null;
+    } catch {
+      // Network / timeout error — backend may be asleep.
+      // If we have an optimistic cached session, keep it and retry with backoff.
+      const hasCachedUser = readPersistedUser() !== null;
+      if (hasCachedUser) {
+        if (reconnectRef.current < RECONNECT_MAX_ATTEMPTS) {
+          setIsReconnecting(true);
+          const delay = RECONNECT_BACKOFF[reconnectRef.current]!;
+          reconnectRef.current += 1;
+          await new Promise((r) => setTimeout(r, delay));
+          return refreshUser();
+        }
+        // All retries exhausted — keep optimistic session but stop reconnecting spinner.
+        setIsReconnecting(false);
+        reconnectRef.current = 0;
+        setAuthPhase("authenticated");
+        return readPersistedUser();
+      }
+      // No cached session and can't reach the server — mark unauthenticated.
+      setIsReconnecting(false);
+      setAuthPhase("unauthenticated");
+      return null;
     }
-    return currentUser;
   }, [authService]);
 
-  // On mount: if we restored optimistically, silently revalidate. Otherwise
-  // probe once to see if a cookie-only session exists.
   useEffect(() => {
     if (didInitRef.current) return;
     didInitRef.current = true;
-    refreshUser().catch(() => {
-      // Network/cold-start failure: keep the optimistic snapshot if present,
-      // otherwise mark unauthenticated so the app is usable offline-ish.
-      setAuthPhase((prev) =>
-        prev === "restoring" ? "unauthenticated" : prev,
-      );
-    });
+    refreshUser();
   }, [refreshUser]);
 
   const initiateAuth = useCallback(
@@ -141,6 +153,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       persistUser(userInfo);
       queryCache.set(AUTH_QUERY_KEY, userInfo, { persist: false });
       setAuthPhase("authenticated");
+      setIsReconnecting(false);
     },
     [authService],
   );
@@ -151,6 +164,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     persistUser(null);
     queryCache.remove(AUTH_QUERY_KEY);
     setAuthPhase("unauthenticated");
+    setIsReconnecting(false);
   }, [authService]);
 
   const loading = authPhase === "restoring";
@@ -161,6 +175,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       loading,
       authPhase,
       isAuthenticated: authPhase === "authenticated" && user !== null,
+      isReconnecting,
       loginModalOpen,
       openLoginModal,
       closeLoginModal,
@@ -173,6 +188,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       user,
       loading,
       authPhase,
+      isReconnecting,
       loginModalOpen,
       openLoginModal,
       closeLoginModal,

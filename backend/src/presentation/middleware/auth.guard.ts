@@ -2,13 +2,24 @@ import Elysia, { type Cookie } from "elysia";
 import type { JwtService } from "@/application/jwt/JwtService";
 import type { Role } from "@/domain/entities/User";
 
-const COOKIE_OPTS = {
+const AUTH_COOKIE_OPTS = {
   httpOnly: true,
   secure: true,
   sameSite: "lax" as const,
   path: "/",
-  maxAge: 7 * 24 * 60 * 60, // 7 days
+  maxAge: 15 * 60, // 15 minutes (matches access token expiry)
 };
+
+const REFRESH_COOKIE_OPTS = {
+  httpOnly: true,
+  secure: true,
+  sameSite: "lax" as const,
+  path: "/",
+  maxAge: 30 * 24 * 60 * 60, // 30 days (matches refresh token expiry)
+};
+
+// Backward-compatible alias
+const COOKIE_OPTS = AUTH_COOKIE_OPTS;
 
 /** Derive `currentUser` from the auth_token cookie on every protected route. */
 export const authGuard = (jwtService: JwtService) =>
@@ -19,7 +30,7 @@ export const authGuard = (jwtService: JwtService) =>
       throw new Error("Unauthorized");
     }
     try {
-      const payload = jwtService.verify(token);
+      const payload = jwtService.verify(token, "access");
       return { currentUser: payload };
     } catch {
       set.status = 401;
@@ -56,7 +67,7 @@ export const requireRoles =
     }
     let payload;
     try {
-      payload = jwtService.verify(token);
+      payload = jwtService.verify(token, "access");
     } catch {
       set.status = 401;
       throw new Error("Invalid or expired token");
@@ -69,4 +80,4 @@ export const requireRoles =
     return { currentUser: payload };
   };
 
-export { COOKIE_OPTS };
+export { AUTH_COOKIE_OPTS, REFRESH_COOKIE_OPTS, COOKIE_OPTS };

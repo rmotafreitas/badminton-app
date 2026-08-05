@@ -22,6 +22,11 @@ export function makeToken(sub: string, roles: Role[]) {
   return jwt.sign({ sub, roles });
 }
 
+export function makeRefreshToken(sub: string, roles: Role[]) {
+  const jwt = new JwtService(JWT_SECRET);
+  return jwt.signRefresh({ sub, roles });
+}
+
 // ── Mock repos ──────────────────────────────────────────────────────────────
 
 export function mockUserRepo(): IUserRepo {
@@ -246,6 +251,7 @@ export function setupDeps(): AppDependencies {
     profileRepo: mockProfileRepo(),
     magicTokenRepo: mockMagicTokenRepo(),
     jwtSecret: JWT_SECRET,
+    enableRegistration: true,
     authProviders: [
       mockAuthProvider("google"),
       mockAuthProvider("email"),
