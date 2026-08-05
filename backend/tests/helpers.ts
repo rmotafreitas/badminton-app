@@ -65,9 +65,13 @@ export function mockUserRepo(): IUserRepo {
     },
     linkAuthMethod: async () => {},
     setPasswordHash: async () => {},
-    updateElo: async (userId, elo) => {
+    updateEloSingles: async (userId, elo) => {
       const user = users.get(userId);
-      if (user) user.elo = elo;
+      if (user) user.eloSingles = elo;
+    },
+    updateEloDoubles: async (userId, elo) => {
+      const user = users.get(userId);
+      if (user) user.eloDoubles = elo;
     },
     assignClub: async (userId, clubId) => {
       const user = users.get(userId);
@@ -370,9 +374,13 @@ export async function setupDepsForPasswordTest() {
     },
     linkAuthMethod: async () => {},
     setPasswordHash: async () => {},
-    updateElo: async (userId, elo) => {
+    updateEloSingles: async (userId, elo) => {
       const user = users.get(userId);
-      if (user) user.elo = elo;
+      if (user) user.eloSingles = elo;
+    },
+    updateEloDoubles: async (userId, elo) => {
+      const user = users.get(userId);
+      if (user) user.eloDoubles = elo;
     },
     assignClub: async (userId, clubId) => {
       const user = users.get(userId);

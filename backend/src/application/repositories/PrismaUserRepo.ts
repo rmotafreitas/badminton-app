@@ -101,10 +101,17 @@ export class PrismaUserRepo implements IUserRepo {
     return records.map(UserMapper.toDomain);
   }
 
-  async updateElo(userId: string, elo: number): Promise<void> {
+  async updateEloSingles(userId: string, elo: number): Promise<void> {
     await this.prisma.user.update({
       where: { id: userId },
-      data: { elo },
+      data: { eloSingles: elo },
+    });
+  }
+
+  async updateEloDoubles(userId: string, elo: number): Promise<void> {
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { eloDoubles: elo },
     });
   }
 

@@ -89,13 +89,30 @@ export function WinLossDonut({
 /* ── ELO Progression Line ────────────────────────────────────────────── */
 
 export function EloLineChart({
-  data,
+  singles,
+  doubles,
   height = 200,
 }: {
-  data: { label: string; elo: number }[];
+  singles: { label: string; elo: number }[];
+  doubles: { label: string; elo: number }[];
   height?: number;
 }) {
   const dict = useDictionary().profile;
+  const gamesDict = useDictionary().games;
+
+  // Merge the two series onto a shared set of x-axis labels (dates). Each
+  // series only has a point when a game of that type was played on that date.
+  const labels = Array.from(
+    new Set([...singles.map((d) => d.label), ...doubles.map((d) => d.label)]),
+  );
+  const singlesMap = new Map(singles.map((d) => [d.label, d.elo]));
+  const doublesMap = new Map(doubles.map((d) => [d.label, d.elo]));
+  const data = labels.map((label) => ({
+    label,
+    singles: singlesMap.get(label) ?? null,
+    doubles: doublesMap.get(label) ?? null,
+  }));
+
   if (data.length === 0) {
     return (
       <div className="flex items-center justify-center text-sm text-muted-foreground/70 py-12">
@@ -104,57 +121,74 @@ export function EloLineChart({
     );
   }
 
-  const elos = data.map((d) => d.elo);
-  const minElo = Math.min(...elos);
-  const maxElo = Math.max(...elos);
+  const allElos = [...singles, ...doubles].map((d) => d.elo);
+  const minElo = allElos.length > 0 ? Math.min(...allElos) : 0;
+  const maxElo = allElos.length > 0 ? Math.max(...allElos) : 400;
   const padding = Math.max(20, Math.round((maxElo - minElo) * 0.15));
 
   return (
-    <ResponsiveContainer width="100%" height={height}>
-      <LineChart data={data} margin={{ top: 8, right: 12, bottom: 0, left: -8 }}>
-        <defs>
-          <linearGradient id="eloGradient" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor={COLORS.primary} stopOpacity={0.15} />
-            <stop offset="100%" stopColor={COLORS.primary} stopOpacity={0} />
-          </linearGradient>
-        </defs>
-        <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
-        <XAxis
-          dataKey="label"
-          tick={{ fontSize: 10, fill: COLORS.mutedFg }}
-          interval="preserveStartEnd"
-          minTickGap={24}
-          axisLine={false}
-          tickLine={false}
-        />
-        <YAxis
-          tick={{ fontSize: 10, fill: COLORS.mutedFg }}
-          domain={[minElo - padding, maxElo + padding]}
-          axisLine={false}
-          tickLine={false}
-          width={36}
-        />
-        <Tooltip
-          contentStyle={{
-            background: "hsl(var(--card))",
-            border: "1px solid hsl(var(--border))",
-            borderRadius: "8px",
-            fontSize: "12px",
-          }}
-          labelStyle={{ color: "hsl(var(--muted-foreground))" }}
-          formatter={(value) => [String(value), "ELO"]}
-        />
-        <Line
-          type="monotone"
-          dataKey="elo"
-          stroke={COLORS.primary}
-          strokeWidth={2.5}
-          dot={{ r: 3, fill: COLORS.primary, strokeWidth: 0 }}
-          activeDot={{ r: 5 }}
-          fill="url(#eloGradient)"
-        />
-      </LineChart>
-    </ResponsiveContainer>
+    <div>
+      <ResponsiveContainer width="100%" height={height}>
+        <LineChart data={data} margin={{ top: 8, right: 12, bottom: 0, left: -8 }}>
+          <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+          <XAxis
+            dataKey="label"
+            tick={{ fontSize: 10, fill: COLORS.mutedFg }}
+            interval="preserveStartEnd"
+            minTickGap={24}
+            axisLine={false}
+            tickLine={false}
+          />
+          <YAxis
+            tick={{ fontSize: 10, fill: COLORS.mutedFg }}
+            domain={[minElo - padding, maxElo + padding]}
+            axisLine={false}
+            tickLine={false}
+            width={36}
+          />
+          <Tooltip
+            contentStyle={{
+              background: "hsl(var(--card))",
+              border: "1px solid hsl(var(--border))",
+              borderRadius: "8px",
+              fontSize: "12px",
+            }}
+            labelStyle={{ color: "hsl(var(--muted-foreground))" }}
+          />
+          <Line
+            type="monotone"
+            dataKey="singles"
+            name={gamesDict.singles}
+            stroke={COLORS.primary}
+            strokeWidth={2.5}
+            connectNulls
+            dot={{ r: 2.5, fill: COLORS.primary, strokeWidth: 0 }}
+            activeDot={{ r: 4 }}
+          />
+          <Line
+            type="monotone"
+            dataKey="doubles"
+            name={gamesDict.doubles}
+            stroke={COLORS.accent}
+            strokeWidth={2.5}
+            connectNulls
+            dot={{ r: 2.5, fill: COLORS.accent, strokeWidth: 0 }}
+            activeDot={{ r: 4 }}
+          />
+        </LineChart>
+      </ResponsiveContainer>
+      {/* Legend */}
+      <div className="flex items-center justify-center gap-4 mt-1 text-[11px] text-muted-foreground">
+        <span className="inline-flex items-center gap-1.5">
+          <span className="inline-block w-2.5 h-2.5 rounded-full" style={{ background: COLORS.primary }} />
+          {gamesDict.singles}
+        </span>
+        <span className="inline-flex items-center gap-1.5">
+          <span className="inline-block w-2.5 h-2.5 rounded-full" style={{ background: COLORS.accent }} />
+          {gamesDict.doubles}
+        </span>
+      </div>
+    </div>
   );
 }
 

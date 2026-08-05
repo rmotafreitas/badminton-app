@@ -1,14 +1,36 @@
 import type { IProfileRepo } from "@/domain/repositories/IProfileRepo";
+import type { IUserRepo } from "@/domain/repositories/IUserRepo";
 import type { Profile } from "@/domain/entities/Profile";
 import { ImageProcessor } from "@/application/utils/ImageProcessor";
 
 export class ProfileService {
-  constructor(private readonly profileRepo: IProfileRepo) {}
+  constructor(
+    private readonly profileRepo: IProfileRepo,
+    private readonly userRepo?: IUserRepo,
+  ) {}
 
   async getProfileByUserId(userId: string): Promise<Profile> {
     const profile = await this.profileRepo.findByUserId(userId);
     if (!profile) throw new Error("Profile not found");
     return profile;
+  }
+
+  async getProfileWithUser(userId: string): Promise<{ profile: Profile; user: { email: string | null; phone: string | null; roles: string[]; eloSingles: number; eloDoubles: number } | null }> {
+    const profile = await this.profileRepo.findByUserId(userId);
+    if (!profile) throw new Error("Profile not found");
+    const user = this.userRepo ? await this.userRepo.findById(userId) : null;
+    return {
+      profile,
+      user: user
+        ? {
+            email: user.email,
+            phone: user.phone,
+            roles: user.roles,
+            eloSingles: user.eloSingles,
+            eloDoubles: user.eloDoubles,
+          }
+        : null,
+    };
   }
 
   async updateProfile(

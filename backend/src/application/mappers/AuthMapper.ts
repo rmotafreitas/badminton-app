@@ -6,7 +6,8 @@ export class AuthMapper {
     return {
       userId: user.id,
       roles: user.roles,
-      elo: user.elo,
+      eloSingles: user.eloSingles,
+      eloDoubles: user.eloDoubles,
       email: user.email,
       phone: user.phone,
       clubId: user.clubId,

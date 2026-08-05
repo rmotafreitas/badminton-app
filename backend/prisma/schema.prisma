@@ -17,7 +17,8 @@ model User {
     phone        String?
     passwordHash String?
     roles        Role[]    @default([PLAYER])
-    elo          Float     @default(200)
+    eloSingles   Float     @default(200)
+    eloDoubles   Float     @default(200)
     isActive     Boolean   @default(true)
     lastAccess   DateTime?
     clubId       String?   @db.ObjectId

@@ -310,10 +310,10 @@ export function ProfilePage() {
       computePlayerStats(
         primaryGames,
         viewedUserId,
-        user?.elo ?? 200,
+        profile?.eloSingles ?? 200,
         locale,
       ),
-    [primaryGames, viewedUserId, user?.elo, locale],
+    [primaryGames, viewedUserId, profile?.eloSingles, locale],
   );
 
   if (profileLoading && !profile) {
@@ -324,10 +324,11 @@ export function ProfilePage() {
     );
   }
 
-  const avatarUrl = photoPreview || fallbackAvatar(profile?.name, user?.email, user?.userId);
+  const avatarUrl = photoPreview || fallbackAvatar(profile?.name, profile?.email, profile?.userId);
   const bannerUrl = bannerPreview;
-  const displayName = profile?.name || user?.email?.split("@")[0];
-  const elo = user?.elo ?? 200;
+  const displayName = profile?.name || profile?.email?.split("@")[0];
+  const eloSingles = profile?.eloSingles ?? 200;
+  const eloDoubles = profile?.eloDoubles ?? 200;
 
   function playerImg(player: any, cls: string) {
     if (player?.profile?.photo) {
@@ -597,8 +598,8 @@ export function ProfilePage() {
                       onError={(e) => {
                         (e.target as HTMLImageElement).src = fallbackAvatar(
                           profile?.name,
-                          user?.email,
-                          user?.userId,
+                          profile?.email,
+                          profile?.userId,
                         );
                       }}
                     />
@@ -609,9 +610,13 @@ export function ProfilePage() {
                       <h2 className="text-[1.25rem] sm:text-[1.75rem] font-bold text-foreground leading-tight">
                         {displayName}
                       </h2>
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-warning/10 text-warning-foreground text-xs font-bold">
-                        <i className="mdi mdi-trophy text-xs"></i>
-                        {elo}
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-warning/10 text-warning-foreground text-xs font-bold" title="Singles ELO">
+                        <i className="mdi mdi-account text-xs"></i>
+                        {eloSingles}
+                      </span>
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-accent/10 text-accent-foreground text-xs font-bold" title="Doubles ELO">
+                        <i className="mdi mdi-account-multiple text-xs"></i>
+                        {eloDoubles}
                       </span>
                     </div>
                     {profile?.bio ? (
@@ -639,7 +644,7 @@ export function ProfilePage() {
                         Email
                       </p>
                       <p className="text-sm text-foreground">
-                        {user?.email || "—"}
+                        {profile?.email || "—"}
                       </p>
                     </div>
                   </div>
@@ -651,7 +656,7 @@ export function ProfilePage() {
                         {dict.phone}
                       </p>
                       <p className="text-sm text-foreground">
-                        {user?.phone || "—"}
+                        {profile?.phone || "—"}
                       </p>
                     </div>
                   </div>
@@ -696,8 +701,8 @@ export function ProfilePage() {
                         {dict.roles}
                       </p>
                       <p className="text-sm text-foreground">
-                        {user?.roles?.length
-                          ? user.roles.map(formatRole).join(", ")
+                        {profile?.roles?.length
+                          ? profile.roles.map(formatRole).join(", ")
                           : "—"}
                       </p>
                     </div>
@@ -814,7 +819,16 @@ export function ProfilePage() {
                     </p>
                   </header>
                   <div className="card-content flex flex-col items-center justify-center py-6">
-                    <EloGauge elo={user?.elo ?? 200} min={0} max={1000} size={160} />
+                    <div className="flex items-center justify-center gap-4">
+                      <div className="flex flex-col items-center">
+                        <EloGauge elo={eloSingles} min={0} max={1000} size={130} />
+                        <span className="text-xs text-muted-foreground mt-1 font-medium">{gamesDict.singles}</span>
+                      </div>
+                      <div className="flex flex-col items-center">
+                        <EloGauge elo={eloDoubles} min={0} max={1000} size={130} />
+                        <span className="text-xs text-muted-foreground mt-1 font-medium">{gamesDict.doubles}</span>
+                      </div>
+                    </div>
                     <div className="mt-3 text-center">
                       <p className="text-xs text-muted-foreground">
                         {dict.bestStreak}: <span className="font-bold text-success">{playerStats.bestStreak}</span>
@@ -867,7 +881,11 @@ export function ProfilePage() {
                     </p>
                   </header>
                   <div className="card-content py-4">
-                    <EloLineChart data={playerStats.eloProgression} height={200} />
+                    <EloLineChart
+                      singles={playerStats.eloProgression.singles}
+                      doubles={playerStats.eloProgression.doubles}
+                      height={200}
+                    />
                   </div>
                 </div>
 

@@ -101,7 +101,7 @@ export function createApp(deps: AppDependencies = {}) {
   ];
 
   const clubService = new ClubService(clubRepo);
-  const profileService = new ProfileService(profileRepo);
+  const profileService = new ProfileService(profileRepo, userRepo);
   const gameService = new GameService(gameRepo, userRepo);
 
   const enableRegistration = process.env.ENABLE_REGISTRATION !== "0";

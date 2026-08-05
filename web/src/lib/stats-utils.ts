@@ -49,6 +49,11 @@ export interface ScoreDistribution {
   count: number;
 }
 
+export interface EloProgression {
+  singles: EloPoint[];
+  doubles: EloPoint[];
+}
+
 export interface PlayerStats {
   total: number;
   wins: number;
@@ -56,7 +61,7 @@ export interface PlayerStats {
   winRate: number;
   currentStreak: { type: "W" | "L"; count: number };
   bestStreak: number;
-  eloProgression: EloPoint[];
+  eloProgression: EloProgression;
   monthlyActivity: MonthlyActivity[];
   byType: Record<GameType, GameTypeStats>;
   recentForm: RecentForm[];
@@ -115,27 +120,37 @@ export function computePlayerStats(
   const losses = playerGames.length - wins;
   const winRate = playerGames.length > 0 ? (wins / playerGames.length) * 100 : 0;
 
-  /* ELO progression — replay games chronologically from DEFAULT_ELO */
-  const eloProgression: EloPoint[] = [];
-  let runningElo = DEFAULT_ELO;
+  /* ELO progression — replay games chronologically, split by type */
+  const singlesProgression: EloPoint[] = [];
+  const doublesProgression: EloPoint[] = [];
+  let singlesElo = DEFAULT_ELO;
+  let doublesElo = DEFAULT_ELO;
   for (const g of playerGames) {
     const won = isWin(g, userId);
-    // Approximate opponent ELO as current running ELO (we don't store
-    // historical opponent ELO; this gives a visually meaningful trend).
-    const oppElo = runningElo;
-    const expected = expectedScore(runningElo, oppElo);
-    runningElo = newRating(runningElo, expected, won ? 1 : 0);
     const d = new Date(g.playedAt);
-    eloProgression.push({
-      date: d.toISOString(),
-      elo: runningElo,
-      label: d.toLocaleDateString(locale, { month: "short", day: "numeric" }),
-    });
+    const label = d.toLocaleDateString(locale, { month: "short", day: "numeric" });
+    const point: EloPoint = { date: d.toISOString(), elo: 0, label };
+
+    if (g.type === "SINGLES") {
+      const oppElo = singlesElo;
+      const expected = expectedScore(singlesElo, oppElo);
+      singlesElo = newRating(singlesElo, expected, won ? 1 : 0);
+      singlesProgression.push({ ...point, elo: singlesElo });
+    } else {
+      const oppElo = doublesElo;
+      const expected = expectedScore(doublesElo, oppElo);
+      doublesElo = newRating(doublesElo, expected, won ? 1 : 0);
+      doublesProgression.push({ ...point, elo: doublesElo });
+    }
   }
-  // If we have a real current ELO from the backend, anchor the last point
-  if (eloProgression.length > 0 && currentElo) {
-    eloProgression[eloProgression.length - 1].elo = currentElo;
+  // Anchor the last point to the real stored ELO from the backend
+  if (singlesProgression.length > 0 && currentElo) {
+    singlesProgression[singlesProgression.length - 1].elo = currentElo;
   }
+  const eloProgression: EloProgression = {
+    singles: singlesProgression,
+    doubles: doublesProgression,
+  };
 
   /* Monthly activity — last 12 months */
   const now = new Date();

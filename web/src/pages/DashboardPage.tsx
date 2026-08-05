@@ -103,8 +103,8 @@ export function DashboardPage() {
   const myGames = useMemo(() => myGamesData ?? [], [myGamesData]);
 
   const playerStats = useMemo(
-    () => computePlayerStats(myGames, user?.userId ?? "", user?.elo ?? 200, locale),
-    [myGames, user?.userId, user?.elo, locale],
+    () => computePlayerStats(myGames, user?.userId ?? "", user?.eloSingles ?? 200, locale),
+    [myGames, user?.userId, user?.eloSingles, locale],
   );
 
   const clubStats = useMemo(
@@ -229,7 +229,16 @@ export function DashboardPage() {
             <div className="card-content flex flex-col items-center justify-center py-6">
               {dataReady ? (
                 <>
-                  <EloGauge elo={user?.elo ?? 200} min={0} max={1000} size={160} />
+                  <div className="flex items-center justify-center gap-4">
+                    <div className="flex flex-col items-center">
+                      <EloGauge elo={user?.eloSingles ?? 200} min={0} max={1000} size={130} />
+                      <span className="text-xs text-muted-foreground mt-1 font-medium">{gameDict.singles}</span>
+                    </div>
+                    <div className="flex flex-col items-center">
+                      <EloGauge elo={user?.eloDoubles ?? 200} min={0} max={1000} size={130} />
+                      <span className="text-xs text-muted-foreground mt-1 font-medium">{gameDict.doubles}</span>
+                    </div>
+                  </div>
                   <div className="mt-3 flex items-center gap-4 text-center">
                     <div>
                       <p className="text-lg font-bold text-success">{playerStats.wins}</p>

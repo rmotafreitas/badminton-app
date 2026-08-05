@@ -15,6 +15,11 @@ export class ProfileMapper {
       photo: photo ?? fallbackAvatar(view.name, null, view.userId),
       banner: safeImageUrl(view.banner),
       bio: view.bio,
+      email: view.email ?? null,
+      phone: view.phone ?? null,
+      roles: view.roles ?? [],
+      eloSingles: view.eloSingles ?? 200,
+      eloDoubles: view.eloDoubles ?? 200,
       createdAt: view.createdAt,
       updatedAt: view.updatedAt,
     };

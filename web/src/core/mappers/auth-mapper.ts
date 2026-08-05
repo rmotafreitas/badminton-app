@@ -9,7 +9,8 @@ export class AuthMapper {
       email: dto.email,
       phone: dto.phone,
       roles: dto.roles as Role[],
-      elo: dto.elo,
+      eloSingles: dto.eloSingles,
+      eloDoubles: dto.eloDoubles,
       clubId: dto.clubId,
     };
   }

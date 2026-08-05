@@ -34,6 +34,11 @@ function readPersistedUser(): AuthUserInfo | null {
     if (!raw) return null;
     const parsed = JSON.parse(raw) as AuthUserInfo;
     if (!parsed?.userId || !Array.isArray(parsed.roles)) return null;
+    // Migrate legacy single-ELO snapshots
+    if (typeof (parsed as any).eloSingles !== "number") {
+      (parsed as any).eloSingles = (parsed as any).elo ?? 200;
+      (parsed as any).eloDoubles = (parsed as any).elo ?? 200;
+    }
     return parsed;
   } catch {
     return null;

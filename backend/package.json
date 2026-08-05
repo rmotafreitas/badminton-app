@@ -9,6 +9,7 @@
     "db:push": "bunx --bun prisma db push",
     "db:studio": "bunx --bun prisma studio",
     "db:seed": "bun run prisma/seed.ts",
+    "db:recompute-elo": "bun run scripts/recompute-elo.ts",
     "test": "bun test"
   },
   "dependencies": {

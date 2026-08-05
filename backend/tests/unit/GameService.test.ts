@@ -187,9 +187,10 @@ function createMockUserRepo() {
     linkAuthMethod: mock(),
     assignClub: mock(),
     findByIds: mock((ids: string[]) =>
-      Promise.resolve(ids.map((id) => ({ id, elo: 200, roles: ["PLAYER"] } as User))),
+      Promise.resolve(ids.map((id) => ({ id, eloSingles: 200, eloDoubles: 200, roles: ["PLAYER"] } as User))),
     ),
-    updateElo: mock(() => Promise.resolve()),
+    updateEloSingles: mock(() => Promise.resolve()),
+    updateEloDoubles: mock(() => Promise.resolve()),
     setPasswordHash: mock(),
     findAll: mock(),
   };

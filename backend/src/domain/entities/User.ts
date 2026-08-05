@@ -8,7 +8,8 @@ export interface User {
   phone: string | null;
   passwordHash: string | null;
   roles: Role[];
-  elo: number;
+  eloSingles: number;
+  eloDoubles: number;
   isActive: boolean;
   lastAccess: Date | null;
   clubId: string | null;

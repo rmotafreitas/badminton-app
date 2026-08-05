@@ -26,6 +26,7 @@ export interface IUserRepo {
   setPasswordHash(userId: string, hash: string): Promise<void>;
   assignClub(userId: string, clubId: string): Promise<User>;
   findByIds(ids: string[]): Promise<User[]>;
-  updateElo(userId: string, elo: number): Promise<void>;
+  updateEloSingles(userId: string, elo: number): Promise<void>;
+  updateEloDoubles(userId: string, elo: number): Promise<void>;
   findAll(): Promise<User[]>;
 }

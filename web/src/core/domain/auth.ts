@@ -5,7 +5,8 @@ export type AuthProvider = "google" | "email" | "email-code" | "phone" | "passwo
 export interface AuthUserInfo {
   userId: string;
   roles: Role[];
-  elo: number;
+  eloSingles: number;
+  eloDoubles: number;
   email: string | null;
   phone: string | null;
   clubId: string | null;

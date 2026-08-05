@@ -18,7 +18,8 @@ interface WinLossDonutProps extends BaseChartProps {
 }
 
 interface EloLineChartProps extends BaseChartProps {
-  data: { label: string; elo: number }[];
+  singles: { label: string; elo: number }[];
+  doubles: { label: string; elo: number }[];
 }
 
 interface ActivityBarChartProps extends BaseChartProps {
