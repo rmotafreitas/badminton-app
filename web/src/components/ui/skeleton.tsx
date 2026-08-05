@@ -1,14 +1,17 @@
+import React from "react";
 import { cn } from "@/lib/utils";
 
 /** A single shimmering placeholder block. */
 export function Skeleton({
   className,
   rounded = "rounded",
+  style,
 }: {
   className?: string;
   rounded?: string;
+  style?: React.CSSProperties;
 }) {
-  return <div className={cn("skeleton", rounded, className)} aria-hidden />;
+  return <div className={cn("skeleton", rounded, className)} style={style} aria-hidden />;
 }
 
 /** One or more stacked text-line skeletons. */
