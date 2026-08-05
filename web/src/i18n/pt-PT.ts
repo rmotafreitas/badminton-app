@@ -229,6 +229,16 @@ export const ptPT = {
     login: "Entrar",
   },
 
+  pwa: {
+    installApp: "Instalar App",
+    addToHomeScreen: "Adicionar ao Ecrã Inicial",
+    addToHomeScreenDesc: "Instala esta app para acesso rápido e melhor experiência.",
+    dismiss: "Fechar",
+    install: "Instalar",
+    updateAvailable: "Nova versão disponível.",
+    updateNow: "Atualizar",
+  },
+
   sidebar: {
     dashboard: "Painel",
     users: "Utilizadores",

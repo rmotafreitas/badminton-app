@@ -1,5 +1,6 @@
 import { useLocation, Link } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
+import { usePWA } from "@/hooks/usePWA";
 import { useDictionary } from "@/i18n";
 
 function isActivePath(current: string, path: string) {
@@ -16,6 +17,8 @@ export function Sidebar() {
   const { user } = useAuth();
   const location = useLocation();
   const dict = useDictionary().sidebar;
+  const pwaDict = useDictionary().pwa;
+  const { canInstall, installApp } = usePWA();
 
   const linkClass = (path: string) =>
     isActivePath(location.pathname, path) ? "active" : "";
@@ -69,6 +72,21 @@ export function Sidebar() {
                 <span className="menu-item-label">{dict.profile}</span>
               </Link>
             </li>
+            {canInstall && (
+              <li>
+                <a
+                  href="#"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    installApp();
+                    closeMobileSidebar();
+                  }}
+                >
+                  <span className="icon"><i className="mdi mdi-download"></i></span>
+                  <span className="menu-item-label">{pwaDict.installApp}</span>
+                </a>
+              </li>
+            )}
             <li>
               <Link to="/logout" onClick={closeMobileSidebar}>
                 <span className="icon"><i className="mdi mdi-logout"></i></span>
