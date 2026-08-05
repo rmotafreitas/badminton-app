@@ -787,13 +787,30 @@ export function ProfilePage() {
             {/* Charts row 1: Win/Loss donut + ELO gauge + Game types */}
             {primaryGamesLoading && primaryGames.length === 0 ? (
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mt-4">
-                {Array.from({ length: 3 }).map((_, i) => (
-                  <div key={i} className="card">
-                    <div className="card-content flex items-center justify-center py-12">
-                      <Skeleton className="h-32 w-32 rounded-full" />
+                <div className="card">
+                  <div className="card-content flex items-center justify-center py-12">
+                    <Skeleton className="h-32 w-32 rounded-full" />
+                  </div>
+                </div>
+                <div className="card">
+                  <div className="card-content flex items-center justify-center py-12">
+                    <div className="flex items-center gap-4">
+                      <div className="flex flex-col items-center gap-2">
+                        <Skeleton className="h-[130px] w-[130px] rounded-full" />
+                        <Skeleton className="h-3 w-16" />
+                      </div>
+                      <div className="flex flex-col items-center gap-2">
+                        <Skeleton className="h-[130px] w-[130px] rounded-full" />
+                        <Skeleton className="h-3 w-16" />
+                      </div>
                     </div>
                   </div>
-                ))}
+                </div>
+                <div className="card">
+                  <div className="card-content py-8">
+                    <Skeleton className="h-[170px] w-full" />
+                  </div>
+                </div>
               </div>
             ) : primaryGames.length > 0 && (
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mt-4">

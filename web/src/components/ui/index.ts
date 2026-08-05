@@ -12,6 +12,7 @@ export {
   SkeletonRows,
   WidgetSkeleton,
   ProfileSkeleton,
+  GameDetailSkeleton,
   FullPageLoader,
 } from "@/components/ui/skeleton";
 export {

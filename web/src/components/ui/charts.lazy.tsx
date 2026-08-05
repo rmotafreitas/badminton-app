@@ -46,17 +46,45 @@ interface TopPlayersChartProps extends BaseChartProps {
   data: { name: string; games: number; wins: number; winRate: number }[];
 }
 
-function ChartSkeleton({ height }: { height: number }) {
+function ChartSkeleton({
+  height,
+  shape,
+  size,
+}: {
+  height: number;
+  shape: "circle" | "bar";
+  size?: number;
+}) {
+  if (shape === "circle") {
+    const s = size ?? height;
+    return (
+      <div style={{ height }} className="flex items-center justify-center">
+        <Skeleton
+          className="rounded-full"
+          style={{ width: s, height: s }}
+        />
+      </div>
+    );
+  }
   return <div style={{ height }}><Skeleton className="h-full w-full" /></div>;
 }
 
 function makeLazyChart<P extends BaseChartProps>(
   factory: () => Promise<{ default: ComponentType<P> }>,
-  fallbackHeight = 170,
+  opts: { fallbackHeight?: number; fallbackShape?: "circle" | "bar" } = {},
 ): ComponentType<P> {
+  const { fallbackHeight = 170, fallbackShape = "bar" } = opts;
   const LazyComponent = lazy(factory);
   return (props: P) => (
-    <Suspense fallback={<ChartSkeleton height={props.height ?? fallbackHeight} />}>
+    <Suspense
+      fallback={
+        <ChartSkeleton
+          height={props.height ?? fallbackHeight}
+          shape={fallbackShape}
+          size={props.size}
+        />
+      }
+    >
       <LazyComponent {...props} />
     </Suspense>
   );
@@ -66,22 +94,28 @@ const loadCharts = () => import("@/components/ui/charts");
 
 export const WinLossDonut = makeLazyChart<WinLossDonutProps>(() =>
   loadCharts().then((m) => ({ default: m.WinLossDonut })),
+  { fallbackShape: "circle" },
 );
 export const EloLineChart = makeLazyChart<EloLineChartProps>(() =>
   loadCharts().then((m) => ({ default: m.EloLineChart })),
+  { fallbackHeight: 200 },
 );
 export const ActivityBarChart = makeLazyChart<ActivityBarChartProps>(() =>
   loadCharts().then((m) => ({ default: m.ActivityBarChart })),
+  { fallbackHeight: 200 },
 );
 export const EloGauge = makeLazyChart<EloGaugeProps>(() =>
   loadCharts().then((m) => ({ default: m.EloGauge })),
+  { fallbackShape: "circle", fallbackHeight: 130 },
 );
 export const TypeSplitChart = makeLazyChart<TypeSplitChartProps>(() =>
   loadCharts().then((m) => ({ default: m.TypeSplitChart })),
 );
 export const RecentFormPills = makeLazyChart<RecentFormPillsProps>(() =>
   loadCharts().then((m) => ({ default: m.RecentFormPills })),
+  { fallbackHeight: 40 },
 );
 export const TopPlayersChart = makeLazyChart<TopPlayersChartProps>(() =>
   loadCharts().then((m) => ({ default: m.TopPlayersChart })),
+  { fallbackHeight: 200 },
 );

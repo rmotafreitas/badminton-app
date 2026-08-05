@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useClubService } from "@/di/container";
 import { useAuth } from "@/hooks/useAuth";
 import { useDictionary } from "@/i18n";
-import { Skeleton } from "@/components/ui";
+import { Skeleton, SkeletonRows } from "@/components/ui";
 import { useQuery, useMutation, invalidateQueries } from "@/hooks/useQuery";
 import type { Club } from "@/core/domain/club";
 
@@ -190,11 +190,19 @@ export function ClubsPage() {
           </header>
           <div className="card-content">
             {isLoading && clubsList.length === 0 ? (
-              <div className="p-4 space-y-3">
-                {Array.from({ length: 4 }).map((_, i) => (
-                  <Skeleton key={i} className="h-10 w-full" />
-                ))}
-              </div>
+              <table>
+                <thead>
+                  <tr>
+                    <th><Skeleton className="h-3 w-16" /></th>
+                    <th><Skeleton className="h-3 w-16" /></th>
+                    <th><Skeleton className="h-3 w-16" /></th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <SkeletonRows rows={4} cols={4} />
+                </tbody>
+              </table>
             ) : clubsList.length === 0 ? (
               <div className="p-4 text-center text-muted-foreground">{dict.noClubsFound}</div>
             ) : (

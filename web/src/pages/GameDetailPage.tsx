@@ -3,7 +3,7 @@ import { useParams, useSearchParams, Link } from "react-router-dom";
 import { useGameService, useClubService } from "@/di/container";
 import { useAuth } from "@/hooks/useAuth";
 import { useDictionary } from "@/i18n";
-import { PlayerSelect, Skeleton, ProfileSkeleton } from "@/components/ui";
+import { PlayerSelect, GameDetailSkeleton } from "@/components/ui";
 import { useQuery, useMutation, invalidateQueries, setQueryData } from "@/hooks/useQuery";
 import { checkScore } from "@/lib/score-utils";
 import type { GameType } from "@/core/domain/game";
@@ -197,17 +197,7 @@ export function GameDetailPage() {
   const typeLabel = (t: string) => t === "SINGLES" ? dict.singles : dict.doubles;
 
   if (gameLoading && !game) {
-    return (
-      <section className="section main-section">
-        <div className="card mb-4 sm:mb-6">
-          <div className="card-content space-y-4">
-            <Skeleton className="h-6 w-40" />
-            <Skeleton className="h-40 w-full" />
-          </div>
-        </div>
-        <ProfileSkeleton />
-      </section>
-    );
+    return <GameDetailSkeleton />;
   }
 
   if (!game) {

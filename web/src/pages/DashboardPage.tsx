@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useClubService, useGameService } from "@/di/container";
 import { useDictionary, useLanguage } from "@/i18n";
-import { Table, WidgetSkeleton, SkeletonRows } from "@/components/ui";
+import { Table, WidgetSkeleton, SkeletonRows, Skeleton } from "@/components/ui";
 import {
   WinLossDonut,
   ActivityBarChart,
@@ -252,7 +252,16 @@ export function DashboardPage() {
                   </div>
                 </>
               ) : (
-                <WidgetSkeleton />
+                <div className="flex items-center justify-center gap-4">
+                  <div className="flex flex-col items-center gap-2">
+                    <Skeleton className="h-[130px] w-[130px] rounded-full" />
+                    <Skeleton className="h-3 w-16" />
+                  </div>
+                  <div className="flex flex-col items-center gap-2">
+                    <Skeleton className="h-[130px] w-[130px] rounded-full" />
+                    <Skeleton className="h-3 w-16" />
+                  </div>
+                </div>
               )}
             </div>
           </div>
@@ -268,7 +277,7 @@ export function DashboardPage() {
               {dataReady ? (
                 <WinLossDonut wins={playerStats.wins} losses={playerStats.losses} size={170} />
               ) : (
-                <WidgetSkeleton />
+                <Skeleton className="h-[170px] w-[170px] rounded-full" />
               )}
             </div>
           </div>
@@ -288,7 +297,7 @@ export function DashboardPage() {
                   height={170}
                 />
               ) : (
-                <WidgetSkeleton />
+                <Skeleton className="h-[170px] w-full" />
               )}
             </div>
           </div>
@@ -307,7 +316,7 @@ export function DashboardPage() {
               {dataReady ? (
                 <ActivityBarChart data={clubStats.monthlyActivity} height={200} />
               ) : (
-                <WidgetSkeleton />
+                <Skeleton className="h-[200px] w-full" />
               )}
             </div>
           </div>
@@ -323,7 +332,7 @@ export function DashboardPage() {
               {dataReady ? (
                 <TopPlayersChart data={clubStats.topPlayers} height={200} />
               ) : (
-                <WidgetSkeleton />
+                <Skeleton className="h-[200px] w-full" />
               )}
             </div>
           </div>

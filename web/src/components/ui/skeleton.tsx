@@ -108,6 +108,65 @@ export function ProfileSkeleton() {
   );
 }
 
+/** Game detail view card skeleton. */
+export function GameDetailSkeleton() {
+  return (
+    <div aria-hidden>
+      <section className="is-hero-bar">
+        <div className="flex flex-col md:flex-row items-center justify-between space-y-6 md:space-y-0">
+          <Skeleton className="h-7 w-32" />
+        </div>
+      </section>
+
+      <section className="section main-section">
+        <div className="card mb-4 sm:mb-6">
+          <header className="card-header">
+            <Skeleton className="h-5 w-24" />
+          </header>
+          <div className="card-content">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-3">
+                <div>
+                  <Skeleton className="h-3 w-12 mb-1" />
+                  <Skeleton className="h-5 w-20" />
+                </div>
+                <div>
+                  <Skeleton className="h-3 w-16 mb-1" />
+                  <div className="flex items-center gap-1.5">
+                    <Skeleton className="h-5 w-5 rounded-full" />
+                    <Skeleton className="h-4 w-28" />
+                  </div>
+                </div>
+                <div>
+                  <Skeleton className="h-3 w-16 mb-1" />
+                  <div className="flex items-center gap-1.5">
+                    <Skeleton className="h-5 w-5 rounded-full" />
+                    <Skeleton className="h-4 w-28" />
+                  </div>
+                </div>
+              </div>
+              <div className="space-y-3">
+                <div>
+                  <Skeleton className="h-3 w-14 mb-1" />
+                  <Skeleton className="h-5 w-32" />
+                </div>
+                <div>
+                  <Skeleton className="h-3 w-12 mb-1" />
+                  <Skeleton className="h-5 w-16" />
+                </div>
+                <div>
+                  <Skeleton className="h-3 w-10 mb-1" />
+                  <Skeleton className="h-4 w-24" />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+  );
+}
+
 /** Full-page centered loader with a label. */
 export function FullPageLoader({ label }: { label?: string }) {
   return (
