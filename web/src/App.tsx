@@ -4,6 +4,8 @@ import { DIProvider } from "@/di/container";
 import { AuthProvider } from "@/context/AuthContext";
 import { PageTitleProvider } from "@/context/PageTitleContext";
 import { LanguageProvider } from "@/i18n";
+import { PWAProvider } from "@/context/PWAContext";
+import { UpdatePrompt } from "@/components/UpdatePrompt";
 import { Router } from "@/routes/Router";
 
 export function App() {
@@ -12,11 +14,14 @@ export function App() {
       <BrowserRouter>
         <DIProvider>
           <LanguageProvider>
-            <AuthProvider>
-              <PageTitleProvider>
-                <Router />
-              </PageTitleProvider>
-            </AuthProvider>
+            <PWAProvider>
+              <AuthProvider>
+                <PageTitleProvider>
+                  <UpdatePrompt />
+                  <Router />
+                </PageTitleProvider>
+              </AuthProvider>
+            </PWAProvider>
           </LanguageProvider>
         </DIProvider>
       </BrowserRouter>

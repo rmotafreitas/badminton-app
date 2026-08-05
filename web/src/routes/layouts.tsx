@@ -2,6 +2,7 @@ import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { Sidebar } from "@/components/Sidebar";
 import { LoginModal } from "@/components/LoginModal";
+import { AddToHomeScreenTip } from "@/components/AddToHomeScreenTip";
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -32,6 +33,7 @@ export function LayoutAdmin({ children }: LayoutProps) {
       <Navbar />
       <Sidebar />
       {children}
+      <AddToHomeScreenTip />
     </div>
   );
 }

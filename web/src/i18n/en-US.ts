@@ -230,6 +230,16 @@ export const enUS = {
     login: "Login",
   },
 
+  pwa: {
+    installApp: "Install App",
+    addToHomeScreen: "Add to Home Screen",
+    addToHomeScreenDesc: "Install this app for quick access and a better experience.",
+    dismiss: "Dismiss",
+    install: "Install",
+    updateAvailable: "A new version is available.",
+    updateNow: "Update",
+  },
+
   sidebar: {
     dashboard: "Dashboard",
     users: "Users",
