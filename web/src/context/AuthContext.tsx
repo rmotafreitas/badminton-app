@@ -161,12 +161,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   );
 
   const logout = useCallback(async () => {
-    await authService.logout();
+    // Clear local state IMMEDIATELY — don't wait for the server.
+    // The server cookie-clear is best-effort (fire-and-forget).
     queryCache.clear();
     setUser(null);
     persistUser(null);
     setAuthPhase("unauthenticated");
     setIsReconnecting(false);
+    // Fire the server logout in the background; ignore failures.
+    authService.logout().catch(() => {});
   }, [authService]);
 
   const loading = authPhase === "restoring";

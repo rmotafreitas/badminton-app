@@ -9,11 +9,10 @@ export function LogoutPage() {
   const dict = useDictionary().auth;
 
   useEffect(() => {
-    const doLogout = async () => {
-      await logout();
-      navigate("/");
-    };
-    doLogout();
+    // logout() clears local state synchronously and fires the
+    // server cookie-clear in the background — no awaiting needed.
+    logout();
+    navigate("/");
   }, [logout, navigate]);
 
   return (
