@@ -161,15 +161,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   );
 
   const logout = useCallback(async () => {
-    // Clear local state IMMEDIATELY — don't wait for the server.
-    // The server cookie-clear is best-effort (fire-and-forget).
+    // Clear local state immediately so the UI is responsive.
     queryCache.clear();
     setUser(null);
     persistUser(null);
     setAuthPhase("unauthenticated");
     setIsReconnecting(false);
-    // Fire the server logout in the background; ignore failures.
-    authService.logout().catch(() => {});
+    // Await the server cookie-clear, but with a 4s timeout.
+    // This ensures cookies are actually cleared before the user
+    // can refresh (which would re-authenticate via /auth/me).
+    // If the backend is asleep, we proceed after 4s — cookies
+    // may remain valid, but the user isn't stuck forever.
+    try {
+      await Promise.race([
+        authService.logout(),
+        new Promise<void>((_, reject) =>
+          setTimeout(() => reject(new Error("logout-timeout")), 4000),
+        ),
+      ]);
+    } catch {
+      // best-effort — local state is already cleared
+    }
   }, [authService]);
 
   const loading = authPhase === "restoring";
