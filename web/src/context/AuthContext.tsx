@@ -149,9 +149,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   const completeAuth = useCallback(
     async (provider: AuthProviderType, input: Record<string, string>) => {
       const userInfo = await authService.completeAuth(provider, input);
+      // Clear stale error entries so useQuery hooks refetch with fresh auth.
+      queryCache.clear();
+      queryCache.set(AUTH_QUERY_KEY, userInfo, { persist: false });
       setUser(userInfo);
       persistUser(userInfo);
-      queryCache.set(AUTH_QUERY_KEY, userInfo, { persist: false });
       setAuthPhase("authenticated");
       setIsReconnecting(false);
     },
@@ -160,9 +162,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const logout = useCallback(async () => {
     await authService.logout();
+    queryCache.clear();
     setUser(null);
     persistUser(null);
-    queryCache.remove(AUTH_QUERY_KEY);
     setAuthPhase("unauthenticated");
     setIsReconnecting(false);
   }, [authService]);

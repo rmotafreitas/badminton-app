@@ -1,4 +1,5 @@
 import api from "@/lib/api";
+import { AxiosError } from "axios";
 import type { AuthRepo } from "@/core/repositories/interfaces/auth-repo";
 import type {
   AuthUserInfo,
@@ -7,6 +8,18 @@ import type {
 } from "@/core/domain/auth";
 import type { AuthUserDTO, AuthInitResultDTO } from "@/core/dtos/auth.dto";
 import { AuthMapper } from "@/core/mappers/auth-mapper";
+
+function isNetworkError(err: unknown): boolean {
+  if (err instanceof AxiosError) {
+    return (
+      err.code === "ECONNABORTED" ||
+      err.code === "ETIMEDOUT" ||
+      err.code === "ERR_NETWORK" ||
+      err.message === "Network Error"
+    );
+  }
+  return false;
+}
 
 export class AuthRepoImpl implements AuthRepo {
   async initiateAuth(
@@ -43,7 +56,8 @@ export class AuthRepoImpl implements AuthRepo {
     try {
       const { data } = await api.get<AuthUserDTO>("/auth/me");
       return AuthMapper.toAuthUserInfo(data);
-    } catch {
+    } catch (err) {
+      if (isNetworkError(err)) throw err;
       return null;
     }
   }

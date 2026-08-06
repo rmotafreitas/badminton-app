@@ -7,6 +7,7 @@ import {
   DashboardPage,
   GamesPage,
   GameDetailPage,
+  TrainingReviewPage,
   UsersPage,
   ClubsPage,
   ProfilePage,
@@ -73,6 +74,13 @@ export const protectedRoutes: readonly Route[] = [
     roles: ["SYSTEM_ADMIN", "CLUB_ADMIN", "COACH", "PLAYER"],
     getTitle: (dict, searchParams) =>
       searchParams.get("edit") === "true" ? dict.games.editGame : dict.games.viewGame,
+  },
+  {
+    path: "/training-review",
+    element: <TrainingReviewPage />,
+    layout: LayoutAdmin,
+    roles: ["SYSTEM_ADMIN", "CLUB_ADMIN", "COACH", "PLAYER"],
+    getTitle: (dict) => dict.trainingReview.title,
   },
   {
     path: "/users",

@@ -19,12 +19,17 @@ import { UserRepoImpl } from "@/core/repositories/user-repo";
 import { UserServiceImpl } from "@/core/services/user-service";
 import type { UserService } from "@/core/services/interfaces/user-service";
 
+import { TrainingReviewRepoImpl } from "@/core/repositories/training-review-repo";
+import { TrainingReviewServiceImpl } from "@/core/services/training-review-service";
+import type { TrainingReviewService } from "@/core/services/interfaces/training-review-service";
+
 interface DIContainer {
   authService: AuthService;
   clubService: ClubService;
   gameService: GameService;
   profileService: ProfileService;
   userService: UserService;
+  trainingReviewService: TrainingReviewService;
 }
 
 const DIContext = createContext<DIContainer | null>(null);
@@ -48,7 +53,10 @@ export const DIProvider: React.FC<{ children: React.ReactNode }> = ({
     const userRepository = new UserRepoImpl();
     const userService = new UserServiceImpl(userRepository);
 
-    return { authService, clubService, gameService, profileService, userService };
+    const trainingReviewRepository = new TrainingReviewRepoImpl();
+    const trainingReviewService = new TrainingReviewServiceImpl(trainingReviewRepository);
+
+    return { authService, clubService, gameService, profileService, userService, trainingReviewService };
   }, []);
 
   return <DIContext.Provider value={container}>{children}</DIContext.Provider>;
@@ -65,3 +73,4 @@ export const useClubService = () => useDI().clubService;
 export const useGameService = () => useDI().gameService;
 export const useProfileService = () => useDI().profileService;
 export const useUserService = () => useDI().userService;
+export const useTrainingReviewService = () => useDI().trainingReviewService;

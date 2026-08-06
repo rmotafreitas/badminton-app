@@ -49,6 +49,12 @@ export function Sidebar() {
                 <span className="menu-item-label">{dict.games}</span>
               </Link>
             </li>
+            <li className={linkClass("/training-review")}>
+              <Link to="/training-review" onClick={closeMobileSidebar}>
+                <span className="icon"><i className="mdi mdi-clipboard-text-clock"></i></span>
+                <span className="menu-item-label">{dict.trainingReview}</span>
+              </Link>
+            </li>
             <li className={linkClass("/users")}>
               <Link to="/users" onClick={closeMobileSidebar}>
                 <span className="icon"><i className="mdi mdi-account-multiple"></i></span>
