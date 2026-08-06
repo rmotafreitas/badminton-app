@@ -187,7 +187,9 @@ class QueryCacheImpl {
     if (!entry) return { data: undefined, isStale: true };
     return {
       data: entry.data as T | undefined,
-      isStale: nowMs() - entry.updatedAt > entry.staleTime,
+      // Entries with no data (failed fetches) must always be treated as stale
+      // so consumers refetch rather than render an empty "fresh" state.
+      isStale: entry.data === undefined || nowMs() - entry.updatedAt > entry.staleTime,
     };
   }
 
@@ -211,8 +213,8 @@ class QueryCacheImpl {
     const existing = this.entries.get(k);
     const age = existing ? nowMs() - existing.updatedAt : Infinity;
 
-    // Fresh — serve immediately.
-    if (existing && age <= existing.staleTime) {
+    // Fresh — serve immediately (only if we actually have data).
+    if (existing && existing.data !== undefined && age <= existing.staleTime) {
       return { data: existing.data as T, promise: undefined };
     }
 
@@ -221,7 +223,7 @@ class QueryCacheImpl {
       if (!existing.promise) {
         this.runFetch<T>(k, fetcher, staleTime, gcTime, persist);
       }
-      return { data: existing.data as T, promise: undefined };
+      return { data: existing.data as T, promise: existing.promise as Promise<T> | undefined };
     }
 
     // Absent or expired — fetch (deduped).

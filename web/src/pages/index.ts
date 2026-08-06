@@ -6,6 +6,7 @@ export { NotFoundPage } from "./NotFoundPage";
 export { DashboardPage } from "./DashboardPage";
 export { GamesPage } from "./GamesPage";
 export { GameDetailPage } from "./GameDetailPage";
+export { TrainingReviewPage } from "./TrainingReviewPage";
 export { UsersPage } from "./UsersPage";
 export { ClubsPage } from "./ClubsPage";
 export { ProfilePage } from "./ProfilePage";

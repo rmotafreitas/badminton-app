@@ -29,6 +29,7 @@ model User {
     profile         Profile?
     club            Club?        @relation(fields: [clubId], references: [id])
     registeredGames Game[]       @relation("GameRegistrar")
+    trainingReviews TrainingSessionReview[]
 }
 
 model Profile {
@@ -105,6 +106,20 @@ model MagicToken {
     expiresAt DateTime
     used      Boolean  @default(false)
     createdAt DateTime @default(now())
+}
+
+model TrainingSessionReview {
+    id        String   @id @default(auto()) @map("_id") @db.ObjectId
+    userId    String   @db.ObjectId
+    date      String
+    effort    Int
+    note      String?
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    @@index([userId, date])
 }
 
 enum Role {

@@ -20,9 +20,11 @@ import { AuthService } from "@/application/services/AuthService";
 import { PrismaClubRepo } from "@/application/repositories/PrismaClubRepo";
 import { PrismaProfileRepo } from "@/application/repositories/PrismaProfileRepo";
 import { PrismaGameRepo } from "@/application/repositories/PrismaGameRepo";
+import { PrismaTrainingSessionReviewRepo } from "@/application/repositories/PrismaTrainingSessionReviewRepo";
 import { ClubService } from "@/application/services/ClubService";
 import { ProfileService } from "@/application/services/ProfileService";
 import { GameService } from "@/application/services/GameService";
+import { TrainingSessionReviewService } from "@/application/services/TrainingSessionReviewService";
 
 import type { IAuthProvider } from "@/application/interfaces/IAuthProvider";
 import type { IUserRepo } from "@/domain/repositories/IUserRepo";
@@ -30,6 +32,7 @@ import type { IMagicTokenRepo } from "@/domain/repositories/IMagicTokenRepo";
 import type { IClubRepo } from "@/domain/repositories/IClubRepo";
 import type { IProfileRepo } from "@/domain/repositories/IProfileRepo";
 import type { IGameRepo } from "@/domain/repositories/IGameRepo";
+import type { ITrainingSessionReviewRepo } from "@/domain/repositories/ITrainingSessionReviewRepo";
 
 // ── Presentation ──────────────────────────────────────────────────────────────
 import { AuthController } from "@/presentation/controllers/AuthController";
@@ -40,6 +43,8 @@ import { ClubController } from "@/presentation/controllers/ClubController";
 import { clubRoutes } from "@/presentation/routes/club.routes";
 import { GameController } from "@/presentation/controllers/GameController";
 import { gameRoutes } from "@/presentation/routes/game.routes";
+import { TrainingSessionReviewController } from "@/presentation/controllers/TrainingSessionReviewController";
+import { trainingReviewRoutes } from "@/presentation/routes/training-review.routes";
 import { UserController } from "@/presentation/controllers/UserController";
 import { userRoutes } from "@/presentation/routes/user.routes";
 
@@ -50,6 +55,7 @@ export interface AppDependencies {
   clubRepo?: IClubRepo;
   profileRepo?: IProfileRepo;
   gameRepo?: IGameRepo;
+  trainingReviewRepo?: ITrainingSessionReviewRepo;
   jwtSecret?: string;
   communicationService?: CommunicationService;
   authProviders?: IAuthProvider[];
@@ -65,6 +71,8 @@ export function createApp(deps: AppDependencies = {}) {
   const clubRepo = deps.clubRepo ?? new PrismaClubRepo(prisma);
   const profileRepo = deps.profileRepo ?? new PrismaProfileRepo(prisma);
   const gameRepo = deps.gameRepo ?? new PrismaGameRepo(prisma);
+  const trainingReviewRepo =
+    deps.trainingReviewRepo ?? new PrismaTrainingSessionReviewRepo(prisma);
 
   const jwtService = new JwtService(
     deps.jwtSecret ?? process.env.JWT_SECRET ?? "unsafe-default-for-tests-only",
@@ -104,6 +112,7 @@ export function createApp(deps: AppDependencies = {}) {
   const clubService = new ClubService(clubRepo);
   const profileService = new ProfileService(profileRepo, userRepo);
   const gameService = new GameService(gameRepo, userRepo);
+  const trainingReviewService = new TrainingSessionReviewService(trainingReviewRepo);
 
   const enableRegistration = deps.enableRegistration ?? (process.env.ENABLE_REGISTRATION !== "0");
 
@@ -117,6 +126,7 @@ export function createApp(deps: AppDependencies = {}) {
   const profileController = new ProfileController(profileService);
   const clubController = new ClubController(clubService, userRepo as any);
   const gameController = new GameController(gameService);
+  const trainingReviewController = new TrainingSessionReviewController(trainingReviewService);
   const userController = new UserController(userRepo);
 
   const app = new Elysia()
@@ -136,6 +146,7 @@ export function createApp(deps: AppDependencies = {}) {
             { name: "Profile", description: "Profile endpoints" },
             { name: "Clubs", description: "Club management endpoints" },
             { name: "Games", description: "Game registration endpoints" },
+            { name: "Training Reviews", description: "Training session review endpoints" },
             { name: "Users", description: "User management endpoints" },
           ],
           components: {
@@ -162,6 +173,7 @@ export function createApp(deps: AppDependencies = {}) {
     .use(profileRoutes(profileController, jwtService))
     .use(clubRoutes(clubController, jwtService))
     .use(gameRoutes(gameController, jwtService))
+    .use(trainingReviewRoutes(trainingReviewController, jwtService))
     .use(userRoutes(userController, jwtService))
     .get("/health", () => ({ status: "ok", ts: new Date().toISOString() }), {
       detail: { tags: ["Health"] },
