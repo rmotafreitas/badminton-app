@@ -4,12 +4,15 @@
   }
 
   .navbar {
-    @apply top-0 left-0 right-0 fixed flex bg-card h-14 border-b border-border z-30 w-screen transition-all
+    @apply top-0 left-0 right-0 fixed flex bg-card border-b border-border z-30 w-screen transition-all
     lg:pl-60 lg:w-auto;
+    padding-top: env(safe-area-inset-top);
+    height: calc(3.5rem + env(safe-area-inset-top));
   }
 
   .navbar-brand {
-    @apply flex-1 items-stretch	flex h-14;
+    @apply flex-1 items-stretch	flex;
+    height: calc(3.5rem + env(safe-area-inset-top));
   }
 
   .navbar-brand.is-right {
@@ -73,9 +76,10 @@
   }
 
   .navbar-menu {
-    max-height: calc(100vh - 3.5rem);
-    @apply hidden absolute w-screen top-14 left-0 bg-card border-b border-border overflow-auto shadow
+    max-height: calc(100vh - 3.5rem - env(safe-area-inset-top));
+    @apply hidden absolute w-screen bg-card border-b border-border overflow-auto shadow
     lg:flex lg:flex-grow lg:static lg:border-b-0 lg:overflow-visible lg:shadow-none;
+    top: calc(3.5rem + env(safe-area-inset-top));
   }
 
   .navbar-menu.active {

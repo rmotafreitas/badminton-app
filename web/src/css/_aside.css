@@ -4,7 +4,9 @@
 }
 
 .aside-tools {
-  @apply flex flex-row w-full flex-1 px-3 h-14 items-center;
+  @apply flex flex-row w-full flex-1 px-3 items-center;
+  padding-top: env(safe-area-inset-top);
+  height: calc(3.5rem + env(safe-area-inset-top));
   background-color: hsl(var(--sidebar-tools-bg));
   color: hsl(var(--sidebar-text));
 }

@@ -1,5 +1,6 @@
 .has-aside {
-  @apply pt-14 lg:pl-60;
+  padding-top: calc(3.5rem + env(safe-area-inset-top));
+  @apply lg:pl-60;
 }
 
 #app {
