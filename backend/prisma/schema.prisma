@@ -122,6 +122,50 @@ model TrainingSessionReview {
     @@index([userId, date])
 }
 
+// Rally Analysis: a recorded session analysed on the user's device. Video and
+// frame-level analysis live in object storage (R2); this keeps the summary.
+model RallySession {
+    id                 String               @id @default(auto()) @map("_id") @db.ObjectId
+    ownerId            String               @db.ObjectId
+    clientId           String
+    title              String?
+    recordedAt         DateTime
+    durationS          Float
+    status             String               @default("pending")
+    format             String?
+    gameId             String?              @db.ObjectId
+    trainingDate       String?
+    participants       RallyParticipant[]
+    participantUserIds String[]             @db.ObjectId
+    videoKey           String?
+    videoBytes         Int?
+    videoUploadedAt    DateTime?
+    videoExpiresAt     DateTime?
+    pinned             Boolean              @default(false)
+    resultKey          String?
+    summary            Json?
+    corrections        Json?
+    analysisLock       RallyAnalysisLock?
+    shareForTraining   Boolean              @default(false)
+    createdAt          DateTime             @default(now())
+    updatedAt          DateTime             @updatedAt
+
+    @@unique([ownerId, clientId])
+    @@index([participantUserIds])
+    @@index([gameId])
+    @@index([videoExpiresAt])
+}
+
+type RallyParticipant {
+    playerId String
+    userId   String @db.ObjectId
+}
+
+type RallyAnalysisLock {
+    deviceId String
+    until    DateTime
+}
+
 enum Role {
     SYSTEM_ADMIN
     CLUB_ADMIN

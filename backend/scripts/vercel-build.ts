@@ -71,6 +71,9 @@ async function main() {
       {
         version: 3,
         routes: [{ src: "/(.*)", dest: "/index" }],
+        // Daily: delete expired Rally Analysis review videos (needs CRON_SECRET;
+        // Vercel sends it as "Authorization: Bearer <CRON_SECRET>").
+        crons: [{ path: "/rally-sessions/maintenance/purge-videos", schedule: "17 4 * * *" }],
       },
       null,
       2,

@@ -41,6 +41,8 @@ Seeded password login: `admin@email.local` / `password`.
 | Prod             | Cloudflare R2            | `https://<account-id>.r2.cloudflarestorage.com` |
 
 Dev credentials live in `infra/seaweedfs/s3.json` (local only). Backend reads `S3_*` vars — see `backend/.env.example`.
+Videos never pass through the API: the backend presigns PUT/GET URLs and the browser talks to storage directly
+(R2 bucket needs a CORS rule for the app origin). A daily Vercel Cron purges expired videos (`CRON_SECRET`).
 
 ---
 

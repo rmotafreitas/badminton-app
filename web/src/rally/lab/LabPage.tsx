@@ -6,6 +6,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ComputeBackend } from "../engine/runtime/types";
 import type { ModelId } from "../engine/models/registry";
 import type { Box } from "../engine/models/yolox";
+import type { AnalysisRequest, AnalysisResponse } from "../engine/analysis/analysis.worker";
+import type { AnalysisResult } from "../engine/types";
 import type {
   MicroCase,
   MicroResult,
@@ -134,6 +136,106 @@ function Btn(props: React.ButtonHTMLAttributes<HTMLButtonElement>) {
       {...props}
       className="px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-sm font-medium disabled:opacity-40 active:scale-95 transition"
     />
+  );
+}
+
+function FullAnalysis({ file, onLog }: { file: File | null; onLog: (s: string) => void }) {
+  const workerRef = useRef<Worker | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [progress, setProgress] = useState<string | null>(null);
+  const [result, setResult] = useState<AnalysisResult | null>(null);
+  const [wallS, setWallS] = useState<number | null>(null);
+
+  useEffect(() => () => workerRef.current?.terminate(), []);
+
+  const run = async () => {
+    let blob: Blob | null = file;
+    if (!blob) {
+      const res = await fetch("/lab/sample.mp4");
+      if (!res.ok) return onLog("Pick a video first");
+      blob = await res.blob();
+    }
+    workerRef.current?.terminate();
+    const w = new Worker(new URL("../engine/analysis/analysis.worker.ts", import.meta.url), { type: "module" });
+    workerRef.current = w;
+    const started = performance.now();
+    setResult(null);
+    setProgress("starting…");
+    w.onmessage = (e: MessageEvent<AnalysisResponse>) => {
+      const m = e.data;
+      if (m.type === "progress") {
+        const p = m.progress;
+        setProgress(
+          `${p.phase} ${Math.round(p.progress * 100)}%` +
+            (p.videoS !== undefined ? ` · ${p.videoS.toFixed(1)}/${p.totalS?.toFixed(1)}s` : ""),
+        );
+        if (p.preview && canvasRef.current) {
+          canvasRef.current.width = p.preview.width;
+          canvasRef.current.height = p.preview.height;
+          canvasRef.current.getContext("2d")!.drawImage(p.preview, 0, 0);
+          p.preview.close();
+        }
+      } else if (m.type === "done") {
+        setWallS((performance.now() - started) / 1000);
+        setResult(m.result);
+        setProgress(null);
+        onLog("Analysis done");
+      } else {
+        setProgress(null);
+        onLog(`Analysis failed: ${m.message}`);
+      }
+    };
+    w.postMessage({ type: "start", jobId: `lab-${Date.now()}`, file: blob, preview: true } satisfies AnalysisRequest);
+  };
+
+  return (
+    <Section title="6 · Full analysis (engine end-to-end)">
+      <div className="flex gap-2 items-center">
+        <Btn disabled={!!progress} onClick={run}>
+          Analyse {file ? file.name : "sample"}
+        </Btn>
+        {progress && <span className="font-mono text-xs">{progress}</span>}
+      </div>
+      <canvas ref={canvasRef} className="w-full rounded-lg bg-black/5" />
+      {result && (
+        <div className="font-mono text-xs space-y-1" data-testid="analysis-summary">
+          <div>
+            {result.video.width}x{result.video.height}@{result.video.fps} · {result.video.durationS}s analysed at{" "}
+            {result.video.analysedFps}fps in {wallS?.toFixed(1)}s ({((wallS ?? 0) / result.video.durationS).toFixed(2)}×) ·{" "}
+            {result.engine.backend}
+          </div>
+          <div>
+            court: {result.calibration ? `${result.calibration.source} score ${result.calibration.score}` : "none"} ·
+            format {result.format} · players {result.players.map((p) => p.id).join(",")} · shuttle samples{" "}
+            {result.shuttle.length}
+          </div>
+          <div>
+            rallies {result.stats.rallies} · shots {result.stats.shots} · avg rally {result.stats.avgRallyShots}
+          </div>
+          {result.stats.players.map((p) => (
+            <div key={p.id}>
+              {p.id}: {p.distanceM} m · {p.shots} shots {JSON.stringify(p.shotsByType)} · max {p.maxSpeedKmh ?? "—"}{" "}
+              km/h
+            </div>
+          ))}
+          <details>
+            <summary>shots</summary>
+            {result.shots.map((s) => (
+              <div key={s.id}>
+                {s.t.toFixed(2)}s {s.hitter} {s.type}({s.typeConfidence}) {s.speedKmh ?? "—"}km/h ({s.speedConfidence})
+                apex {s.apexHeight ?? "—"} land {s.landing ? `${s.landing.x},${s.landing.y}` : "—"}
+              </div>
+            ))}
+          </details>
+          <details>
+            <summary>json</summary>
+            <pre data-testid="analysis-json" className="max-h-64 overflow-auto">
+              {JSON.stringify({ ...result, tracks: "…", shuttle: "…" }, null, 1)}
+            </pre>
+          </details>
+        </div>
+      )}
+    </Section>
   );
 }
 
@@ -505,6 +607,8 @@ export default function LabPage() {
         </div>
         {env?.camera && <pre className="text-xs overflow-x-auto">{JSON.stringify(env.camera)}</pre>}
       </Section>
+
+      <FullAnalysis file={file} onLog={setLogLine} />
 
       <Section title="5 · Results">
         <Btn onClick={share}>Share results</Btn>

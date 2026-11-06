@@ -25,6 +25,12 @@ import { ClubService } from "@/application/services/ClubService";
 import { ProfileService } from "@/application/services/ProfileService";
 import { GameService } from "@/application/services/GameService";
 import { TrainingSessionReviewService } from "@/application/services/TrainingSessionReviewService";
+import { PrismaRallySessionRepo } from "@/application/repositories/PrismaRallySessionRepo";
+import { RallySessionService } from "@/application/services/RallySessionService";
+import { S3ObjectStorage } from "@/application/storage/S3ObjectStorage";
+import { AppError } from "@/application/errors/AppError";
+import type { IObjectStorage } from "@/application/interfaces/IObjectStorage";
+import type { IRallySessionRepo } from "@/domain/repositories/IRallySessionRepo";
 
 import type { IAuthProvider } from "@/application/interfaces/IAuthProvider";
 import type { IUserRepo } from "@/domain/repositories/IUserRepo";
@@ -45,6 +51,8 @@ import { GameController } from "@/presentation/controllers/GameController";
 import { gameRoutes } from "@/presentation/routes/game.routes";
 import { TrainingSessionReviewController } from "@/presentation/controllers/TrainingSessionReviewController";
 import { trainingReviewRoutes } from "@/presentation/routes/training-review.routes";
+import { RallySessionController } from "@/presentation/controllers/RallySessionController";
+import { rallyMaintenanceRoutes, rallySessionRoutes } from "@/presentation/routes/rally-session.routes";
 import { UserController } from "@/presentation/controllers/UserController";
 import { userRoutes } from "@/presentation/routes/user.routes";
 
@@ -56,6 +64,8 @@ export interface AppDependencies {
   profileRepo?: IProfileRepo;
   gameRepo?: IGameRepo;
   trainingReviewRepo?: ITrainingSessionReviewRepo;
+  rallySessionRepo?: IRallySessionRepo;
+  objectStorage?: IObjectStorage;
   jwtSecret?: string;
   communicationService?: CommunicationService;
   authProviders?: IAuthProvider[];
@@ -113,6 +123,9 @@ export function createApp(deps: AppDependencies = {}) {
   const profileService = new ProfileService(profileRepo, userRepo);
   const gameService = new GameService(gameRepo, userRepo);
   const trainingReviewService = new TrainingSessionReviewService(trainingReviewRepo);
+  const rallySessionRepo = deps.rallySessionRepo ?? new PrismaRallySessionRepo(prisma);
+  const objectStorage = deps.objectStorage ?? S3ObjectStorage.fromEnv();
+  const rallySessionService = new RallySessionService(rallySessionRepo, userRepo, objectStorage);
 
   const enableRegistration = deps.enableRegistration ?? (process.env.ENABLE_REGISTRATION !== "0");
 
@@ -128,8 +141,15 @@ export function createApp(deps: AppDependencies = {}) {
   const gameController = new GameController(gameService);
   const trainingReviewController = new TrainingSessionReviewController(trainingReviewService);
   const userController = new UserController(userRepo);
+  const rallySessionController = new RallySessionController(rallySessionService);
 
   const app = new Elysia()
+    .onError(({ error, set }) => {
+      if (error instanceof AppError) {
+        set.status = error.status;
+        return { error: error.message };
+      }
+    })
     .use(
       swagger({
         path: "/swagger",
@@ -148,6 +168,7 @@ export function createApp(deps: AppDependencies = {}) {
             { name: "Games", description: "Game registration endpoints" },
             { name: "Training Reviews", description: "Training session review endpoints" },
             { name: "Users", description: "User management endpoints" },
+            { name: "Rally Analysis", description: "Recorded sessions analysed on-device" },
           ],
           components: {
             securitySchemes: {
@@ -166,7 +187,7 @@ export function createApp(deps: AppDependencies = {}) {
         origin: process.env.FRONTEND_URL ?? "https://localhost:5173",
         credentials: true,
         allowedHeaders: ["Content-Type"],
-        methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
       }),
     )
     .use(authRoutes(authController, jwtService))
@@ -175,6 +196,8 @@ export function createApp(deps: AppDependencies = {}) {
     .use(gameRoutes(gameController, jwtService))
     .use(trainingReviewRoutes(trainingReviewController, jwtService))
     .use(userRoutes(userController, jwtService))
+    .use(rallyMaintenanceRoutes(rallySessionController))
+    .use(rallySessionRoutes(rallySessionController, jwtService))
     .get("/health", () => ({ status: "ok", ts: new Date().toISOString() }), {
       detail: { tags: ["Health"] },
     });
