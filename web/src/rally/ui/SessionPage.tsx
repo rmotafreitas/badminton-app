@@ -442,6 +442,7 @@ export default function SessionPage() {
                   <thead>
                     <tr className="text-left text-xs text-gray-500">
                       <th className="py-1">{t.session.players}</th>
+                      {isOwner && effective && !summaryOnly && <th className="py-1" />}
                       <th className="py-1 text-right">{t.session.distance}</th>
                       <th className="py-1 text-right">{t.session.shots}</th>
                       <th className="py-1 text-right">{t.session.maxSpeed}</th>
@@ -491,6 +492,34 @@ export default function SessionPage() {
                               ))}
                             </div>
                           </td>
+                          {isOwner && effective && !summaryOnly && (
+                            <td className="py-2 pr-2">
+                              <select
+                                value=""
+                                onChange={(e) => {
+                                  const other = e.target.value as PlayerId;
+                                  if (!other) return;
+                                  const t0 = playerRef.current?.currentTime() ?? 0;
+                                  setDraft((d) => ({
+                                    ...d,
+                                    swaps: [...(d.swaps ?? []), [Math.round(t0 * 10) / 10, p.id as PlayerId, other]],
+                                  }));
+                                }}
+                                className="bg-transparent border rounded px-1 py-0.5 text-xs"
+                                title={t.session.swap}
+                                aria-label={t.session.swap}
+                              >
+                                <option value="">⇄</option>
+                                {stats.players
+                                  .filter((o) => o.id !== p.id)
+                                  .map((o) => (
+                                    <option key={o.id} value={o.id}>
+                                      ⇄ {o.id}
+                                    </option>
+                                  ))}
+                              </select>
+                            </td>
+                          )}
                           <td className="py-2 text-right font-mono">~{p.distanceM} m</td>
                           <td className="py-2 text-right font-mono">{p.shots}</td>
                           <td className="py-2 text-right font-mono">{p.maxSpeedKmh ? `~${p.maxSpeedKmh} km/h` : "—"}</td>

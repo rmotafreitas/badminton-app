@@ -156,7 +156,12 @@ export class RallySessionService {
       }
       patch.pinned = input.pinned;
     }
-    if (input.corrections !== undefined) patch.corrections = input.corrections;
+    if (input.corrections !== undefined) {
+      if (JSON.stringify(input.corrections ?? null).length > 200_000) {
+        throw new ValidationError("Corrections too large");
+      }
+      patch.corrections = input.corrections;
+    }
     if (input.shareForTraining !== undefined) patch.shareForTraining = input.shareForTraining;
     return this.repo.update(id, patch);
   }

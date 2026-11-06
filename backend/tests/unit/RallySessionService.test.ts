@@ -148,6 +148,13 @@ describe("RallySessionService", () => {
     ).rejects.toThrow("Unknown user");
   });
 
+  it("caps the size of stored corrections", async () => {
+    const s = await create();
+    const huge = { shots: Object.fromEntries(Array.from({ length: 20000 }, (_, i) => [`r1s${i}`, { type: "smash" }])) };
+    await expect(svc.update(s.id, "owner", { corrections: huge })).rejects.toThrow("too large");
+    await svc.update(s.id, "owner", { corrections: { shots: { r1s1: { type: "clear" } } } });
+  });
+
   it("limits pins", async () => {
     for (let i = 0; i < RALLY_LIMITS.maxPins; i++) {
       const s = await create("owner", `client-pin-${i}`);
