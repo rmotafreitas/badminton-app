@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { useDictionary, useLanguage } from "@/i18n";
 import { useRallyRepo } from "@/di/container";
 import { useQuery } from "@/hooks/useQuery";
-import { formatDuration } from "./hooks";
+import { formatDuration } from "./format";
 
 export function GameRallySessions({ gameId }: { gameId: string }) {
   const t = useDictionary().rally;
