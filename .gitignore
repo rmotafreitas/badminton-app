@@ -44,3 +44,7 @@ backend/certs/local/*.pem
 *.tgz
 
 aefa-main
+
+# Rally Analysis: model weights and local test footage (never committed)
+web/public/models/
+web/public/lab/

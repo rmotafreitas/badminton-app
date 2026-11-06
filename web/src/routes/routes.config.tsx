@@ -1,3 +1,4 @@
+import { lazy, Suspense } from "react";
 import {
   AuthCallbackPage,
   LoginPage,
@@ -15,6 +16,8 @@ import {
 import { LayoutAdmin, LayoutApp, LayoutLogin } from "@/routes/layouts";
 import type { Role } from "@/core/domain/roles";
 import type { Dictionary } from "@/i18n";
+
+const RallyLabPage = lazy(() => import("@/rally/lab/LabPage"));
 
 interface Route {
   path: string;
@@ -43,6 +46,16 @@ export const publicRoutes: readonly Route[] = [
   {
     path: "/logout",
     element: <LogoutPage />,
+    layout: LayoutApp,
+  },
+  {
+    // Internal on-device benchmark for Rally Analysis. Unlisted, no API calls.
+    path: "/lab",
+    element: (
+      <Suspense fallback={null}>
+        <RallyLabPage />
+      </Suspense>
+    ),
     layout: LayoutApp,
   },
   {
