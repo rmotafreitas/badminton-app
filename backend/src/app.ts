@@ -144,10 +144,11 @@ export function createApp(deps: AppDependencies = {}) {
   const rallySessionController = new RallySessionController(rallySessionService);
 
   const app = new Elysia()
-    .onError(({ error, set }) => {
+    // A Response (not an object) so it doesn't widen every route's inferred
+    // response type for the typed client.
+    .onError(({ error }) => {
       if (error instanceof AppError) {
-        set.status = error.status;
-        return { error: error.message };
+        return Response.json({ error: error.message }, { status: error.status }) as unknown as void;
       }
     })
     .use(
