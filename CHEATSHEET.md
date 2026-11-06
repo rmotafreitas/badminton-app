@@ -19,6 +19,29 @@ make install
 make db-generate
 ```
 
+### Host-run backend (alternative to the Docker backend)
+
+```bash
+# Infra only: Mongo (replica set, no auth) + SeaweedFS (local S3 stand-in for R2)
+docker compose -f docker-compose.dev.yml up -d mongo mongo-init seaweedfs seaweedfs-init
+
+# backend/.env → DATABASE_URL=mongodb://localhost:27017/app?directConnection=true
+cd backend && bun run db:push && bun dev     # https://localhost:3000
+cd web && bun dev --host                     # https://localhost:5173 (+ LAN for phones)
+```
+
+`prisma/seed.ts` has its `main()` call commented out on purpose (it wipes the DB).
+Seeded password login: `admin@email.local` / `password`.
+
+### Object storage (Rally Analysis videos)
+
+| Env              | Service                  | Endpoint                                     |
+| ---------------- | ------------------------ | -------------------------------------------- |
+| Dev              | SeaweedFS (`seaweedfs`)  | `http://localhost:8333`, bucket `rally-dev`  |
+| Prod             | Cloudflare R2            | `https://<account-id>.r2.cloudflarestorage.com` |
+
+Dev credentials live in `infra/seaweedfs/s3.json` (local only). Backend reads `S3_*` vars — see `backend/.env.example`.
+
 ---
 
 ## Daily dev workflow
