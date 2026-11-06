@@ -128,9 +128,12 @@ analysis starts) are part of the normal Vite build.
 - Values are estimates from one camera and shown with "~". Launch speed comes
   from a physics fit; confidence is reported per shot and only reviewed or
   confident speeds count toward records.
-- Hit attribution in fast net exchanges and shot typing from unusual angles
-  are the weakest parts — the review step exists for that; opt-in shared
-  corrections are meant for future retraining.
+- **Measured accuracy** (ShuttleSet benchmark, `tools/eval/shuttleset`, 178
+  labelled hits from a pro broadcast): hits precision 78 % / recall 60 %,
+  hitter side 89 %, shot type 50 % (lifts and clears ~70–85 %, net shots
+  ~45 %). Phone footage of amateurs is untested at scale — score your own
+  reviewed sessions with `tools/eval/evaluate.ts`. The review step exists for
+  the misses; opt-in shared corrections are meant for future retraining.
 - Players switching ends during a long session keep their P-labels by side;
   use "swap labels" corrections.
 - No real-phone benchmark yet: run `/lab` on target phones (WebGPU required

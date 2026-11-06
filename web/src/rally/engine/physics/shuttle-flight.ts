@@ -181,10 +181,21 @@ export interface FlightFit {
 }
 
 const PX_SIGMA = 3;
+/** Prior on the contact-time offset (s). */
+const TIME_SIGMA = 0.02;
 
+/**
+ * θ = (p₀, v₀, δ): launch state and a small contact-time offset δ (s). The
+ * hit time comes from video frames, so the real contact is up to half a
+ * frame (or a missed frame) away; at smash speeds 30 ms is ~40 % of speed.
+ */
 export function residuals(theta: number[], cam: Camera, obs: readonly Observation[], prior: LaunchPrior) {
   const start: FlightState = { p: [theta[0]!, theta[1]!, theta[2]!], v: [theta[3]!, theta[4]!, theta[5]!] };
-  const pts = simulate(start, obs.map((o) => o.t));
+  const dt = theta[6] ?? 0;
+  const pts = simulate(
+    start,
+    obs.map((o) => Math.max(1e-4, o.t - dt)),
+  );
   const r: number[] = [];
   for (let i = 0; i < obs.length; i++) {
     const p = pts[i]!;
@@ -196,8 +207,9 @@ export function residuals(theta: number[], cam: Camera, obs: readonly Observatio
     r.push((px.x - obs[i]!.px.x) / PX_SIGMA, (px.y - obs[i]!.px.y) / PX_SIGMA);
   }
   for (let k = 0; k < 3; k++) r.push((theta[k]! - prior.p[k]!) / prior.sigma[k]!);
+  if (theta.length > 6) r.push(dt / TIME_SIGMA);
   if (prior.end) {
-    const [pe] = simulate(start, [prior.end.t]);
+    const [pe] = simulate(start, [Math.max(1e-4, prior.end.t - dt)]);
     for (let k = 0; k < 3; k++) r.push((pe![k]! - prior.end.p[k]!) / prior.end.sigma[k]!);
   }
   r.push(...plausibility(start, prior));
@@ -217,7 +229,7 @@ function levenberg(theta0: number[], f: (t: number[]) => number[], iters = 40) {
   for (let it = 0; it < iters; it++) {
     const J: number[][] = [];
     for (let j = 0; j < theta.length; j++) {
-      const h = j < 3 ? 1e-4 : 1e-3;
+      const h = j < 3 || j === 6 ? 1e-4 : 1e-3;
       const tp = [...theta];
       tp[j]! += h;
       const rp = f(tp);
@@ -278,7 +290,7 @@ export function fitFlight(cam: Camera, obs: readonly Observation[], prior: Launc
           prior.towardsY * speed * Math.cos(e) * Math.cos(a),
           speed * Math.sin(e),
         ];
-        const theta0 = [...prior.p, ...v];
+        const theta0 = [...prior.p, ...v, 0];
         const res = levenberg(theta0, f, 25);
         if (!best || res.cost < best.cost) best = res;
       }
