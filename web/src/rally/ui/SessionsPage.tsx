@@ -82,13 +82,13 @@ export default function SessionsPage() {
           <div className="flex gap-2">
             <Link to="/analysis/record" className="button green">
               <span className="icon">
-                <i className="mdi mdi-record-circle" />
+                <i aria-hidden className="mdi mdi-record-circle" />
               </span>
               <span>{t.record}</span>
             </Link>
             <button className="button blue" onClick={() => fileRef.current?.click()} title={t.importHint}>
               <span className="icon">
-                <i className="mdi mdi-upload" />
+                <i aria-hidden className="mdi mdi-upload" />
               </span>
               <span>{t.import}</span>
             </button>
@@ -109,7 +109,7 @@ export default function SessionsPage() {
       <section className="section main-section space-y-4">
         {!online && (
           <div className="notification yellow">
-            <i className="mdi mdi-wifi-off mr-2" />
+            <i aria-hidden className="mdi mdi-wifi-off mr-2" />
             {t.offline}
           </div>
         )}
@@ -140,7 +140,7 @@ export default function SessionsPage() {
         {local.length === 0 && others.length === 0 && (
           <div className="card">
             <div className="card-content text-center py-10 text-gray-500">
-              <i className="mdi mdi-video-outline text-4xl block mb-2" />
+              <i aria-hidden className="mdi mdi-video-outline text-4xl block mb-2" />
               {t.empty}
             </div>
           </div>
@@ -151,7 +151,7 @@ export default function SessionsPage() {
             <header className="card-header">
               <p className="card-header-title">
                 <span className="icon">
-                  <i className="mdi mdi-cellphone" />
+                  <i aria-hidden className="mdi mdi-cellphone" />
                 </span>
                 {t.onThisDevice}
               </p>
@@ -163,7 +163,7 @@ export default function SessionsPage() {
                     to={`/analysis/${s.clientId}`}
                     className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 dark:hover:bg-slate-800/50"
                   >
-                    <i className="mdi mdi-badminton text-2xl text-emerald-600" />
+                    <i aria-hidden className="mdi mdi-badminton text-2xl text-emerald-600" />
                     <div className="flex-1 min-w-0">
                       <div className="font-medium truncate">
                         {s.title ?? t.session.untitled} · {when(s.recordedAt, locale)}
@@ -202,7 +202,7 @@ export default function SessionsPage() {
             <header className="card-header">
               <p className="card-header-title">
                 <span className="icon">
-                  <i className="mdi mdi-cloud-outline" />
+                  <i aria-hidden className="mdi mdi-cloud-outline" />
                 </span>
                 {t.otherDevice}
               </p>
@@ -214,7 +214,7 @@ export default function SessionsPage() {
                     to={`/analysis/s/${r.id}`}
                     className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 dark:hover:bg-slate-800/50"
                   >
-                    <i className="mdi mdi-cloud-outline text-2xl text-sky-600" />
+                    <i aria-hidden className="mdi mdi-cloud-outline text-2xl text-sky-600" />
                     <div className="flex-1 min-w-0">
                       <div className="font-medium truncate">
                         {r.title ?? t.session.untitled} · {when(r.recordedAt, locale)}

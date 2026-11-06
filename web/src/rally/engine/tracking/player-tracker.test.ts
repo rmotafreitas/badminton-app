@@ -98,6 +98,24 @@ describe("player tracker", () => {
     expect(r.players.length).toBe(3);
   });
 
+  it("does not count far-court depth jitter as running", () => {
+    // Far player at a low camera: ±60 cm depth noise, actually running 30 m.
+    // (A fixed 0.3 s window counts the jitter as running and fails this.)
+    const path = (t: number) => ({ x: 0, y: 3 + 1.5 * (1 - Math.cos((t * Math.PI) / 3)) });
+    let seed = 9;
+    const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647 - 0.5) * 1.2;
+    const frames: FrameDetections[] = [];
+    for (let i = 0; i < 30 * 30; i++) {
+      const t = i / 30;
+      const p = path(t);
+      frames.push({ t, boxes: [box({ x: -1.5, y: -3 }), box({ x: p.x + rnd() * 0.3, y: p.y + rnd() })] });
+    }
+    const r = trackPlayers(frames, { toCourt, format: "singles" });
+    const d = distanceCovered(r.tracks[1]!);
+    expect(d).toBeGreaterThan(30 * 0.85);
+    expect(d).toBeLessThan(30 * 1.2);
+  });
+
   it("measures distance covered within 10 %", () => {
     // Shuttle run: 3 m back and forth, 10 times in 30 s → 60 m.
     const path = (t: number) => {

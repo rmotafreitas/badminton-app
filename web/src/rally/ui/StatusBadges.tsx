@@ -37,7 +37,7 @@ export function AnalysisBadge({ s }: { s: Pick<LocalSession, "analysis"> }) {
     case "needs-court":
       return (
         <Pill tone="warn">
-          <i className="mdi mdi-vector-square" />
+          <i aria-hidden className="mdi mdi-vector-square" />
           {t.needsCourt}
         </Pill>
       );

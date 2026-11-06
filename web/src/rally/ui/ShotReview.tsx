@@ -36,7 +36,7 @@ export function ShotReview({ effective, draft, onDraft, names, onSeek, onAdd, re
         <div className="flex flex-wrap items-center justify-between gap-2">
           {onAdd && (
             <button className="button small light" onClick={onAdd}>
-              <i className="mdi mdi-plus mr-1" />
+              <i aria-hidden className="mdi mdi-plus mr-1" />
               {t.session.addShot}
             </button>
           )}
@@ -114,7 +114,7 @@ export function ShotReview({ effective, draft, onDraft, names, onSeek, onAdd, re
                           : "—"}
                     </td>
                     <td className="py-1.5 text-right whitespace-nowrap">
-                      {s.reviewed && <i className="mdi mdi-check-decagram text-emerald-600 mr-1" title={t.session.reviewed} />}
+                      {s.reviewed && <i aria-hidden className="mdi mdi-check-decagram text-emerald-600 mr-1" title={t.session.reviewed} />}
                       {!readOnly && (
                         <button
                           className="button small light"

@@ -16,7 +16,7 @@ export function GameRallySessions({ gameId }: { gameId: string }) {
       <header className="card-header">
         <p className="card-header-title">
           <span className="icon">
-            <i className="mdi mdi-motion-play-outline" />
+            <i aria-hidden className="mdi mdi-motion-play-outline" />
           </span>
           {t.title}
         </p>
@@ -25,7 +25,7 @@ export function GameRallySessions({ gameId }: { gameId: string }) {
         {data.map((s) => (
           <li key={s.id}>
             <Link to={`/analysis/s/${s.id}`} className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 dark:hover:bg-slate-800/50">
-              <i className="mdi mdi-badminton text-xl text-emerald-600" />
+              <i aria-hidden className="mdi mdi-badminton text-xl text-emerald-600" />
               <div className="flex-1 min-w-0 text-sm">
                 <div className="font-medium truncate">
                   {s.title ?? t.session.untitled} · {s.recordedAt.toLocaleDateString(lang)} · {formatDuration(s.durationS)}

@@ -280,7 +280,7 @@ export default function SessionPage() {
               {effective && videoSrc && (
                 <button className="button blue" disabled={exporting !== null} onClick={() => void doExport()}>
                   <span className="icon">
-                    <i className="mdi mdi-share-variant" />
+                    <i aria-hidden className="mdi mdi-share-variant" />
                   </span>
                   <span>
                     {exporting !== null ? `${t.session.exporting} ${Math.round(exporting * 100)}%` : t.session.export}
@@ -298,16 +298,16 @@ export default function SessionPage() {
         {exported && (
           <div className="card">
             <div className="card-content flex flex-wrap items-center gap-2">
-              <i className="mdi mdi-check-circle text-emerald-600 text-xl" />
+              <i aria-hidden className="mdi mdi-check-circle text-emerald-600 text-xl" />
               <span className="flex-1 text-sm">{exported.name}</span>
               {canShareFile(exported.blob, exported.name) && (
                 <button className="button green" onClick={() => void shareFile(exported.blob, exported.name)}>
-                  <i className="mdi mdi-share-variant mr-1" />
+                  <i aria-hidden className="mdi mdi-share-variant mr-1" />
                   {t.session.share}
                 </button>
               )}
               <button className="button blue" onClick={() => downloadFile(exported.blob, exported.name)}>
-                <i className="mdi mdi-download mr-1" />
+                <i aria-hidden className="mdi mdi-download mr-1" />
                 {t.session.download}
               </button>
               <button className="button light" onClick={() => setExported(null)} aria-label="Close">
@@ -409,7 +409,7 @@ export default function SessionPage() {
                   <span>{t.session.approx}</span>
                   {local?.hasLocalVideo && isOwner && (
                     <button className="button small light" onClick={openCornerEditor}>
-                      <i className="mdi mdi-vector-square mr-1" />
+                      <i aria-hidden className="mdi mdi-vector-square mr-1" />
                       {t.session.adjustCourt}
                     </button>
                   )}
@@ -539,7 +539,7 @@ export default function SessionPage() {
             <header className="card-header">
               <p className="card-header-title">
                 <span className="icon">
-                  <i className="mdi mdi-playlist-check" />
+                  <i aria-hidden className="mdi mdi-playlist-check" />
                 </span>
                 {t.session.review}
               </p>
@@ -606,7 +606,7 @@ export default function SessionPage() {
               )}
               {server.gameId && (
                 <Link to={`/games/${server.gameId}`} className="text-sky-600 hover:underline">
-                  <i className="mdi mdi-badminton mr-1" />
+                  <i aria-hidden className="mdi mdi-badminton mr-1" />
                   {t.session.linkGame}
                 </Link>
               )}

@@ -12,7 +12,7 @@
  * web/public/models. WebGPU flags are passed; without a GPU it falls back to WASM.
  */
 import { chromium } from "playwright";
-import { mkdirSync } from "node:fs";
+import { mkdirSync, readFileSync } from "node:fs";
 
 const APP = process.env.APP_URL ?? "https://localhost:5173";
 const VIDEO = process.env.RALLY_VIDEO;
@@ -62,10 +62,12 @@ try {
   }
 
   await page.getByRole("button", { name: /Export video/ }).click();
-  await page.getByRole("button", { name: "Download" }).waitFor({ timeout: 900000 });
+  await page.getByRole("button", { name: "Download", exact: true }).waitFor({ timeout: 900000 });
   const dl = page.waitForEvent("download", { timeout: 60000 });
-  await page.getByRole("button", { name: "Download" }).click();
+  await page.getByRole("button", { name: "Download", exact: true }).click();
   await (await dl).saveAs(OUT + "export.mp4");
+  const head = readFileSync(OUT + "export.mp4").subarray(4, 8).toString("latin1");
+  if (head !== "ftyp") throw new Error("export is not an MP4");
   log("exported", OUT + "export.mp4");
   if (errors.length) throw new Error(`page errors: ${errors.join(" | ")}`);
   log("PASS");

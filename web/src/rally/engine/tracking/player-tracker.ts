@@ -423,15 +423,39 @@ function fillGaps(tr: PlayerTrack, maxGap: number) {
 }
 
 /**
- * Distance covered (m) from a 10 Hz court track: centred moving average over
- * 0.3 s to remove detection jitter, then path length ignoring sub-2 cm steps.
- * (Wider windows cut corners on direction changes and under-count lunges.)
+ * Position jitter of a 10 Hz track (m): robust std of second differences,
+ * which cancel smooth motion and keep measurement noise (σ·√6 for white noise).
  */
-export function distanceCovered(tr: PlayerTrack): number {
+export function trackJitter(tr: PlayerTrack): number {
   const n = tr.court.length / 2;
-  const half = 1;
-  const smooth: (Vec2 | null)[] = [];
+  const d: number[] = [];
+  for (let i = 1; i < n - 1; i++) {
+    const xs = [tr.court[(i - 1) * 2]!, tr.court[i * 2]!, tr.court[(i + 1) * 2]!];
+    const ys = [tr.court[(i - 1) * 2 + 1]!, tr.court[i * 2 + 1]!, tr.court[(i + 1) * 2 + 1]!];
+    if (xs.some(Number.isNaN)) continue;
+    d.push(Math.hypot(xs[0]! - 2 * xs[1]! + xs[2]!, ys[0]! - 2 * ys[1]! + ys[2]!));
+  }
+  if (d.length < 10) return 0;
+  d.sort((p, q) => p - q);
+  return d[d.length >> 1]! / Math.sqrt(6);
+}
+
+/**
+ * Smoothed 10 Hz positions. The window adapts to the track's own jitter:
+ * near players (precise feet) keep fast direction changes; far players,
+ * whose depth is noisy from a low camera, get more smoothing so jitter
+ * isn't counted as running.
+ */
+export function smoothTrack(tr: PlayerTrack): (Vec2 | null)[] {
+  const n = tr.court.length / 2;
+  const jitter = trackJitter(tr);
+  const half = jitter < 0.04 ? 1 : jitter < 0.1 ? 2 : jitter < 0.2 ? 3 : 4;
+  const out: (Vec2 | null)[] = [];
   for (let i = 0; i < n; i++) {
+    if (Number.isNaN(tr.court[i * 2]!)) {
+      out.push(null);
+      continue;
+    }
     let sx = 0;
     let sy = 0;
     let c = 0;
@@ -442,17 +466,31 @@ export function distanceCovered(tr: PlayerTrack): number {
       sy += tr.court[k * 2 + 1]!;
       c++;
     }
-    smooth.push(c && !Number.isNaN(tr.court[i * 2]!) ? { x: sx / c, y: sy / c } : null);
+    out.push({ x: sx / c, y: sy / c });
   }
+  return out;
+}
+
+/** Path length of a smoothed track; ignores sub-2 cm steps and > 12 m/s glitches. */
+export function pathLength(smooth: readonly (Vec2 | null)[], upTo = smooth.length): number[] {
+  const cum = new Array<number>(Math.min(upTo, smooth.length)).fill(0);
   let d = 0;
-  for (let i = 1; i < n; i++) {
+  for (let i = 1; i < cum.length; i++) {
     const a = smooth[i - 1];
     const b = smooth[i];
-    if (!a || !b) continue;
-    const step = Math.hypot(b.x - a.x, b.y - a.y);
-    if (step > 0.02 && step < 1.2) d += step; // > 12 m/s is a tracking glitch
+    if (a && b) {
+      const step = Math.hypot(b.x - a.x, b.y - a.y);
+      if (step > 0.02 && step < 1.2) d += step;
+    }
+    cum[i] = d;
   }
-  return d;
+  return cum;
+}
+
+/** Distance covered (m) from a 10 Hz court track. */
+export function distanceCovered(tr: PlayerTrack): number {
+  const cum = pathLength(smoothTrack(tr));
+  return cum.length ? cum[cum.length - 1]! : 0;
 }
 
 /** Court position of a player at time t (linear interpolation), or null. */

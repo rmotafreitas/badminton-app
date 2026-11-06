@@ -60,7 +60,7 @@ export function ProfileRallyCard({ userId }: { userId: string }) {
       <header className="card-header">
         <p className="card-header-title">
           <span className="icon">
-            <i className="mdi mdi-motion-play-outline" />
+            <i aria-hidden className="mdi mdi-motion-play-outline" />
           </span>
           {t.profile.title}
         </p>

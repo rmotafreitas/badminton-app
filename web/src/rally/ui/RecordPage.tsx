@@ -374,7 +374,7 @@ export default function RecordPage() {
         )}
 
         <Link to="/analysis" className="absolute top-3 left-3 rounded-full bg-black/50 w-10 h-10 flex items-center justify-center" aria-label="Close">
-          <i className="mdi mdi-close text-xl" />
+          <i aria-hidden className="mdi mdi-close text-xl" />
         </Link>
         {recording && (
           <div className="absolute top-3 left-1/2 -translate-x-1/2 rounded-full bg-red-600 px-3 py-1 text-sm font-mono">

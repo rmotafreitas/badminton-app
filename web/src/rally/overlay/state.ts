@@ -3,7 +3,7 @@
  * per result (prepareOverlay), then frameState() is cheap enough per frame.
  */
 import type { Vec2 } from "../engine/geometry/linalg";
-import { boxAt, positionAt } from "../engine/tracking/player-tracker";
+import { boxAt, pathLength, positionAt, smoothTrack } from "../engine/tracking/player-tracker";
 import type { AnalysisResult, PlayerId, Shot, ShuttleSample } from "../engine/types";
 import { TRACK_HZ } from "../engine/types";
 
@@ -22,31 +22,9 @@ export function prepareOverlay(
 ): PreparedOverlay {
   const cumDistance = new Map<PlayerId, Float32Array>();
   for (const tr of result.tracks) {
-    const n = tr.court.length / 2;
-    const cum = new Float32Array(n);
-    let d = 0;
-    let prev: Vec2 | null = null;
-    for (let i = 0; i < n; i++) {
-      // Same 0.3 s smoothing as stats.distanceCovered, so numbers agree.
-      let sx = 0;
-      let sy = 0;
-      let c = 0;
-      for (let k = Math.max(0, i - 1); k <= Math.min(n - 1, i + 1); k++) {
-        const x = tr.court[k * 2]!;
-        if (Number.isNaN(x)) continue;
-        sx += x;
-        sy += tr.court[k * 2 + 1]!;
-        c++;
-      }
-      const p = c && !Number.isNaN(tr.court[i * 2]!) ? { x: sx / c, y: sy / c } : null;
-      if (p && prev) {
-        const step = Math.hypot(p.x - prev.x, p.y - prev.y);
-        if (step > 0.02 && step < 1.2) d += step;
-      }
-      if (p) prev = p;
-      cum[i] = d;
-    }
-    cumDistance.set(tr.id, cum);
+    // Same smoothing as stats.distanceCovered, so the overlay ends on the
+    // same number the stats show.
+    cumDistance.set(tr.id, Float32Array.from(pathLength(smoothTrack(tr))));
   }
   const shots = result.shots.filter((s) => !s.deleted).sort((a, b) => a.t - b.t);
   return { result, cumDistance, shots, names };
