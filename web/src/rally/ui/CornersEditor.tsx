@@ -39,12 +39,18 @@ export function CornersEditor({ frame, width, height, initial, onDone, onCancel,
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [corners, setCorners] = useState<Calibration["corners"]>(initial ?? defaultCorners(width, height));
   const drag = useRef<number | null>(null);
-  // Padding around the frame so off-screen corners stay reachable.
-  const pad = 0.25;
-  const view = useMemo(
-    () => ({ x0: -width * pad, y0: -height * pad, w: width * (1 + 2 * pad), h: height * (1 + 2 * pad) }),
-    [width, height],
-  );
+  // View = frame ∪ the initial corners (+ margin), so off-picture corners
+  // stay reachable; capped at 3× the frame so the picture stays usable.
+  const view = useMemo(() => {
+    const pts = [...(initial ?? defaultCorners(width, height)), { x: 0, y: 0 }, { x: width, y: height }];
+    const m = 0.06 * Math.max(width, height);
+    const x0 = Math.max(-width, Math.min(...pts.map((p) => p.x)) - m);
+    const y0 = Math.max(-height, Math.min(...pts.map((p) => p.y)) - m);
+    const x1 = Math.min(2 * width, Math.max(...pts.map((p) => p.x)) + m);
+    const y1 = Math.min(2 * height, Math.max(...pts.map((p) => p.y)) + m);
+    return { x0, y0, w: x1 - x0, h: y1 - y0 };
+    // Recompute only when the frame/initial guess changes, not while dragging.
+  }, [initial, width, height]);
 
   // Redraw when the canvas gets/changes its layout size (first paint can
   // happen before layout, leaving a 0-wide canvas).

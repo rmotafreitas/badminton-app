@@ -12,7 +12,7 @@ import { invalidateQueries, useQuery } from "@/hooks/useQuery";
 import type { RallySession } from "@/core/domain/rally";
 import { applyCorrections } from "../engine/stats";
 import type { AnalysisResult, Calibration, Corrections, PlayerId, SessionFormat } from "../engine/types";
-import { exportWithOverlay, shareOrDownload } from "../media/exporter";
+import { canShareFile, downloadFile, exportWithOverlay, shareFile } from "../media/exporter";
 import { LABELS_EN, LABELS_PT } from "../overlay/theme";
 import { buddyTheme } from "../overlay/theme";
 import { summarise } from "../sessions/manager";
@@ -146,6 +146,7 @@ export default function SessionPage() {
   const [saving, setSaving] = useState(false);
   const [exporting, setExporting] = useState<number | null>(null);
   const [exportError, setExportError] = useState<string | null>(null);
+  const [exported, setExported] = useState<{ blob: Blob; name: string } | null>(null);
   const [cornerFrame, setCornerFrame] = useState<HTMLCanvasElement | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
 
@@ -216,7 +217,7 @@ export default function SessionPage() {
         labels: lang === "pt-PT" ? LABELS_PT : LABELS_EN,
         onProgress: (p) => setExporting(p),
       });
-      await shareOrDownload(out, `${title.replace(/[^\w-]+/g, "_")}-rally.mp4`);
+      setExported({ blob: out, name: `${title.replace(/[^\w-]+/g, "_")}-rally.mp4` });
     } catch (e) {
       setExportError((e as Error).message);
     } finally {
@@ -294,6 +295,27 @@ export default function SessionPage() {
       <section className="section main-section space-y-4">
         {summaryOnly && <div className="notification blue">{t.session.summaryOnly}</div>}
         {exportError && <div className="notification red">{exportError}</div>}
+        {exported && (
+          <div className="card">
+            <div className="card-content flex flex-wrap items-center gap-2">
+              <i className="mdi mdi-check-circle text-emerald-600 text-xl" />
+              <span className="flex-1 text-sm">{exported.name}</span>
+              {canShareFile(exported.blob, exported.name) && (
+                <button className="button green" onClick={() => void shareFile(exported.blob, exported.name)}>
+                  <i className="mdi mdi-share-variant mr-1" />
+                  {t.session.share}
+                </button>
+              )}
+              <button className="button blue" onClick={() => downloadFile(exported.blob, exported.name)}>
+                <i className="mdi mdi-download mr-1" />
+                {t.session.download}
+              </button>
+              <button className="button light" onClick={() => setExported(null)} aria-label="Close">
+                ✕
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* ── Player / analysis state ─────────────────────────────────────── */}
         {!summaryOnly && (

@@ -474,6 +474,7 @@ export const ptPT = {
       export: "Exportar vídeo",
       exporting: "A exportar",
       share: "Partilhar",
+      download: "Descarregar",
       pin: "Guardar vídeo",
       unpin: "Deixar de guardar",
       pinned: "Guardado além de 60 dias",

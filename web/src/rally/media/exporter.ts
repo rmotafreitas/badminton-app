@@ -92,22 +92,36 @@ export async function exportWithOverlay(video: Blob, opts: ExportOptions): Promi
   }
 }
 
-/** Share via the OS sheet when possible, else download. */
-export async function shareOrDownload(file: Blob, name: string): Promise<"shared" | "downloaded"> {
+/** True if this browser can hand a video file to the OS share sheet. */
+export function canShareFile(file: Blob, name: string): boolean {
+  try {
+    return !!navigator.canShare?.({ files: [new File([file], name, { type: file.type || "video/mp4" })] });
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Share via the OS sheet. Must run inside a fresh user gesture (a tap): an
+ * export takes long enough that the gesture that started it has expired.
+ */
+export async function shareFile(file: Blob, name: string): Promise<boolean> {
   const f = new File([file], name, { type: file.type || "video/mp4" });
   try {
-    if (navigator.canShare?.({ files: [f] })) {
-      await navigator.share({ files: [f], title: name });
-      return "shared";
-    }
+    await navigator.share({ files: [f], title: name });
+    return true;
   } catch (e) {
-    if ((e as Error).name === "AbortError") return "shared";
+    return (e as Error).name === "AbortError";
   }
-  const url = URL.createObjectURL(f);
+}
+
+export function downloadFile(file: Blob, name: string) {
+  const url = URL.createObjectURL(file);
   const a = document.createElement("a");
   a.href = url;
   a.download = name;
+  document.body.appendChild(a);
   a.click();
-  setTimeout(() => URL.revokeObjectURL(url), 30_000);
-  return "downloaded";
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }

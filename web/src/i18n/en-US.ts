@@ -477,6 +477,7 @@ export const enUS = {
       export: "Export video",
       exporting: "Exporting",
       share: "Share",
+      download: "Download",
       pin: "Keep video",
       unpin: "Unpin video",
       pinned: "Kept beyond 60 days",
