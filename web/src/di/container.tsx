@@ -23,6 +23,9 @@ import { TrainingReviewRepoImpl } from "@/core/repositories/training-review-repo
 import { TrainingReviewServiceImpl } from "@/core/services/training-review-service";
 import type { TrainingReviewService } from "@/core/services/interfaces/training-review-service";
 
+import { RallyRepoImpl } from "@/core/repositories/rally-repo";
+import type { RallyRepo } from "@/core/repositories/interfaces/rally-repo";
+
 interface DIContainer {
   authService: AuthService;
   clubService: ClubService;
@@ -30,6 +33,8 @@ interface DIContainer {
   profileService: ProfileService;
   userService: UserService;
   trainingReviewService: TrainingReviewService;
+  /** Rally Analysis talks to the repo directly; orchestration lives in rally/sessions. */
+  rallyRepo: RallyRepo;
 }
 
 const DIContext = createContext<DIContainer | null>(null);
@@ -56,7 +61,9 @@ export const DIProvider: React.FC<{ children: React.ReactNode }> = ({
     const trainingReviewRepository = new TrainingReviewRepoImpl();
     const trainingReviewService = new TrainingReviewServiceImpl(trainingReviewRepository);
 
-    return { authService, clubService, gameService, profileService, userService, trainingReviewService };
+    const rallyRepo = new RallyRepoImpl();
+
+    return { authService, clubService, gameService, profileService, userService, trainingReviewService, rallyRepo };
   }, []);
 
   return <DIContext.Provider value={container}>{children}</DIContext.Provider>;
@@ -74,3 +81,4 @@ export const useGameService = () => useDI().gameService;
 export const useProfileService = () => useDI().profileService;
 export const useUserService = () => useDI().userService;
 export const useTrainingReviewService = () => useDI().trainingReviewService;
+export const useRallyRepo = () => useDI().rallyRepo;

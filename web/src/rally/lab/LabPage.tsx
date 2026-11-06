@@ -188,7 +188,7 @@ function FullAnalysis({ file, onLog }: { file: File | null; onLog: (s: string) =
         (window as unknown as { __rallyLastResult?: AnalysisResult }).__rallyLastResult = m.result;
         setProgress(null);
         onLog("Analysis done");
-      } else {
+      } else if (m.type === "error") {
         setProgress(null);
         onLog(`Analysis failed: ${m.message}`);
       }

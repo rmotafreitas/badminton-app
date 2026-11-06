@@ -18,6 +18,16 @@ import type { Role } from "@/core/domain/roles";
 import type { Dictionary } from "@/i18n";
 
 const RallyLabPage = lazy(() => import("@/rally/lab/LabPage"));
+const RallySessionsPage = lazy(() => import("@/rally/ui/SessionsPage"));
+const RallySessionPage = lazy(() => import("@/rally/ui/SessionPage"));
+const RallyRecordPage = lazy(() => import("@/rally/ui/RecordPage"));
+
+const lazyEl = (C: React.ComponentType) => (
+  <Suspense fallback={null}>
+    <C />
+  </Suspense>
+);
+const ALL_ROLES: Role[] = ["SYSTEM_ADMIN", "CLUB_ADMIN", "COACH", "PLAYER"];
 
 interface Route {
   path: string;
@@ -94,6 +104,34 @@ export const protectedRoutes: readonly Route[] = [
     layout: LayoutAdmin,
     roles: ["SYSTEM_ADMIN", "CLUB_ADMIN", "COACH", "PLAYER"],
     getTitle: (dict) => dict.trainingReview.title,
+  },
+  {
+    path: "/analysis",
+    element: lazyEl(RallySessionsPage),
+    layout: LayoutAdmin,
+    roles: ALL_ROLES,
+    getTitle: (dict) => dict.rally.title,
+  },
+  {
+    path: "/analysis/record",
+    element: lazyEl(RallyRecordPage),
+    layout: LayoutAdmin,
+    roles: ALL_ROLES,
+    getTitle: (dict) => dict.rally.recorder.title,
+  },
+  {
+    path: "/analysis/s/:serverId",
+    element: lazyEl(RallySessionPage),
+    layout: LayoutAdmin,
+    roles: ALL_ROLES,
+    getTitle: (dict) => dict.rally.title,
+  },
+  {
+    path: "/analysis/:key",
+    element: lazyEl(RallySessionPage),
+    layout: LayoutAdmin,
+    roles: ALL_ROLES,
+    getTitle: (dict) => dict.rally.title,
   },
   {
     path: "/users",

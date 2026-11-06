@@ -4,7 +4,7 @@
  */
 
 const DB_NAME = "rally-analysis";
-const DB_VERSION = 1;
+const DB_VERSION = 3;
 
 export const STORES = {
   /** Local session records (metadata, status, result, corrections). */
@@ -13,6 +13,10 @@ export const STORES = {
   videos: "videos",
   /** Analysis checkpoints, keyed by session id. */
   checkpoints: "checkpoints",
+  /** Full analysis results (AnalysisResult), keyed by client id. */
+  results: "results",
+  /** Players-removed still frames (JPEG) for the court check. */
+  frames: "frames",
 } as const;
 
 export type StoreName = (typeof STORES)[keyof typeof STORES];

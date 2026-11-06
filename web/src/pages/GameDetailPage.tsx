@@ -1,5 +1,6 @@
 import { useEffect, useState, useMemo } from "react";
 import { useParams, useSearchParams, Link } from "react-router-dom";
+import { GameRallySessions } from "@/rally/ui/GameRallySessions";
 import { useGameService, useClubService } from "@/di/container";
 import { useAuth } from "@/hooks/useAuth";
 import { useDictionary } from "@/i18n";
@@ -399,6 +400,7 @@ export function GameDetailPage() {
             </div>
           </div>
         </div>
+        {id && <GameRallySessions gameId={id} />}
       </section>
     </>
   );

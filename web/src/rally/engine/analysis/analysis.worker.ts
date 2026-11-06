@@ -6,7 +6,14 @@
  */
 import { ortJsepRuntime, hasWebGpu } from "../runtime/ort-runtime";
 import { idbDelete, idbGet, idbPut, STORES } from "../../storage/idb";
-import { AnalysisAborted, analyzeVideo, type AnalysisProgress, type Checkpoint } from "./analyze";
+import {
+  AnalysisAborted,
+  analyzeVideo,
+  calibrateVideo,
+  type AnalysisProgress,
+  type CalibrationCheck,
+  type Checkpoint,
+} from "./analyze";
 import type { AnalysisResult, Calibration, SessionFormat } from "../types";
 
 declare const self: DedicatedWorkerGlobalScope;
@@ -21,11 +28,13 @@ export type AnalysisRequest =
       preview?: boolean;
       debug?: boolean;
     }
+  | { type: "calibrate"; jobId: string; file: Blob }
   | { type: "cancel"; jobId: string };
 
 export type AnalysisResponse =
   | { type: "progress"; jobId: string; progress: AnalysisProgress }
   | { type: "done"; jobId: string; result: AnalysisResult }
+  | { type: "calibrated"; jobId: string; check: CalibrationCheck }
   | { type: "error"; jobId: string; message: string; cancelled?: boolean };
 
 const controllers = new Map<string, AbortController>();
@@ -38,6 +47,23 @@ self.onmessage = async (ev: MessageEvent<AnalysisRequest>) => {
   }
   const ctrl = new AbortController();
   controllers.set(msg.jobId, ctrl);
+  if (msg.type === "calibrate") {
+    try {
+      const backend = (await hasWebGpu()) ? "webgpu" : "wasm";
+      const check = await calibrateVideo(msg.file, { runtime: ortJsepRuntime, backend, signal: ctrl.signal });
+      self.postMessage({ type: "calibrated", jobId: msg.jobId, check } satisfies AnalysisResponse);
+    } catch (e) {
+      self.postMessage({
+        type: "error",
+        jobId: msg.jobId,
+        message: e instanceof Error ? e.message : String(e),
+        cancelled: e instanceof AnalysisAborted,
+      } satisfies AnalysisResponse);
+    } finally {
+      controllers.delete(msg.jobId);
+    }
+    return;
+  }
   try {
     const backend = (await hasWebGpu()) ? "webgpu" : "wasm";
     const result = await analyzeVideo(msg.file, {

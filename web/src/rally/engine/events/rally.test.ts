@@ -8,7 +8,7 @@ import { trackPlayers, type FrameDetections } from "../tracking/player-tracker";
 import { applyCorrections, computeStats } from "../stats";
 import type { PlayerId, ShotType, ShuttleSample } from "../types";
 import { cleanShuttleTrack } from "./shuttle-track";
-import { buildShots, classify } from "./shots";
+import { buildShots, classify, classifyFromContext } from "./shots";
 
 function lookAt(eye: Vec3, target: Vec3, f: number, width: number, height: number) {
   const fwd = sub3(target, eye);
@@ -189,6 +189,15 @@ describe("rally pipeline on a synthetic doubles rally", () => {
     const p3 = fixed.stats.players.find((p) => p.id === "P3")!;
     expect(p3.shotsByType.clear).toBe(1);
     expect(p3.distanceM).toBeGreaterThan(0);
+  });
+});
+
+describe("classifyFromContext", () => {
+  it("gives sensible low-confidence guesses without physics", () => {
+    expect(classifyFromContext({ first: false, flightTime: 1.5, hitterY: -5.5, receiverY: 5 })).toBe("clear");
+    expect(classifyFromContext({ first: false, flightTime: 1.4, hitterY: -1.5, receiverY: 5.5 })).toBe("lift");
+    expect(classifyFromContext({ first: false, flightTime: 0.6, hitterY: -4.5, receiverY: 2 })).toBe("smash");
+    expect(classifyFromContext({ first: false, flightTime: 0.7, hitterY: -1.8, receiverY: 2 })).toBe("net");
   });
 });
 

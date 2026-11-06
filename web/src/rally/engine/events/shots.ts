@@ -187,6 +187,29 @@ export function classify(f: ShotFeatures): { type: ShotType; confidence: Confide
   return { type: "other", confidence: "low" };
 }
 
+/**
+ * Fallback when there is no trustworthy physics fit: flight time to the next
+ * contact plus where hitter and receiver stand. Always low confidence — it
+ * gives the review list a sensible starting point instead of "other".
+ */
+export function classifyFromContext(f: {
+  first: boolean;
+  flightTime: number | null;
+  hitterY: number | null;
+  receiverY: number | null;
+}): ShotType {
+  if (f.first) return "serve";
+  if (f.flightTime === null || f.hitterY === null) return "other";
+  const hitterDepth = Math.abs(f.hitterY);
+  const receiverDepth = f.receiverY === null ? null : Math.abs(f.receiverY);
+  if (f.flightTime >= 1.15) return hitterDepth >= 4 ? "clear" : "lift";
+  if (hitterDepth <= 2.6 && receiverDepth !== null && receiverDepth <= 2.8 && f.flightTime >= 0.5) return "net";
+  if (hitterDepth >= 3.8 && f.flightTime < 0.75) return "smash";
+  if (hitterDepth >= 3.8 && receiverDepth !== null && receiverDepth <= 3) return "drop";
+  if (f.flightTime < 0.9) return "drive";
+  return "other";
+}
+
 // ── Assembly ───────────────────────────────────────────────────────────────
 
 export interface BuildShotsInput {
@@ -253,7 +276,7 @@ export function buildShots(input: BuildShotsInput): { rallies: Rally[]; shots: S
           : obs.length >= 15
             ? "medium"
             : "low";
-      const { type, confidence } = classify({
+      const physics = classify({
         first: k === 0,
         hitterY: hitterPos?.y ?? null,
         contactHeight: goodFit ? fit!.start.p[2] : null,
@@ -262,6 +285,18 @@ export function buildShots(input: BuildShotsInput): { rallies: Rally[]; shots: S
         apex: goodFit ? fit!.summary.apexHeight : null,
         landingY: goodFit ? (fit!.summary.landing?.y ?? null) : null,
       });
+      const { type, confidence } =
+        physics.type !== "other"
+          ? physics
+          : {
+              type: classifyFromContext({
+                first: k === 0,
+                flightTime: next ? next.t - h.t : null,
+                hitterY: hitterPos?.y ?? null,
+                receiverY: receiverPos?.y ?? null,
+              }),
+              confidence: "low" as const,
+            };
 
       const id = `${rallyId}s${k + 1}`;
       ids.push(id);

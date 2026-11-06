@@ -104,6 +104,30 @@ export const groundRings: Widget = (env) => {
   }
 };
 
+/** Court lines projected from the calibration (live setup / debugging). */
+export const courtLines: Widget = (env) => {
+  if (!env.courtH) return;
+  const { ctx, u } = env;
+  ctx.save();
+  ctx.strokeStyle = "rgba(255,255,255,0.75)";
+  ctx.lineWidth = Math.max(1, u * 0.25);
+  for (const l of COURT_LINES) {
+    ctx.beginPath();
+    let started = false;
+    for (let k = 0; k <= 20; k++) {
+      const w = k / 20;
+      const img = applyH(env.courtH, { x: l.a.x + w * (l.b.x - l.a.x), y: l.a.y + w * (l.b.y - l.a.y) });
+      if (!img) continue;
+      const q = env.toCanvas(img);
+      if (started) ctx.lineTo(q.x, q.y);
+      else ctx.moveTo(q.x, q.y);
+      started = true;
+    }
+    ctx.stroke();
+  }
+  ctx.restore();
+};
+
 export const playerTags: Widget = (env) => {
   const { ctx, u } = env;
   for (const p of env.state.players) {
@@ -287,11 +311,18 @@ export const DEFAULT_SKIN: OverlaySkin = {
   hud: [speedCard, shotCountCard, shotLabel, distancePanel, courtMap, footer],
 };
 
-/** Scene-only skin for live preview / clean exports. */
+/** Scene-only skin for clean exports. */
 export const MINIMAL_SKIN: OverlaySkin = {
   id: "minimal",
   scene: [groundRings, shuttleTrail, playerTags],
   hud: [courtMap],
+};
+
+/** Live camera preview: court fit, players and the mini map. */
+export const LIVE_SKIN: OverlaySkin = {
+  id: "live",
+  scene: [courtLines, groundRings, playerTags],
+  hud: [courtMap, distancePanel],
 };
 
 export function renderOverlay(
@@ -302,6 +333,8 @@ export function renderOverlay(
   theme: OverlayTheme,
   labels: OverlayLabels,
   skin: OverlaySkin = DEFAULT_SKIN,
+  /** false when drawing on top of a video frame (export). */
+  clear = true,
 ) {
   const r = prepared.result;
   const sx = vp.video.w / r.video.width;
@@ -317,7 +350,7 @@ export function renderOverlay(
     toCanvas: (p) => ({ x: vp.video.x + p.x * sx, y: vp.video.y + p.y * sy }),
     courtH: r.calibration?.H ?? null,
   };
-  ctx.clearRect(0, 0, vp.width, vp.height);
+  if (clear) ctx.clearRect(0, 0, vp.width, vp.height);
   for (const w of skin.scene) w(env);
   for (const w of skin.hud) w(env);
 }

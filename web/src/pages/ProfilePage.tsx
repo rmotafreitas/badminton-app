@@ -1,5 +1,6 @@
 import { useEffect, useState, useRef, useCallback, useMemo } from "react";
 import { useParams } from "react-router-dom";
+import { ProfileRallyCard } from "@/rally/ui/ProfileRallyCard";
 import { useAuth } from "@/hooks/useAuth";
 import { usePageTitle } from "@/context/PageTitleContext";
 import {
@@ -1076,6 +1077,7 @@ export function ProfilePage() {
             )}
           </div>
         )}
+        {viewedUserId && <ProfileRallyCard userId={viewedUserId} />}
       </section>
     </>
   );

@@ -134,6 +134,64 @@ function fitAspect(r: { x0: number; y0: number; x1: number; y1: number }, w: num
 
 const now = () => performance.now();
 
+export interface CalibrationCheck {
+  calibration: Calibration | null;
+  /** Players-removed still frame (JPEG, source aspect) to confirm/adjust corners on. */
+  frame: Blob;
+  width: number;
+  height: number;
+}
+
+/**
+ * Quick court check before the long analysis (a few seconds): background
+ * median + people's feet + court detection.
+ */
+export async function calibrateVideo(
+  file: Blob,
+  opts: Pick<AnalyzeOptions, "runtime" | "backend" | "signal">,
+): Promise<CalibrationCheck> {
+  const input = new Input({ formats: ALL_FORMATS, source: new BlobSource(file) });
+  let person: InferenceSession | null = null;
+  try {
+    const track = await input.getPrimaryVideoTrack();
+    if (!track) throw new Error("This file has no video track");
+    const [srcW, srcH, durationS] = await Promise.all([
+      track.getDisplayWidth(),
+      track.getDisplayHeight(),
+      input.computeDuration(),
+    ]);
+    const scale = Math.min(1, 960 / Math.max(srcW, srcH));
+    const dw = Math.round((srcW * scale) / 2) * 2;
+    const dh = Math.round((srcH * scale) / 2) * 2;
+    const sink = new CanvasSink(track, { width: dw, height: dh, fit: "fill", poolSize: 2 });
+    const canvas = new OffscreenCanvas(dw, dh);
+    const ctx = canvas.getContext("2d", { willReadFrequently: true })!;
+    const frames: Uint8ClampedArray<ArrayBuffer>[] = [];
+    const times = Array.from({ length: 15 }, (_, i) => (durationS * (i + 0.5)) / 15);
+    for await (const c of sink.canvasesAtTimestamps(times)) {
+      if (opts.signal?.aborted) throw new AnalysisAborted();
+      if (!c) continue;
+      ctx.drawImage(c.canvas, 0, 0);
+      frames.push(new Uint8ClampedArray(ctx.getImageData(0, 0, dw, dh).data));
+    }
+    if (!frames.length) throw new Error("Could not decode the video");
+    person = await opts.runtime.createSession(await fetchModel("yolox-tiny-person"), { backend: opts.backend });
+    const feet: Vec2[] = [];
+    for (const f of frames.filter((_, i) => i % 2 === 0)) {
+      ctx.putImageData(new ImageData(f, dw, dh), 0, 0);
+      for (const b of await detectPeople(person, canvas, dw, dh)) feet.push({ x: (b.x1 + b.x2) / 2, y: b.y2 });
+    }
+    const bg = medianRgba(frames, dw * dh);
+    const calibration = autoCalibrate(bg, dw, dh, srcW, srcH, feet);
+    ctx.putImageData(new ImageData(bg, dw, dh), 0, 0);
+    const frame = await canvas.convertToBlob({ type: "image/jpeg", quality: 0.85 });
+    return { calibration, frame, width: srcW, height: srcH };
+  } finally {
+    await person?.release().catch(() => undefined);
+    input.dispose();
+  }
+}
+
 export async function analyzeVideo(file: Blob, opts: AnalyzeOptions): Promise<AnalysisResult> {
   const abort = () => {
     if (opts.signal?.aborted) throw new AnalysisAborted();
@@ -243,6 +301,7 @@ export async function analyzeVideo(file: Blob, opts: AnalyzeOptions): Promise<An
     let n = 0;
     let lastSave = now();
     let lastPreview = 0;
+    let lastProgress = 0;
     const previewMs = opts.previewEveryMs ?? 1000;
 
     for await (const c of sink.canvasesAtTimestamps(times)) {
@@ -278,11 +337,17 @@ export async function analyzeVideo(file: Blob, opts: AnalyzeOptions): Promise<An
       n++;
 
       const tNow = now();
-      if (previewMs > 0 && tNow - lastPreview > previewMs) {
-        lastPreview = tNow;
-        const lastBoxes = frames[frames.length - 1]?.boxes ?? [];
-        const recent = shuttle.filter((s) => s.t > t - 0.6);
-        const preview = renderPreview(c.canvas, dw, dh, k, lastBoxes, recent, calibration);
+      // Progress at least twice a second; a preview frame only when asked.
+      const wantPreview = previewMs > 0 && tNow - lastPreview > previewMs;
+      if (wantPreview || tNow - lastProgress > 500) {
+        lastProgress = tNow;
+        let preview: ImageBitmap | undefined;
+        if (wantPreview) {
+          lastPreview = tNow;
+          const lastBoxes = frames[frames.length - 1]?.boxes ?? [];
+          const recent = shuttle.filter((s) => s.t > t - 0.6);
+          preview = renderPreview(c.canvas, dw, dh, k, lastBoxes, recent, calibration);
+        }
         report(
           { phase: "scan", progress: 0.05 + 0.9 * (t / durationS), videoS: t, totalS: durationS, preview },
           preview,
