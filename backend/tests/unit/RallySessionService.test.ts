@@ -5,6 +5,7 @@ import type { IUserRepo } from "../../src/domain/repositories/IUserRepo";
 import type { IObjectStorage } from "../../src/application/interfaces/IObjectStorage";
 import type { RallySession } from "../../src/domain/entities/RallySession";
 import type { User } from "../../src/domain/entities/User";
+import { RallySessionMapper } from "../../src/application/mappers/RallySessionMapper";
 
 function memoryRepo(): IRallySessionRepo {
   const rows = new Map<string, RallySession>();
@@ -217,5 +218,48 @@ describe("RallySessionService", () => {
     await svc.delete(s.id, "owner");
     expect(store.deleted).toContain(up.key);
     expect(await repo.findById(s.id)).toBeNull();
+  });
+});
+
+describe("RallySessionMapper.toView", () => {
+  const session = (patch: Partial<RallySession>): RallySession =>
+    ({
+      id: "s1",
+      ownerId: "u1",
+      clientId: "c1",
+      title: null,
+      recordedAt: new Date(0),
+      durationS: 30,
+      status: "pending",
+      format: null,
+      gameId: null,
+      trainingDate: null,
+      participants: [],
+      videoKey: null,
+      videoBytes: null,
+      videoUploadedAt: null,
+      videoExpiresAt: null,
+      pinned: false,
+      resultKey: null,
+      summary: null,
+      corrections: null,
+      analysisLock: null,
+      shareForTraining: false,
+      createdAt: new Date(0),
+      updatedAt: new Date(0),
+      ...patch,
+    }) as RallySession;
+  const now = new Date("2026-11-06T12:00:00Z");
+
+  it("reports an abandoned analysis (lease expired) as pending", () => {
+    const s = session({ status: "analysing", analysisLock: { deviceId: "d", until: new Date(now.getTime() - 1000) } });
+    expect(RallySessionMapper.toView(s, "full", now).status).toBe("pending");
+    expect(RallySessionMapper.toView(session({ status: "analysing" }), "summary", now).status).toBe("pending");
+  });
+
+  it("keeps a live analysis and other states as they are", () => {
+    const live = session({ status: "analysing", analysisLock: { deviceId: "d", until: new Date(now.getTime() + 60_000) } });
+    expect(RallySessionMapper.toView(live, "full", now).status).toBe("analysing");
+    expect(RallySessionMapper.toView(session({ status: "analysed" }), "full", now).status).toBe("analysed");
   });
 });

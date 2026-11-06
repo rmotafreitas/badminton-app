@@ -34,14 +34,17 @@ export class RallySessionMapper {
    * "summary" access (club-mates) hides corrections, video and lock state:
    * they see the stats, not the footage.
    */
-  static toView(s: RallySession, access: "full" | "summary"): RallySessionView {
+  static toView(s: RallySession, access: "full" | "summary", now: Date = new Date()): RallySessionView {
+    // A device that died mid-analysis leaves "analysing" behind; once its
+    // lease has run out, nobody is analysing it any more.
+    const stale = s.status === "analysing" && (!s.analysisLock || s.analysisLock.until < now);
     const base = {
       id: s.id,
       ownerId: s.ownerId,
       title: s.title,
       recordedAt: s.recordedAt,
       durationS: s.durationS,
-      status: s.status,
+      status: stale ? "pending" : s.status,
       format: s.format,
       gameId: s.gameId,
       trainingDate: s.trainingDate,
