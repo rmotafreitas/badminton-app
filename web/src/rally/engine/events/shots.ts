@@ -68,6 +68,8 @@ function playersInReach(tracks: readonly PlayerTrack[], t: number, p: Vec2): Pla
 
 export interface DetectOptions {
   fps: number;
+  /** Image diagonal (px); sets the minimum shuttle speed for a hit. */
+  diagonal?: number;
   /** Player → court half, for the alternation rule. */
   sides?: Partial<Record<PlayerId, -1 | 1>>;
   /** Frames of context on each side for one-sided velocities. */
@@ -85,6 +87,9 @@ export function detectHits(
   const win = opts.window ?? Math.max(3, Math.round(opts.fps / 10));
   const minSharp = opts.minSharpness ?? 0.55;
   const refractory = opts.refractory ?? 0.3;
+  // Jitter floor: ~0.08 image diagonals per second (≈ 120 px/s at 720p);
+  // far-court shots move few pixels, static blobs are removed upstream.
+  const minSpeed = 0.08 * (opts.diagonal ?? 1468);
   const maxDt = (win + 2) / opts.fps;
   const cands: HitCandidate[] = [];
   // Serves (and any shot after a detection gap): the shuttle starts moving
@@ -109,6 +114,9 @@ export function detectHits(
     const nb = Math.hypot(vb.x, vb.y);
     const na = Math.hypot(va.x, va.y);
     if (nb + na < 1e-6) continue;
+    // A hit sends the shuttle somewhere: pixel jitter of a static false
+    // positive has huge relative direction changes but no real speed.
+    if (Math.max(na, nb) < minSpeed) continue;
     const sharpness = Math.hypot(va.x - vb.x, va.y - vb.y) / (nb + na);
     if (sharpness < minSharp) continue;
     const reach = playersInReach(tracks, track[i]!.t, track[i]!);
@@ -218,12 +226,18 @@ export interface BuildShotsInput {
   sides: Partial<Record<PlayerId, -1 | 1>>;
   camera: Camera | null;
   fps: number;
+  /** Image diagonal (px). */
+  diagonal?: number;
 }
 
 const CONTACT_Z = 2.0;
 
 export function buildShots(input: BuildShotsInput): { rallies: Rally[]; shots: Shot[] } {
-  const hits = detectHits(input.track, input.tracks, { fps: input.fps, sides: input.sides });
+  const hits = detectHits(input.track, input.tracks, {
+    fps: input.fps,
+    sides: input.sides,
+    diagonal: input.diagonal,
+  });
   const rallies: Rally[] = [];
   const shots: Shot[] = [];
   const trackOf = (id: PlayerId | null) => input.tracks.find((t) => t.id === id);

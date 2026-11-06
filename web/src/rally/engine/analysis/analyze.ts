@@ -377,6 +377,7 @@ export async function analyzeVideo(file: Blob, opts: AnalyzeOptions): Promise<An
       sides,
       camera: cam,
       fps: analysedFps,
+      diagonal: Math.hypot(srcW, srcH),
     });
     const partial = { players: tracked.players, tracks: tracked.tracks, shots, rallies };
     const result: AnalysisResult = {
