@@ -10,7 +10,7 @@
  *      far half, left→right; associate detections to slots each frame with an
  *      alpha–beta filter so brief occlusions don't lose identities.
  */
-import { insideCourt } from "../geometry/court";
+import { COURT, insideCourt } from "../geometry/court";
 import type { Vec2 } from "../geometry/linalg";
 import type { PlayerId, PlayerInfo, PlayerTrack, SessionFormat } from "../types";
 import { TRACK_HZ } from "../types";
@@ -36,6 +36,11 @@ export interface TrackerOptions {
   format?: SessionFormat;
   /** Max people per half we will track. */
   maxPerSide?: number;
+  /**
+   * Estimated real height (m) of the person in a box, from the calibrated
+   * camera. Seated spectators (~1.1 m), bags and kids drop out.
+   */
+  heightOf?: (box: Detection, court: Vec2) => number | null;
 }
 
 export interface TrackerResult {
@@ -56,11 +61,22 @@ function feet(b: Detection): Vec2 {
   return { x: (b.x1 + b.x2) / 2, y: b.y2 };
 }
 
-function candidates(frame: FrameDetections, toCourt: TrackerOptions["toCourt"]): Candidate[] {
+function candidates(
+  frame: FrameDetections,
+  toCourt: TrackerOptions["toCourt"],
+  heightOf?: TrackerOptions["heightOf"],
+): Candidate[] {
   const out: Candidate[] = [];
   for (const box of frame.boxes) {
     const court = toCourt(feet(box));
     if (!court) continue;
+    if (heightOf) {
+      const hM = heightOf(box, court);
+      // Players measure ~1.25–2.5 m (lunging … raised racket arm); seated
+      // people ~0.7–0.9 m. Boxes cut
+      // by the frame edge are allowed through (null).
+      if (hM !== null && (hM < 1.0 || hM > 2.8)) continue;
+    }
     // Players step a little outside the lines; behind the baseline more so.
     if (Math.abs(court.x) > 3.05 + 1.2 || Math.abs(court.y) > 6.7 + 2) continue;
     if (!insideCourt(court, "doubles", 2)) continue;
@@ -75,14 +91,17 @@ function candidates(frame: FrameDetections, toCourt: TrackerOptions["toCourt"]):
   return out;
 }
 
-/** Most common per-frame count of people on a half (ignoring empty frames). */
-function modeCount(counts: number[], max: number): number {
-  const hist = new Array<number>(max + 1).fill(0);
-  for (const c of counts) hist[Math.min(c, max)]!++;
-  hist[0] = 0;
-  let best = 0;
-  for (let i = 1; i <= max; i++) if (hist[i]! > hist[best]!) best = i;
-  return best;
+/**
+ * People on a half: the largest k seen in at least `frac` of frames.
+ * (The mode under-counts: partners occlude each other and far players are
+ * often missed, but a person who isn't there is never detected for long.)
+ */
+function sustainedCount(counts: number[], max: number, frac = 0.3): number {
+  if (!counts.length) return 0;
+  for (let k = max; k >= 1; k--) {
+    if (counts.filter((c) => c >= k).length >= frac * counts.length) return k;
+  }
+  return 0;
 }
 
 export function inferFormat(near: number, far: number): SessionFormat {
@@ -101,7 +120,12 @@ interface Slot {
 }
 
 /** All permutations assigning ≤ slots.length candidates (small n: ≤ 3 per side). */
-function bestAssignment(slots: Slot[], cands: Candidate[], predict: (s: Slot) => Vec2) {
+function bestAssignment(
+  slots: Slot[],
+  cands: Candidate[],
+  predict: (s: Slot) => Vec2,
+  gate: (s: Slot) => number,
+) {
   let best: { cost: number; map: (number | -1)[] } = {
     cost: Infinity,
     map: slots.map(() => -1),
@@ -115,14 +139,15 @@ function bestAssignment(slots: Slot[], cands: Candidate[], predict: (s: Slot) =>
       return;
     }
     const p = predict(slots[i]!);
-    // Option: leave slot unmatched (fixed penalty = gate).
+    // Option: leave slot unmatched. The penalty equals the slot's gate so any
+    // candidate it could accept is preferred (stale slots have wide gates).
     map.push(-1);
-    rec(i + 1, cost + GATE_M);
+    rec(i + 1, cost + (slots[i]!.initialised ? gate(slots[i]!) : GATE_M));
     map.pop();
     for (let j = 0; j < cands.length; j++) {
       if (used[j]) continue;
       const d = Math.hypot(cands[j]!.court.x - p.x, cands[j]!.court.y - p.y);
-      if (slots[i]!.initialised && d > GATE_M) continue;
+      if (slots[i]!.initialised && d > gate(slots[i]!)) continue;
       used[j] = true;
       map.push(j);
       rec(i + 1, cost + (slots[i]!.initialised ? d : 0));
@@ -134,14 +159,121 @@ function bestAssignment(slots: Slot[], cands: Candidate[], predict: (s: Slot) =>
   return best.map;
 }
 
+/**
+ * Spots occupied for most of the session at the edge of (or outside) the
+ * court: benches, chairs, people sitting behind a baseline. Players move;
+ * a coach feeding from mid-court isn't at the edge, so isn't excluded.
+ */
+interface Tracklet {
+  pts: Vec2[];
+  last: Vec2;
+  lastIdx: number;
+}
+
+/** Greedy short-range linking of candidates across frames (no identities). */
+function tracklets(perFrame: { cands: Candidate[] }[], radius = 0.9): Tracklet[] {
+  const all: Tracklet[] = [];
+  let active: Tracklet[] = [];
+  perFrame.forEach((f, idx) => {
+    const used = new Set<Tracklet>();
+    for (const c of f.cands) {
+      let best: Tracklet | null = null;
+      let bd = radius;
+      for (const t of active) {
+        if (used.has(t)) continue;
+        const d = Math.hypot(t.last.x - c.court.x, t.last.y - c.court.y);
+        if (d < bd) {
+          bd = d;
+          best = t;
+        }
+      }
+      if (!best) {
+        best = { pts: [], last: c.court, lastIdx: idx };
+        all.push(best);
+      }
+      best.pts.push(c.court);
+      best.last = c.court;
+      best.lastIdx = idx;
+      used.add(best);
+    }
+    active = all.filter((t) => idx - t.lastIdx <= 10);
+  });
+  return all;
+}
+
+function spread(pts: Vec2[]): number {
+  const mx = pts.reduce((a, p) => a + p.x, 0) / pts.length;
+  const my = pts.reduce((a, p) => a + p.y, 0) / pts.length;
+  return Math.sqrt(pts.reduce((a, p) => a + (p.x - mx) ** 2 + (p.y - my) ** 2, 0) / pts.length);
+}
+
+/**
+ * Spectators: people who barely move for most of the session near the court
+ * edges (sitting on a bench, waiting behind a baseline), plus long-occupied
+ * spots at the edge. Their detections are ignored.
+ */
+export function stationaryZones(perFrame: { cands: Candidate[] }[]): Vec2[] {
+  const n = perFrame.length;
+  const zones: Vec2[] = [];
+  if (n >= 20) {
+    for (const t of tracklets(perFrame)) {
+      if (t.pts.length < 0.5 * n || spread(t.pts) > 0.25) continue;
+      const mx = t.pts.reduce((a, p) => a + p.x, 0) / t.pts.length;
+      const my = t.pts.reduce((a, p) => a + p.y, 0) / t.pts.length;
+      // Only near the edges: a still feeder or a waiting player mid-court
+      // is a participant.
+      if (Math.abs(mx) > COURT.halfDoublesWidth - 1 || Math.abs(my) > COURT.halfLength - 1.5) {
+        zones.push({ x: mx, y: my });
+      }
+    }
+  }
+  return [...zones, ...edgeZones(perFrame)];
+}
+
+function edgeZones(perFrame: { cands: Candidate[] }[]): Vec2[] {
+  const cell = 0.4;
+  const counts = new Map<string, number>();
+  const key = (x: number, y: number) => `${x}:${y}`;
+  for (const f of perFrame) {
+    const seen = new Set<string>();
+    for (const c of f.cands) {
+      const k = key(Math.round(c.court.x / cell), Math.round(c.court.y / cell));
+      if (seen.has(k)) continue;
+      seen.add(k);
+      counts.set(k, (counts.get(k) ?? 0) + 1);
+    }
+  }
+  const n = perFrame.length;
+  const zones: Vec2[] = [];
+  for (const k of counts.keys()) {
+    const [cx, cy] = k.split(":").map(Number) as [number, number];
+    let sum = 0;
+    for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) sum += counts.get(key(cx + dx, cy + dy)) ?? 0;
+    const p = { x: cx * cell, y: cy * cell };
+    const atEdge = Math.abs(p.x) > COURT.halfDoublesWidth - 1 || Math.abs(p.y) > COURT.halfLength - 1;
+    if (atEdge && sum > 0.5 * n && n >= 20) {
+      if (zones.every((z) => Math.hypot(z.x - p.x, z.y - p.y) > 0.8)) zones.push(p);
+    }
+  }
+  return zones;
+}
+
 export function trackPlayers(frames: readonly FrameDetections[], opts: TrackerOptions): TrackerResult {
   const maxPerSide = opts.maxPerSide ?? 3;
-  const perFrame = frames.map((f) => ({ t: f.t, cands: candidates(f, opts.toCourt) }));
+  const raw = frames.map((f) => ({ t: f.t, cands: candidates(f, opts.toCourt, opts.heightOf) }));
+  const zones = stationaryZones(raw);
+  const perFrame = raw.map((f) => ({
+    t: f.t,
+    cands: f.cands.filter((c) => zones.every((z) => Math.hypot(z.x - c.court.x, z.y - c.court.y) > 0.7)),
+  }));
 
-  const nearCounts = perFrame.map((f) => f.cands.filter((c) => c.court.y < 0).length);
-  const farCounts = perFrame.map((f) => f.cands.filter((c) => c.court.y >= 0).length);
-  let near = modeCount(nearCounts, maxPerSide);
-  let far = modeCount(farCounts, maxPerSide);
+  // Counting and initialisation use a strict margin: people sitting just
+  // behind a baseline (coaches, waiting players) must not become players.
+  const strict = (c: Candidate) => insideCourt(c.court, "doubles", 0.5);
+  const nearCounts = perFrame.map((f) => f.cands.filter((c) => strict(c) && c.court.y < 0).length);
+  const farCounts = perFrame.map((f) => f.cands.filter((c) => strict(c) && c.court.y >= 0).length);
+  let near = sustainedCount(nearCounts, maxPerSide);
+  let far = sustainedCount(farCounts, maxPerSide);
   const format = opts.format ?? inferFormat(near, far);
   if (format === "singles") [near, far] = [1, 1];
   if (format === "doubles") [near, far] = [2, 2];
@@ -162,21 +294,27 @@ export function trackPlayers(frames: readonly FrameDetections[], opts: TrackerOp
   makeSide(-1, near);
   makeSide(1, far);
 
-  // Initialise each side's slots from the first frame that shows exactly the
-  // expected count there, sorted left → right (as seen from the near half).
+  // Initialise each side's slots from the most active people in the first
+  // ~10 s (long-lived and moving), sorted left → right as seen from the near
+  // half. Robust to someone standing still on court for a moment.
+  const early = perFrame.filter((f) => f.t - (perFrame[0]?.t ?? 0) <= 10);
   for (const side of [-1, 1] as const) {
     const sideSlots = slots.filter((s) => s.side === side);
     if (!sideSlots.length) continue;
-    const first = perFrame.find(
-      (f) => f.cands.filter((c) => Math.sign(c.court.y || 1) === side).length === sideSlots.length,
-    );
-    if (!first) continue;
-    const cs = first.cands
-      .filter((c) => Math.sign(c.court.y || 1) === side)
-      .sort((a, b) => a.court.x - b.court.x);
+    const onSide = early.map((f) => ({
+      cands: f.cands.filter((c) => strict(c) && Math.sign(c.court.y || 1) === side),
+    }));
+    const ranked = tracklets(onSide)
+      .filter((t) => t.pts.length >= 3)
+      .map((t) => ({ t, score: t.pts.length * (0.2 + spread(t.pts)) }))
+      .sort((a, b) => b.score - a.score)
+      .slice(0, sideSlots.length)
+      .map(({ t }) => t.pts[0]!)
+      .sort((a, b) => a.x - b.x);
+    if (ranked.length !== sideSlots.length) continue;
     sideSlots.forEach((s, i) => {
-      s.pos = { ...cs[i]!.court };
-      s.lastSeen = first.t;
+      s.pos = { ...ranked[i]! };
+      s.lastSeen = perFrame[0]?.t ?? 0;
       s.initialised = true;
     });
   }
@@ -193,9 +331,12 @@ export function trackPlayers(frames: readonly FrameDetections[], opts: TrackerOp
 
   const ALPHA = 0.6;
   const BETA = 0.15;
-  let prevT = tStart;
+  const MAX_SPEED = 8; // m/s — faster than any badminton footwork
+  let prevT = -Infinity;
   for (const f of perFrame) {
-    const dt = Math.max(1e-3, f.t - prevT);
+    // First frame / duplicate timestamps: use the nominal interval so the
+    // velocity update can't explode (r / 1 ms → hundreds of m/s).
+    const dt = Number.isFinite(prevT) ? Math.min(1, Math.max(1 / 60, f.t - prevT)) : 1 / TRACK_HZ;
     prevT = f.t;
     const predict = (s: Slot): Vec2 => {
       // Velocity decays while unseen: people stop, they don't fly off.
@@ -208,12 +349,20 @@ export function trackPlayers(frames: readonly FrameDetections[], opts: TrackerOp
       if (!sideSlots.length) continue;
       // Allow small net-crossing tolerance (players reach over the net zone).
       const cands = f.cands.filter((c) => (side < 0 ? c.court.y < 0.5 : c.court.y >= -0.5));
-      const map = bestAssignment(sideSlots, cands, predict);
+      // A slot unseen for a while may have moved anywhere on its half:
+      // widen its gate so it can be re-acquired after occlusion/misses.
+      const gate = (s: Slot) => {
+        const stale = f.t - s.lastSeen;
+        return stale < 0.5 ? GATE_M : Math.min(6, GATE_M + 2 * stale);
+      };
+      const map = bestAssignment(sideSlots, cands, predict, gate);
       sideSlots.forEach((s, i) => {
         const p = predict(s);
         const j = map[i]!;
         if (j < 0) {
+          // Coast, but bleed off velocity: people stop, they don't drift.
           s.pos = p;
+          s.vel = { x: s.vel.x * 0.5, y: s.vel.y * 0.5 };
           return;
         }
         const z = cands[j]!.court;
@@ -225,7 +374,10 @@ export function trackPlayers(frames: readonly FrameDetections[], opts: TrackerOp
           const rx = z.x - p.x;
           const ry = z.y - p.y;
           s.pos = { x: p.x + ALPHA * rx, y: p.y + ALPHA * ry };
-          s.vel = { x: s.vel.x + (BETA * rx) / dt, y: s.vel.y + (BETA * ry) / dt };
+          const vx = s.vel.x + (BETA * rx) / dt;
+          const vy = s.vel.y + (BETA * ry) / dt;
+          const sp = Math.hypot(vx, vy);
+          s.vel = sp > MAX_SPEED ? { x: (vx / sp) * MAX_SPEED, y: (vy / sp) * MAX_SPEED } : { x: vx, y: vy };
         }
         s.lastSeen = f.t;
         const k = Math.round((f.t - tStart) * TRACK_HZ);

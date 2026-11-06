@@ -126,6 +126,8 @@ export interface AnalysisResult {
   rallies: Rally[];
   shots: Shot[];
   stats: SessionStats;
+  /** Raw detections, only when analysed with `debug` (engine development). */
+  debug?: { frames: unknown[]; shuttleRaw: ShuttleSample[] };
 }
 
 /** Person corrections, stored separately so re-analysis can re-apply them. */

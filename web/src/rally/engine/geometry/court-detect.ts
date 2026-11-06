@@ -24,7 +24,7 @@ import {
 } from "./camera";
 import { COURT, COURT_CORNERS, COURT_LINES, type CourtLine } from "./court";
 import { estimateHomography } from "./homography";
-import { applyH, mat3Mul, type Mat3, type Vec2, type Vec3 } from "./linalg";
+import { applyH, mat3Inv, mat3Mul, type Mat3, type Vec2, type Vec3 } from "./linalg";
 
 export interface GrayImage {
   width: number;
@@ -394,6 +394,9 @@ function rectToUnit(x0: number, x1: number, y0: number, y1: number): Mat3 {
   return [sx, 0, -x0 * sx, 0, sy, -y0 * sy, 0, 0, 1];
 }
 
+/** Weight of the "players stand on the court" evidence vs line support. */
+const FEET_WEIGHT = 0.12;
+
 const UNIT: Vec2[] = [
   { x: 0, y: 0 },
   { x: 1, y: 0 },
@@ -405,7 +408,39 @@ const UNIT: Vec2[] = [
  * Detects the court. Returns null when nothing plausible is found.
  * ≈ 0.3–1.5 s on a 640-px frame; run it in a worker.
  */
-export function detectCourt(img: GrayImage, opts: { maxLines?: number } = {}): CourtDetection | null {
+/**
+ * Fraction of people's feet that land on the court (with a margin), and
+ * whether both halves are used. Players stand on the court; a hypothesis that
+ * puts them behind a baseline or under the stands is wrong.
+ */
+function feetScore(H: Mat3, feet: readonly Vec2[]): number {
+  if (!feet.length) return 0;
+  const Hinv = mat3Inv(H);
+  if (!Hinv) return 0;
+  let inside = 0;
+  let near = 0;
+  let far = 0;
+  for (const f of feet) {
+    const c = applyH(Hinv, f);
+    if (!c) continue;
+    if (Math.abs(c.x) <= 3.05 + 0.8 && Math.abs(c.y) <= 6.7 + 1.2) {
+      inside++;
+      if (c.y < 0) near++;
+      else far++;
+    }
+  }
+  const frac = inside / feet.length;
+  const balance = inside ? Math.min(near, far) / inside : 0;
+  return frac * (0.7 + 0.3 * Math.min(1, balance * 3));
+}
+
+export interface DetectCourtOptions {
+  maxLines?: number;
+  /** Image points where people stand (box bottoms), same scale as the image. */
+  feet?: readonly Vec2[];
+}
+
+export function detectCourt(img: GrayImage, opts: DetectCourtOptions = {}): CourtDetection | null {
   const { width: w, height: h } = img;
   const mask = lineMask(img);
   const maskCount = mask.reduce((a, v) => a + v, 0);
@@ -436,6 +471,7 @@ export function detectCourt(img: GrayImage, opts: { maxLines?: number } = {}): C
           rects.push(rectToUnit(xs[q]!, xs[p]!, ys[i]!, ys[j]!));
         }
 
+  const feet = opts.feet ?? [];
   const shortlist: { H: Mat3; value: number }[] = [];
   const keep = 30;
   const consider = (H: Mat3) => {
@@ -445,8 +481,9 @@ export function detectCourt(img: GrayImage, opts: { maxLines?: number } = {}): C
     if (!isPlausiblePhonePose(cam)) return;
     if (Math.hypot(cam.centre[0], cam.centre[1]) > 40) return;
     const s = scoreHomography(H, dist, w, h, maskCount, 2.5, 0.6, cam);
-    if (shortlist.length < keep || s.value > shortlist[shortlist.length - 1]!.value) {
-      shortlist.push({ H, value: s.value });
+    const value = s.value + FEET_WEIGHT * feetScore(H, feet);
+    if (shortlist.length < keep || value > shortlist[shortlist.length - 1]!.value) {
+      shortlist.push({ H, value });
       shortlist.sort((a, b) => b.value - a.value);
       if (shortlist.length > keep) shortlist.pop();
     }
@@ -474,11 +511,12 @@ export function detectCourt(img: GrayImage, opts: { maxLines?: number } = {}): C
     }
   }
   if (!shortlist.length) return null;
-  let best: { H: Mat3; s: Score } | null = null;
+  let best: { H: Mat3; s: Score; value: number } | null = null;
   for (const c of shortlist) {
     const H = refine(c.H, mask, w, h);
     const s = scoreHomography(H, dist, w, h, maskCount, 2.5, 0.1, cameraFromHomography(H, w, h));
-    if (!best || s.value > best.s.value) best = { H, s };
+    const value = s.value + FEET_WEIGHT * feetScore(H, feet);
+    if (!best || value > best.value) best = { H, s, value };
   }
   const H = canonical(best!.H, w, h);
   const s = scoreHomography(H, dist, w, h, maskCount);

@@ -59,6 +59,34 @@ describe("player tracker", () => {
     }
   });
 
+  it("ignores a spectator sitting just inside the far baseline", () => {
+    const paths = [
+      (t: number) => ({ x: -1.5 + 0.5 * Math.sin(t), y: -3 }),
+      (t: number) => ({ x: 1.5, y: -4 + Math.sin(t * 0.7) }),
+      (t: number) => ({ x: -1.2, y: 3 + 0.8 * Math.sin(t * 1.3) }),
+      (t: number) => ({ x: 1.4 + 0.3 * Math.cos(t), y: 4.5 }),
+    ];
+    const r = trackPlayers(scenario(paths, 20, 30, [{ x: 0.8, y: 6.2 }]), { toCourt });
+    expect(r.format).toBe("doubles");
+    expect(r.players.length).toBe(4);
+  });
+
+  it("keeps every slot alive when initialised away from the first detection", () => {
+    // Regression: a slot initialised at a tracklet's first point and corrected
+    // on frame 0 must not get a runaway velocity (dt ≈ 0).
+    const paths = [
+      (t: number) => ({ x: -2 + 0.2 * t, y: -2 }),
+      (t: number) => ({ x: t < 0.05 ? -0.6 : 0.2, y: t < 0.05 ? -2.1 : -3.4 }),
+      (t: number) => ({ x: -1, y: 3 + Math.sin(t) }),
+      () => ({ x: 1.2, y: 4 }),
+    ];
+    const r = trackPlayers(scenario(paths, 10), { toCourt, format: "doubles" });
+    for (const tr of r.tracks) {
+      const valid = tr.court.filter((v, i) => i % 2 === 0 && !Number.isNaN(v)).length;
+      expect(valid / (tr.court.length / 2)).toBeGreaterThan(0.8);
+    }
+  });
+
   it("detects a practice session (1 feeder vs 2 players)", () => {
     const paths = [
       (t: number) => ({ x: -1 + Math.sin(t), y: -3 }),

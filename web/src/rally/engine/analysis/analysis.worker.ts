@@ -19,6 +19,7 @@ export type AnalysisRequest =
       corners?: Calibration["corners"];
       format?: SessionFormat;
       preview?: boolean;
+      debug?: boolean;
     }
   | { type: "cancel"; jobId: string };
 
@@ -46,6 +47,7 @@ self.onmessage = async (ev: MessageEvent<AnalysisRequest>) => {
       format: msg.format,
       signal: ctrl.signal,
       previewEveryMs: msg.preview ? 1000 : 0,
+      debug: msg.debug,
       onProgress: (progress) => {
         const transfer = progress.preview ? [progress.preview] : [];
         self.postMessage({ type: "progress", jobId: msg.jobId, progress } satisfies AnalysisResponse, transfer);

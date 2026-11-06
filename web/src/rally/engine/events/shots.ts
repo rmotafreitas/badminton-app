@@ -238,7 +238,14 @@ export function buildShots(input: BuildShotsInput): { rallies: Rally[]; shots: S
         avgSpeedKmh = Math.round((d / (next.t - h.t)) * 3.6);
       }
 
-      const goodFit = fit && fit.rmsPx < 6;
+      // Physically valid fits only: contact between knee-ish and a jump
+      // smash's reach, human launch speeds, and pixels explained.
+      const goodFit =
+        !!fit &&
+        fit.rmsPx < 6 &&
+        fit.start.p[2] >= 0.2 &&
+        fit.start.p[2] <= 3.6 &&
+        fit.speed * 3.6 <= 420;
       const speedConfidence: Confidence = !goodFit
         ? "low"
         : receiverPos && obs.length >= 6

@@ -16,7 +16,7 @@ import { estimateHomography } from "../geometry/homography";
 import { applyH, mat3Inv, type Mat3, type Vec2, type Vec3 } from "../geometry/linalg";
 import { fetchModel, type ModelId } from "../models/registry";
 import { TN_H, TN_SEQ, TN_W, detectShuttle, medianBackground, type RgbaFrame } from "../models/tracknet";
-import { detectPeople } from "../models/yolox";
+import { detectPeople, mergeBoxes, type Region } from "../models/yolox";
 import type { ComputeBackend, InferenceRuntime, InferenceSession } from "../runtime/types";
 import { buildShots } from "../events/shots";
 import { cleanShuttleTrack } from "../events/shuttle-track";
@@ -70,6 +70,8 @@ export interface AnalyzeOptions {
   signal?: AbortSignal;
   /** Emit a preview frame at most this often (ms). 0 = never. */
   previewEveryMs?: number;
+  /** Attach raw detections to the result (engine development only). */
+  debug?: boolean;
 }
 
 export class AnalysisAborted extends Error {
@@ -176,6 +178,14 @@ export async function analyzeVideo(file: Blob, opts: AnalyzeOptions): Promise<An
     const bg = medianRgba(bgFrames, dw * dh);
     report({ phase: "prepare", progress: 0.02 });
 
+    const shuttleModel = opts.shuttleModel ?? "tracknetv3-fp16";
+    const [tnBytes, personBytes] = await Promise.all([
+      fetchModel(shuttleModel),
+      fetchModel("yolox-tiny-person"),
+    ]);
+    const person = await opts.runtime.createSession(personBytes, { backend: opts.backend });
+    sessions.push(person);
+
     let calibration: Calibration | null = null;
     const ckpt = await opts.checkpoint?.load();
     if (opts.corners) {
@@ -183,9 +193,19 @@ export async function analyzeVideo(file: Blob, opts: AnalyzeOptions): Promise<An
     } else if (ckpt?.calibration) {
       calibration = ckpt.calibration;
     } else {
-      calibration = autoCalibrate(bg, dw, dh, srcW, srcH);
+      // Where people stand is strong evidence for which lines are the court.
+      const feet: Vec2[] = [];
+      for (const f of bgFrames.filter((_, i) => i % 2 === 0)) {
+        abort();
+        bgCtx.putImageData(new ImageData(f, dw, dh), 0, 0);
+        for (const b of await detectPeople(person, bgCanvas, dw, dh)) feet.push({ x: (b.x1 + b.x2) / 2, y: b.y2 });
+      }
+      calibration = autoCalibrate(bg, dw, dh, srcW, srcH, feet);
     }
     const cam = calibration ? cameraFromHomography(calibration.H, srcW, srcH) : null;
+
+    // Far players are small: also detect on a zoomed crop of the far half.
+    const farRegion = cam ? farHalfRegion(cam, srcW, srcH, k) : null;
 
     // TrackNet window in source px → decode px.
     const win = trackNetWindow(cam, srcW, srcH);
@@ -205,15 +225,8 @@ export async function analyzeVideo(file: Blob, opts: AnalyzeOptions): Promise<An
     );
     bgFrames.length = 0;
 
-    const shuttleModel = opts.shuttleModel ?? "tracknetv3-fp16";
-    const [tnBytes, personBytes] = await Promise.all([
-      fetchModel(shuttleModel),
-      fetchModel("yolox-tiny-person"),
-    ]);
     const tn = await opts.runtime.createSession(tnBytes, { backend: opts.backend });
     sessions.push(tn);
-    const person = await opts.runtime.createSession(personBytes, { backend: opts.backend });
-    sessions.push(person);
     report({ phase: "prepare", progress: 0.05 });
 
     // ── scan ───────────────────────────────────────────────────────────────
@@ -237,7 +250,10 @@ export async function analyzeVideo(file: Blob, opts: AnalyzeOptions): Promise<An
       if (!c) continue;
       const t = c.timestamp;
       if (n % personEvery === 0) {
-        const boxes = await detectPeople(person, c.canvas, dw, dh);
+        let boxes = await detectPeople(person, c.canvas, dw, dh);
+        if (farRegion) {
+          boxes = mergeBoxes([boxes, await detectPeople(person, c.canvas, dw, dh, 0.35, farRegion)]);
+        }
         frames.push({
           t,
           boxes: boxes.map((b) => ({ x1: b.x1 * k, y1: b.y1 * k, x2: b.x2 * k, y2: b.y2 * k, score: b.score })),
@@ -283,7 +299,11 @@ export async function analyzeVideo(file: Blob, opts: AnalyzeOptions): Promise<An
     report({ phase: "finish", progress: 0.96 });
     const Hinv = calibration ? mat3Inv(calibration.H) : null;
     const toCourt = (p: Vec2) => (Hinv ? applyH(Hinv, p) : null);
-    const tracked = trackPlayers(frames, { toCourt, format: opts.format });
+    const tracked = trackPlayers(frames, {
+      toCourt,
+      format: opts.format,
+      heightOf: cam ? (box, court) => personHeight(cam, box, court, srcH) : undefined,
+    });
     const cleaned = cleanShuttleTrack(shuttle, { fps: analysedFps, diagonal: Math.hypot(srcW, srcH) });
     const sides = Object.fromEntries(tracked.players.map((p) => [p.id, p.side]));
     const { rallies, shots } = buildShots({
@@ -313,6 +333,7 @@ export async function analyzeVideo(file: Blob, opts: AnalyzeOptions): Promise<An
       rallies,
       shots,
       stats: computeStats(partial),
+      ...(opts.debug ? { debug: { frames, shuttleRaw: shuttle } } : {}),
     };
     report({ phase: "finish", progress: 1 });
     return result;
@@ -320,6 +341,57 @@ export async function analyzeVideo(file: Blob, opts: AnalyzeOptions): Promise<An
     for (const s of sessions) await s.release().catch(() => undefined);
     input.dispose();
   }
+}
+
+/**
+ * Decode-px region around the far half (players up to ~2.3 m tall), if it is
+ * small enough in the frame that zooming in helps detection.
+ */
+function farHalfRegion(cam: Camera, srcW: number, srcH: number, k: number): Region | null {
+  const pts: Vec2[] = [];
+  for (const x of [-COURT.halfDoublesWidth - 0.8, COURT.halfDoublesWidth + 0.8])
+    for (const y of [0, COURT.halfLength + 1])
+      for (const z of [0, 2.3]) {
+        const p = project(cam, [x, y, z]);
+        if (p) pts.push(p);
+      }
+  if (pts.length < 8) return null;
+  const x0 = Math.max(0, Math.min(...pts.map((p) => p.x)));
+  const x1 = Math.min(srcW, Math.max(...pts.map((p) => p.x)));
+  const y0 = Math.max(0, Math.min(...pts.map((p) => p.y)));
+  const y1 = Math.min(srcH, Math.max(...pts.map((p) => p.y)));
+  const w = x1 - x0;
+  const h = y1 - y0;
+  if (w <= 0 || h <= 0 || w * h > 0.45 * srcW * srcH) return null;
+  // Pad 10 % so people at the edges aren't cut.
+  const px = w * 0.1;
+  const py = h * 0.1;
+  return {
+    x: Math.max(0, x0 - px) / k,
+    y: Math.max(0, y0 - py) / k,
+    w: Math.min(srcW, w + 2 * px) / k,
+    h: Math.min(srcH, h + 2 * py) / k,
+  };
+}
+
+/**
+ * Real height (m) of a detected person: box pixel height vs the projected
+ * pixel height of a 1 m pole standing on their feet. Null if the box touches
+ * the frame's top/bottom edge (person cut off).
+ */
+export function personHeight(
+  cam: Camera,
+  box: { y1: number; y2: number },
+  court: Vec2,
+  srcH: number,
+): number | null {
+  if (box.y1 <= 2 || box.y2 >= srcH - 2) return null;
+  const foot = project(cam, [court.x, court.y, 0]);
+  const top = project(cam, [court.x, court.y, 1]);
+  if (!foot || !top) return null;
+  const perMetre = foot.y - top.y;
+  if (perMetre <= 1) return null;
+  return (box.y2 - box.y1) / perMetre;
 }
 
 function medianRgba(frames: Uint8ClampedArray[], pixels: number): Uint8ClampedArray<ArrayBuffer> {
@@ -345,6 +417,8 @@ export function autoCalibrate(
   h: number,
   srcW: number,
   srcH: number,
+  /** People's feet in the same (decode) pixel space as `rgba`. */
+  feet: Vec2[] = [],
 ): Calibration | null {
   const s = Math.min(1, 640 / Math.max(w, h));
   const gw = Math.round(w * s);
@@ -355,7 +429,7 @@ export function autoCalibrate(
   const ctx = small.getContext("2d", { willReadFrequently: true })!;
   ctx.drawImage(canvas, 0, 0, gw, gh);
   const gray = toGray(ctx.getImageData(0, 0, gw, gh).data, gw, gh);
-  const det = detectCourt(gray);
+  const det = detectCourt(gray, { feet: feet.map((p) => ({ x: p.x * s, y: p.y * s })) });
   if (!det) return null;
   const toSrc = srcW / gw;
   const corners = det.corners.map((c) => ({ x: c.x * toSrc, y: c.y * toSrc })) as Calibration["corners"];

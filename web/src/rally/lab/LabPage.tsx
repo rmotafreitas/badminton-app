@@ -7,7 +7,8 @@ import type { ComputeBackend } from "../engine/runtime/types";
 import type { ModelId } from "../engine/models/registry";
 import type { Box } from "../engine/models/yolox";
 import type { AnalysisRequest, AnalysisResponse } from "../engine/analysis/analysis.worker";
-import type { AnalysisResult } from "../engine/types";
+import type { AnalysisResult, Calibration } from "../engine/types";
+import { OverlayPlayer } from "../ui/OverlayPlayer";
 import type {
   MicroCase,
   MicroResult,
@@ -145,6 +146,8 @@ function FullAnalysis({ file, onLog }: { file: File | null; onLog: (s: string) =
   const [progress, setProgress] = useState<string | null>(null);
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [wallS, setWallS] = useState<number | null>(null);
+  const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  const [cornersText, setCornersText] = useState("");
 
   useEffect(() => () => workerRef.current?.terminate(), []);
 
@@ -155,6 +158,10 @@ function FullAnalysis({ file, onLog }: { file: File | null; onLog: (s: string) =
       if (!res.ok) return onLog("Pick a video first");
       blob = await res.blob();
     }
+    setVideoUrl((old) => {
+      if (old) URL.revokeObjectURL(old);
+      return URL.createObjectURL(blob!);
+    });
     workerRef.current?.terminate();
     const w = new Worker(new URL("../engine/analysis/analysis.worker.ts", import.meta.url), { type: "module" });
     workerRef.current = w;
@@ -178,6 +185,7 @@ function FullAnalysis({ file, onLog }: { file: File | null; onLog: (s: string) =
       } else if (m.type === "done") {
         setWallS((performance.now() - started) / 1000);
         setResult(m.result);
+        (window as unknown as { __rallyLastResult?: AnalysisResult }).__rallyLastResult = m.result;
         setProgress(null);
         onLog("Analysis done");
       } else {
@@ -185,7 +193,21 @@ function FullAnalysis({ file, onLog }: { file: File | null; onLog: (s: string) =
         onLog(`Analysis failed: ${m.message}`);
       }
     };
-    w.postMessage({ type: "start", jobId: `lab-${Date.now()}`, file: blob, preview: true } satisfies AnalysisRequest);
+    let corners: Calibration["corners"] | undefined;
+    try {
+      corners = cornersText.trim() ? JSON.parse(cornersText) : undefined;
+    } catch {
+      onLog("Corners must be JSON: [{x,y}×4] near-left, near-right, far-right, far-left");
+      return;
+    }
+    w.postMessage({
+      type: "start",
+      jobId: `lab-${Date.now()}`,
+      file: blob,
+      preview: true,
+      debug: true,
+      corners,
+    } satisfies AnalysisRequest);
   };
 
   return (
@@ -196,7 +218,19 @@ function FullAnalysis({ file, onLog }: { file: File | null; onLog: (s: string) =
         </Btn>
         {progress && <span className="font-mono text-xs">{progress}</span>}
       </div>
+      <input
+        data-testid="corners"
+        value={cornersText}
+        onChange={(e) => setCornersText(e.target.value)}
+        placeholder='Optional manual corners (source px): [{"x":..,"y":..}×4] NL, NR, FR, FL'
+        className="w-full border rounded px-2 py-1 font-mono text-xs bg-transparent"
+      />
       <canvas ref={canvasRef} className="w-full rounded-lg bg-black/5" />
+      {result && videoUrl && (
+        <div data-testid="overlay-player">
+          <OverlayPlayer src={videoUrl} result={result} />
+        </div>
+      )}
       {result && (
         <div className="font-mono text-xs space-y-1" data-testid="analysis-summary">
           <div>
