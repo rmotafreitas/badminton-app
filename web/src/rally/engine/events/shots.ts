@@ -28,6 +28,8 @@ export interface HitCandidate {
   hitter: PlayerId | null;
   /** Every player within reach, best first (resolved by side alternation). */
   reach: PlayerId[];
+  /** Shuttle height relative to each in-reach player's box (0 feet … 1 box top). */
+  heights: Partial<Record<PlayerId, number>>;
 }
 
 /** Velocity (px/s) by least squares over samples [from, to] (inclusive). */
@@ -49,21 +51,29 @@ function velocity(track: readonly ShuttleSample[], from: number, to: number): Ve
   return { x: stx / stt, y: sty / stt };
 }
 
-function playersInReach(tracks: readonly PlayerTrack[], t: number, p: Vec2): PlayerId[] {
+function playersInReach(
+  tracks: readonly PlayerTrack[],
+  t: number,
+  p: Vec2,
+): { reach: PlayerId[]; heights: Partial<Record<PlayerId, number>> } {
   const hits: { id: PlayerId; d: number }[] = [];
+  const heights: Partial<Record<PlayerId, number>> = {};
   for (const tr of tracks) {
     const b = boxAt(tr, t);
     if (!b) continue;
     const [x1, y1, x2, y2] = b;
     const w = x2 - x1;
     const h = y2 - y1;
-    // Reach: an arm + racket above the head and to the sides.
-    const inside = p.x >= x1 - 0.7 * w && p.x <= x2 + 0.7 * w && p.y >= y1 - 0.9 * h && p.y <= y2;
+    // Reach: an arm + racket to the sides, and above the head up to 0.6 of a
+    // body height (the detector's box usually includes a raised arm). A
+    // flight apex seen from behind the baseline sits well above that.
+    const inside = p.x >= x1 - 0.7 * w && p.x <= x2 + 0.7 * w && p.y >= y1 - 0.6 * h && p.y <= y2;
     if (!inside) continue;
+    heights[tr.id as PlayerId] = (y2 - p.y) / Math.max(1, h);
     const d = Math.hypot(p.x - (x1 + x2) / 2, p.y - y1) / Math.max(1, h);
     hits.push({ id: tr.id as PlayerId, d });
   }
-  return hits.sort((a, b) => a.d - b.d).map((h) => h.id);
+  return { reach: hits.sort((a, b) => a.d - b.d).map((h) => h.id), heights };
 }
 
 export interface DetectOptions {
@@ -99,8 +109,8 @@ export function detectHits(
     if (!startsSegment) continue;
     const ahead = track.slice(i, i + win + 1);
     if (ahead.length < win || ahead[ahead.length - 1]!.t - track[i]!.t > maxDt) continue;
-    const reach = playersInReach(tracks, track[i]!.t, track[i]!);
-    if (reach.length) cands.push({ t: track[i]!.t, index: i, sharpness: 0.9, hitter: reach[0]!, reach });
+    const { reach, heights } = playersInReach(tracks, track[i]!.t, track[i]!);
+    if (reach.length) cands.push({ t: track[i]!.t, index: i, sharpness: 0.9, hitter: reach[0]!, reach, heights });
   }
   for (let i = 1; i < track.length - 1; i++) {
     // Both windows must be temporally contiguous.
@@ -119,9 +129,9 @@ export function detectHits(
     if (Math.max(na, nb) < minSpeed) continue;
     const sharpness = Math.hypot(va.x - vb.x, va.y - vb.y) / (nb + na);
     if (sharpness < minSharp) continue;
-    const reach = playersInReach(tracks, track[i]!.t, track[i]!);
+    const { reach, heights } = playersInReach(tracks, track[i]!.t, track[i]!);
     if (!reach.length) continue;
-    cands.push({ t: track[i]!.t, index: i, sharpness, hitter: reach[0]!, reach });
+    cands.push({ t: track[i]!.t, index: i, sharpness, hitter: reach[0]!, reach, heights });
   }
   // Non-maximum suppression in time.
   cands.sort((a, b) => b.sharpness - a.sharpness);
@@ -140,6 +150,21 @@ export function detectHits(
       const prevSide = opts.sides[prev.hitter];
       const opposite = cur.reach.find((id) => opts.sides![id] !== undefined && opts.sides![id] !== prevSide);
       if (opposite) cur.hitter = opposite;
+    }
+    // Two same-side contacts < 0.6 s apart are physically impossible (the
+    // shuttle can't cross the net and come back that fast): one is a false
+    // hit — usually a flight apex seen above a near player's head. Keep the
+    // one where the shuttle is closer to the hitter's body.
+    const sideOf = (h: HitCandidate) => (h.hitter ? opts.sides![h.hitter] : undefined);
+    const bodyHeight = (h: HitCandidate) => (h.hitter ? (h.heights[h.hitter] ?? 1) : 1);
+    for (let k = 1; k < kept.length; ) {
+      const a = kept[k - 1]!;
+      const b = kept[k]!;
+      if (b.t - a.t < 0.6 && sideOf(a) !== undefined && sideOf(a) === sideOf(b)) {
+        kept.splice(bodyHeight(a) <= bodyHeight(b) ? k : k - 1, 1);
+        continue;
+      }
+      k++;
     }
   }
   return kept;
@@ -160,40 +185,6 @@ export function segmentRallies(hits: readonly HitCandidate[], maxGap = 3.5): Hit
 }
 
 // ── Classification ─────────────────────────────────────────────────────────
-
-export interface ShotFeatures {
-  first: boolean;
-  hitterY: number | null;
-  contactHeight: number | null;
-  launchVz: number | null;
-  speed: number | null;
-  apex: number | null;
-  landingY: number | null;
-}
-
-/** Rule-based shot typing from physical features (refined by people's reviews). */
-export function classify(f: ShotFeatures): { type: ShotType; confidence: Confidence } {
-  if (f.first) return { type: "serve", confidence: "high" };
-  if (f.contactHeight === null || f.speed === null || f.launchVz === null) {
-    return { type: "other", confidence: "low" };
-  }
-  const kmh = f.speed * 3.6;
-  const high = f.contactHeight >= 1.8;
-  const landDepth = f.landingY === null ? null : Math.abs(f.landingY);
-  const nearNet = f.hitterY !== null && Math.abs(f.hitterY) <= 2.6;
-
-  if (high && f.launchVz < -2 && kmh >= 70) return { type: "smash", confidence: "high" };
-  if (nearNet && landDepth !== null && landDepth <= 2.4 && (f.apex ?? 9) <= 2.4)
-    return { type: "net", confidence: "medium" };
-  if (high && landDepth !== null && landDepth <= 3.2 && kmh < 80) return { type: "drop", confidence: "medium" };
-  if (high && (landDepth ?? 0) >= 4 && f.launchVz >= -2) return { type: "clear", confidence: "medium" };
-  if (!high && f.launchVz > 2 && ((landDepth ?? 0) >= 4 || (f.apex ?? 0) >= 3.5))
-    return { type: "lift", confidence: "medium" };
-  if (f.contactHeight >= 0.7 && (f.apex ?? 0) - f.contactHeight < 0.7 && kmh >= 35)
-    return { type: "drive", confidence: "medium" };
-  if (high && f.launchVz < -2) return { type: "smash", confidence: "low" };
-  return { type: "other", confidence: "low" };
-}
 
 /**
  * Fallback when there is no trustworthy physics fit: flight time to the next
@@ -216,6 +207,98 @@ export function classifyFromContext(f: {
   if (hitterDepth >= 3.8 && receiverDepth !== null && receiverDepth <= 3) return "drop";
   if (f.flightTime < 0.9) return "drive";
   return "other";
+}
+
+export type ContactHeight = "high" | "mid" | "low";
+
+/**
+ * Contact height from the image: where the shuttle is relative to the
+ * hitter's body box at the moment of contact (same depth, so no 3D needed).
+ * Overhead strokes meet the shuttle at/above the top of the box (raised
+ * racket arm); underarm lifts and net shots well below the shoulders.
+ */
+export function contactHeight(
+  shuttleY: number,
+  box: readonly [number, number, number, number] | null,
+): ContactHeight | null {
+  if (!box) return null;
+  const h = box[3] - box[1];
+  if (h <= 0) return null;
+  const r = (box[3] - shuttleY) / h;
+  return r >= 0.85 ? "high" : r <= 0.5 ? "low" : "mid";
+}
+
+const CONTACT_PRIOR: Record<ContactHeight, { z: number; sigma: number }> = {
+  high: { z: 2.5, sigma: 0.5 },
+  mid: { z: 1.4, sigma: 0.5 },
+  low: { z: 0.7, sigma: 0.4 },
+};
+
+export interface ShotCues {
+  first: boolean;
+  contact: ContactHeight | null;
+  /** |y| of the hitter / next receiver (m from the net). */
+  hitterDepth: number | null;
+  receiverDepth: number | null;
+  /** Seconds until the next contact (null for a rally's last shot). */
+  flightTime: number | null;
+  /** From a physically valid fit only. */
+  fit: { vz: number; speedKmh: number; landingDepth: number | null; apex: number } | null;
+}
+
+/**
+ * Shot type from robust cues first (contact height, flight time, where the
+ * players stand), physics second. The two confusions people notice most:
+ *   clear vs lift  → overhead vs underarm contact
+ *   smash vs drop  → a drop is slower and lands short, a smash is fast
+ */
+export function classifyShot(c: ShotCues): { type: ShotType; confidence: Confidence } {
+  if (c.first) return { type: "serve", confidence: "high" };
+  const recv = c.receiverDepth ?? c.fit?.landingDepth ?? null;
+  const ft = c.flightTime;
+  const hitter = c.hitterDepth;
+  const conf: Confidence = recv !== null && ft !== null ? "medium" : "low";
+
+  if (c.contact === "high") {
+    if (recv !== null && recv <= 2.6 && (ft === null || ft >= 0.5)) return { type: "drop", confidence: conf };
+    if (ft !== null && ft < 0.75 && (!c.fit || c.fit.vz < 1)) {
+      return { type: "smash", confidence: c.fit && c.fit.vz < -1 && c.fit.speedKmh >= 100 ? "high" : conf };
+    }
+    if (recv !== null && recv >= 4.3) return { type: "clear", confidence: conf };
+    if (recv !== null && recv <= 3.2) return { type: "drop", confidence: conf };
+    if (ft !== null) return ft >= 1.0 ? { type: "clear", confidence: "low" } : { type: "drop", confidence: "low" };
+    if (c.fit) return c.fit.vz < -1 ? { type: "smash", confidence: "low" } : { type: "clear", confidence: "low" };
+    return { type: "other", confidence: "low" };
+  }
+
+  if (c.contact === "mid") {
+    if (hitter !== null && hitter <= 2.4 && recv !== null && recv <= 3) return { type: "net", confidence: conf };
+    if (ft !== null && ft < 0.9) return { type: "drive", confidence: conf };
+    if (recv !== null && recv >= 4.3) {
+      return { type: hitter !== null && hitter >= 4 ? "clear" : "lift", confidence: conf };
+    }
+    return { type: "drive", confidence: "low" };
+  }
+
+  if (c.contact === "low") {
+    if (hitter !== null && hitter <= 2.8 && recv !== null && recv <= 3) return { type: "net", confidence: conf };
+    if ((recv !== null && recv >= 3.5) || (ft ?? 0) >= 1.0 || (c.fit?.apex ?? 0) >= 3) {
+      return { type: "lift", confidence: conf };
+    }
+    if (hitter !== null && hitter <= 2.8) return { type: "net", confidence: "low" };
+    return { type: "drive", confidence: "low" };
+  }
+
+  // No body box at contact: fall back to context only.
+  return {
+    type: classifyFromContext({
+      first: false,
+      flightTime: ft,
+      hitterY: hitter,
+      receiverY: c.receiverDepth,
+    }),
+    confidence: "low",
+  };
 }
 
 // ── Assembly ───────────────────────────────────────────────────────────────
@@ -242,10 +325,18 @@ export function buildShots(input: BuildShotsInput): { rallies: Rally[]; shots: S
   const shots: Shot[] = [];
   const trackOf = (id: PlayerId | null) => input.tracks.find((t) => t.id === id);
 
+  const contactOf = (h: HitCandidate): ContactHeight | null => {
+    const tr = trackOf(h.hitter);
+    const sample = input.track[h.index];
+    return tr && sample ? contactHeight(sample.y, boxAt(tr, h.t)) : null;
+  };
+
   segmentRallies(hits).forEach((rallyHits, ri) => {
     const rallyId = `r${ri + 1}`;
     const ids: string[] = [];
     rallyHits.forEach((h, k) => {
+      const contact = contactOf(h);
+      const prior = contact ? CONTACT_PRIOR[contact] : { z: CONTACT_Z, sigma: 0.8 };
       const next = rallyHits[k + 1];
       const tEnd = next ? next.t : h.t + 2.5;
       const obs: Observation[] = input.track
@@ -254,15 +345,21 @@ export function buildShots(input: BuildShotsInput): { rallies: Rally[]; shots: S
       const hitterPos = positionAt(trackOf(h.hitter) ?? input.tracks[0]!, h.t);
       const side = (h.hitter && input.sides[h.hitter]) ?? (hitterPos ? (hitterPos.y < 0 ? -1 : 1) : -1);
       const receiverPos = next?.hitter ? positionAt(trackOf(next.hitter)!, next.t) : null;
+      const nextContact = next ? contactOf(next) : null;
+      const endPrior = nextContact ? CONTACT_PRIOR[nextContact] : { z: CONTACT_Z, sigma: 0.9 };
 
       let fit: FlightFit | null = null;
       if (input.camera && hitterPos && obs.length >= 4) {
         fit = fitFlight(input.camera, obs, {
-          p: [hitterPos.x, hitterPos.y, CONTACT_Z],
-          sigma: [0.6, 0.6, 0.8],
+          p: [hitterPos.x, hitterPos.y, prior.z],
+          sigma: [0.6, 0.6, prior.sigma],
           towardsY: side === -1 ? 1 : -1,
           end: receiverPos
-            ? { t: next!.t - h.t, p: [receiverPos.x, receiverPos.y, CONTACT_Z], sigma: [0.6, 0.6, 0.9] }
+            ? {
+                t: next!.t - h.t,
+                p: [receiverPos.x, receiverPos.y, endPrior.z],
+                sigma: [0.6, 0.6, endPrior.sigma],
+              }
             : undefined,
         });
       }
@@ -271,7 +368,7 @@ export function buildShots(input: BuildShotsInput): { rallies: Rally[]; shots: S
       let avgSpeedKmh: number | null = null;
       if (fit && receiverPos && next) {
         const [ex, ey] = [receiverPos.x, receiverPos.y];
-        const d = Math.hypot(ex - fit.start.p[0], ey - fit.start.p[1], CONTACT_Z - fit.start.p[2]);
+        const d = Math.hypot(ex - fit.start.p[0], ey - fit.start.p[1], endPrior.z - fit.start.p[2]);
         avgSpeedKmh = Math.round((d / (next.t - h.t)) * 3.6);
       }
 
@@ -290,27 +387,21 @@ export function buildShots(input: BuildShotsInput): { rallies: Rally[]; shots: S
           : obs.length >= 15
             ? "medium"
             : "low";
-      const physics = classify({
+      const { type, confidence } = classifyShot({
         first: k === 0,
-        hitterY: hitterPos?.y ?? null,
-        contactHeight: goodFit ? fit!.start.p[2] : null,
-        launchVz: goodFit ? fit!.start.v[2] : null,
-        speed: goodFit ? fit!.speed : null,
-        apex: goodFit ? fit!.summary.apexHeight : null,
-        landingY: goodFit ? (fit!.summary.landing?.y ?? null) : null,
+        contact,
+        hitterDepth: hitterPos ? Math.abs(hitterPos.y) : null,
+        receiverDepth: receiverPos ? Math.abs(receiverPos.y) : null,
+        flightTime: next ? next.t - h.t : null,
+        fit: goodFit
+          ? {
+              vz: fit!.start.v[2],
+              speedKmh: fit!.speed * 3.6,
+              landingDepth: fit!.summary.landing ? Math.abs(fit!.summary.landing.y) : null,
+              apex: fit!.summary.apexHeight,
+            }
+          : null,
       });
-      const { type, confidence } =
-        physics.type !== "other"
-          ? physics
-          : {
-              type: classifyFromContext({
-                first: k === 0,
-                flightTime: next ? next.t - h.t : null,
-                hitterY: hitterPos?.y ?? null,
-                receiverY: receiverPos?.y ?? null,
-              }),
-              confidence: "low" as const,
-            };
 
       const id = `${rallyId}s${k + 1}`;
       ids.push(id);

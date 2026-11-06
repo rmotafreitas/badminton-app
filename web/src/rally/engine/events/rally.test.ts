@@ -8,7 +8,7 @@ import { trackPlayers, type FrameDetections } from "../tracking/player-tracker";
 import { applyCorrections, computeStats } from "../stats";
 import type { PlayerId, ShotType, ShuttleSample } from "../types";
 import { cleanShuttleTrack } from "./shuttle-track";
-import { buildShots, classify, classifyFromContext } from "./shots";
+import { buildShots, classifyFromContext, classifyShot } from "./shots";
 
 function lookAt(eye: Vec3, target: Vec3, f: number, width: number, height: number) {
   const fwd = sub3(target, eye);
@@ -201,15 +201,22 @@ describe("classifyFromContext", () => {
   });
 });
 
-describe("classify", () => {
-  it("knows a smash and a net shot", () => {
-    expect(
-      classify({ first: false, hitterY: -4, contactHeight: 2.6, launchVz: -6, speed: 30, apex: 2.6, landingY: 3 })
-        .type,
-    ).toBe("smash");
-    expect(
-      classify({ first: false, hitterY: -1.5, contactHeight: 1.2, launchVz: 1, speed: 6, apex: 1.7, landingY: 1.2 })
-        .type,
-    ).toBe("net");
+describe("classifyShot", () => {
+  const base = { first: false, fit: null } as const;
+  it("tells a lift (underarm, to the back) from a clear (overhead, to the back)", () => {
+    const deep = { hitterDepth: 2.2, receiverDepth: 5.6, flightTime: 1.5 };
+    expect(classifyShot({ ...base, ...deep, contact: "low" }).type).toBe("lift");
+    expect(classifyShot({ ...base, ...deep, contact: "mid" }).type).toBe("lift");
+    expect(classifyShot({ ...base, ...deep, hitterDepth: 5.5, contact: "high" }).type).toBe("clear");
+  });
+  it("tells a drop (short) from a smash (fast)", () => {
+    const rear = { hitterDepth: 5, contact: "high" as const };
+    expect(classifyShot({ ...base, ...rear, receiverDepth: 2.0, flightTime: 0.95 }).type).toBe("drop");
+    expect(classifyShot({ ...base, ...rear, receiverDepth: 2.3, flightTime: 0.7 }).type).toBe("drop");
+    expect(classifyShot({ ...base, ...rear, receiverDepth: 3.8, flightTime: 0.5 }).type).toBe("smash");
+  });
+  it("knows net shots and drives", () => {
+    expect(classifyShot({ ...base, contact: "low", hitterDepth: 1.6, receiverDepth: 1.9, flightTime: 0.9 }).type).toBe("net");
+    expect(classifyShot({ ...base, contact: "mid", hitterDepth: 3.5, receiverDepth: 3.4, flightTime: 0.5 }).type).toBe("drive");
   });
 });
