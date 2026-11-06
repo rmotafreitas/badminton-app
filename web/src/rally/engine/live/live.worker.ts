@@ -14,9 +14,7 @@ import type { Vec2 } from "../geometry/linalg";
 declare const self: DedicatedWorkerGlobalScope;
 
 export type LiveRequest =
-  | { type: "init" }
-  | { type: "frame"; bitmap: ImageBitmap; sample: boolean }
-  | { type: "detect-court" };
+  { type: "init" } | { type: "frame"; bitmap: ImageBitmap; sample: boolean } | { type: "detect-court" };
 
 export interface LiveCheck {
   /** Corners in frame px (near-left, near-right, far-right, far-left), or null. */
@@ -43,7 +41,9 @@ let prevGray: Uint8Array | null = null;
 let stability = 1;
 let light = 128;
 
-const SAMPLE_LONG = 480;
+// Same scale as the analysis court check (autoCalibrate): at 480 px the court
+// lines get too thin and detection scores drop below the threshold.
+const SAMPLE_LONG = 640;
 const MAX_SAMPLES = 9;
 
 function post(m: LiveResponse) {
@@ -141,6 +141,10 @@ self.onmessage = async (ev: MessageEvent<LiveRequest>) => {
           if (feet.length > 120) feet.splice(0, feet.length - 120);
         }
         post({ type: "boxes", boxes, ms: performance.now() - t, width: bitmap.width, height: bitmap.height });
+      } else {
+        // Model still loading (or failed): always answer, or the page — which
+        // sends one frame at a time — would wait for this reply forever.
+        post({ type: "boxes", boxes: [], ms: 0, width: bitmap.width, height: bitmap.height });
       }
       bitmap.close();
     } else if (m.type === "detect-court") {

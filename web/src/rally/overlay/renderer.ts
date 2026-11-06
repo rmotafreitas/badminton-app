@@ -76,7 +76,8 @@ function text(
   ctx.fillText(s, x, y);
 }
 
-const approx = (v: number | null | undefined, unit = "") => (v === null || v === undefined ? "—" : `~${Math.round(v)}${unit}`);
+const approx = (v: number | null | undefined, unit = "") =>
+  v === null || v === undefined ? "—" : `~${Math.round(v)}${unit}`;
 
 const playerColor = (env: DrawEnv, id: PlayerId) => env.theme.players[id] ?? env.theme.text;
 
@@ -351,6 +352,13 @@ export function renderOverlay(
     courtH: r.calibration?.H ?? null,
   };
   if (clear) ctx.clearRect(0, 0, vp.width, vp.height);
+  // Scene widgets (court lines, rings, tags, trail) live on the picture: keep
+  // them off letterbox bars and blurred fills.
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(vp.video.x, vp.video.y, vp.video.w, vp.video.h);
+  ctx.clip();
   for (const w of skin.scene) w(env);
+  ctx.restore();
   for (const w of skin.hud) w(env);
 }

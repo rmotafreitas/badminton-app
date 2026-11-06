@@ -20,7 +20,7 @@ import { RecordingBuffer } from "../sessions/recording-buffer";
 import { CornersEditor } from "./CornersEditor";
 import { useSessionManager } from "./hooks";
 
-const LIVE_LONG = 480; // must match live.worker SAMPLE_LONG
+const LIVE_LONG = 640; // must match live.worker SAMPLE_LONG
 /** 720p60 H.264/VP9: plenty for analysis, ~1.8 GB per hour. */
 const VIDEO_BPS = 4_000_000;
 const BYTES_PER_MIN = ((VIDEO_BPS + 128_000) / 8) * 60;
@@ -74,6 +74,7 @@ export default function RecordPage() {
   const recRef = useRef<MediaRecorder | null>(null);
   const wakeRef = useRef<WakeLockSentinel | null>(null);
   const busy = useRef(false);
+  const busySince = useRef(0);
   const boxesRef = useRef<{ boxes: Box[]; w: number; h: number }>({
     boxes: [],
     w: 1,
@@ -171,7 +172,13 @@ export default function RecordPage() {
         boxesRef.current = { boxes: m.boxes, w: m.width, h: m.height };
         busy.current = false;
       } else if (m.type === "check") {
-        setCheck(m.check);
+        // Keep the best court seen so far (the phone is still): later checks
+        // only replace it when about as good, so the lines don't jump around.
+        setCheck((prev) =>
+          prev?.corners && (!m.check.corners || m.check.courtScore < prev.courtScore - 0.05)
+            ? { ...m.check, corners: prev.corners, courtScore: prev.courtScore }
+            : m.check,
+        );
       } else if (m.type === "error") {
         busy.current = false;
       }
@@ -193,9 +200,12 @@ export default function RecordPage() {
     const loop = async () => {
       const v = videoRef.current;
       const w = workerRef.current;
+      const t = performance.now();
+      // Safety net: never wait more than 3 s for a reply to a frame.
+      if (busy.current && t - busySince.current > 3000) busy.current = false;
       if (v && w && !busy.current && v.readyState >= 2) {
         busy.current = true;
-        const t = performance.now();
+        busySince.current = t;
         const sample = t - lastSample > 600;
         if (sample) lastSample = t;
         try {
@@ -253,7 +263,8 @@ export default function RecordPage() {
         const court = Hinv ? applyH(Hinv, { x: (box[0] + box[2]) / 2, y: box[3] }) : null;
         return { box, court };
       })
-      .filter((p) => !Hinv || (p.court && Math.abs(p.court.x) < 4.3 && Math.abs(p.court.y) < 8.2));
+      // Court (6.1 × 13.4 m) plus a step around it: spectators sit further out.
+      .filter((p) => !Hinv || (p.court && Math.abs(p.court.x) < 3.7 && Math.abs(p.court.y) < 7.4));
     const near = onCourt.filter((p) => (p.court?.y ?? 0) < 0).sort((a, b) => (a.court?.x ?? 0) - (b.court?.x ?? 0));
     const far = onCourt.filter((p) => (p.court?.y ?? 0) >= 0).sort((a, b) => (a.court?.x ?? 0) - (b.court?.x ?? 0));
     const ids: PlayerId[] = ["P1", "P2", "P3", "P4", "P5", "P6"];
