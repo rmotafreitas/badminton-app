@@ -57,8 +57,15 @@ tools/models/                 reproducible model export (weights are not in git)
    analysed) analyse it — a server lease lock prevents double work.
 6. **Corrections** (shot type/hitter/false hits, label swaps, format) are stored
    separately and applied on top; stats are always recomputed from them.
-7. **Export** renders the same overlay into an MP4 on-device and hands it to the
-   share sheet / download. Nothing is stored server-side.
+7. **Export** (`media/exporter.ts`, `media/clips.ts`, `ui/ExportDialog.tsx`)
+   renders the same overlay into an MP4 on-device and hands it to the share
+   sheet / download. Nothing is stored server-side. Choices: the whole video,
+   rallies (padded, dead time between them cut) or one shot (from the review
+   list's clip buttons); landscape 16:9 or vertical 9:16; when the aspect
+   changes, the whole court letterboxed over a blurred fill, or a smoothed,
+   speed-limited virtual camera following the action (shuttle + last hitter)
+   or one player. The sheet's preview uses the exporter's own draw code.
+   Shots have m:ss.s timestamps and coloured markers on the player's seek bar.
 
 ### Access
 

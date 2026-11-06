@@ -10,6 +10,7 @@ import type { AnalysisResult, PlayerId } from "../engine/types";
 import { DEFAULT_SKIN, renderOverlay, type OverlaySkin } from "../overlay/renderer";
 import { frameState, prepareOverlay } from "../overlay/state";
 import { buddyTheme, LABELS_EN, type OverlayLabels, type OverlayTheme } from "../overlay/theme";
+import { stamp } from "../media/clips";
 
 export interface OverlayPlayerHandle {
   seek(t: number): void;
@@ -159,6 +160,22 @@ export const OverlayPlayer = forwardRef<OverlayPlayerHandle, Props>(function Ove
     video: () => videoRef.current,
   }));
 
+  const seekTo = (t: number) => {
+    setTime(t);
+    if (videoRef.current) videoRef.current.currentTime = t;
+  };
+  // Shot markers on the seek bar (colour = shot type), tap to jump.
+  const markers = useMemo(
+    () =>
+      prepared.shots.map((s) => ({
+        id: s.id,
+        t: s.t,
+        color: theme.shotTypes[s.type],
+        label: `${stamp(s.t)} · ${labels.shotTypes[s.type]}${s.hitter ? ` · ${prepared.names[s.hitter] ?? s.hitter}` : ""}`,
+      })),
+    [prepared, theme, labels],
+  );
+
   const toggle = () => {
     const v = videoRef.current;
     if (!v) return;
@@ -195,21 +212,40 @@ export const OverlayPlayer = forwardRef<OverlayPlayerHandle, Props>(function Ove
         >
           <i aria-hidden className={`mdi ${playing ? "mdi-pause" : "mdi-play"} text-2xl`} />
         </button>
-        <input
-          type="range"
-          min={0}
-          max={duration || 0}
-          step={0.01}
-          value={Math.min(time, duration || 0)}
-          aria-label={controlLabels.seek}
-          onChange={(e) => {
-            const v = videoRef.current;
-            const t = Number(e.target.value);
-            setTime(t);
-            if (v) v.currentTime = t;
-          }}
-          className="flex-1 accent-lime-400 h-1.5"
-        />
+        <div className="flex-1 min-w-0 flex flex-col justify-center gap-1">
+          {markers.length > 0 && duration > 0 && (
+            <div className="relative h-3" aria-hidden>
+              {prepared.result.rallies.map((r) => (
+                <div
+                  key={r.id}
+                  className="absolute top-1 h-1 rounded-full bg-white/20"
+                  style={{ left: `${(r.start / duration) * 100}%`, width: `${((r.end - r.start) / duration) * 100}%` }}
+                />
+              ))}
+              {markers.map((m) => (
+                <button
+                  key={m.id}
+                  type="button"
+                  tabIndex={-1}
+                  title={m.label}
+                  onClick={() => seekTo(Math.max(0, m.t - 0.6))}
+                  className="absolute top-0 h-3 w-[3px] -ml-px rounded-sm hover:scale-y-125"
+                  style={{ left: `${(m.t / duration) * 100}%`, background: m.color }}
+                />
+              ))}
+            </div>
+          )}
+          <input
+            type="range"
+            min={0}
+            max={duration || 0}
+            step={0.01}
+            value={Math.min(time, duration || 0)}
+            aria-label={controlLabels.seek}
+            onChange={(e) => seekTo(Number(e.target.value))}
+            className="w-full accent-lime-400 h-1.5"
+          />
+        </div>
         <span className="text-xs tabular-nums text-white/80 whitespace-nowrap">
           {clock(time)} / {clock(duration)}
         </span>

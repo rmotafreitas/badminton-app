@@ -65,7 +65,15 @@ try {
     log("correction saved");
   }
 
+  // Export sheet: rallies only, vertical 9:16, virtual camera following the action.
   await page.getByRole("button", { name: /Export video/ }).click();
+  const sheet = page.getByRole("dialog", { name: "Export video" });
+  await sheet.getByRole("button", { name: /^Rallies/ }).click();
+  await sheet.getByRole("button", { name: /^Vertical 9:16/ }).click();
+  await sheet.getByRole("button", { name: /^Follow the action/ }).click();
+  await page.waitForTimeout(1500);
+  await page.screenshot({ path: OUT + "export-sheet.png" });
+  await sheet.getByRole("button", { name: "Export", exact: true }).click();
   await page.getByRole("button", { name: "Download", exact: true }).waitFor({ timeout: 900000 });
   const dl = page.waitForEvent("download", { timeout: 60000 });
   await page.getByRole("button", { name: "Download", exact: true }).click();

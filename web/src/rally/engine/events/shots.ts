@@ -407,6 +407,9 @@ export interface BuildShotsInput {
 
 const CONTACT_Z = 2.0;
 
+/** Fastest plausible launch per shot type (km/h); unlisted types: no cap. */
+const SHOT_MAX_KMH: Partial<Record<ShotType, number>> = { net: 70, drop: 180 };
+
 export function buildShots(input: BuildShotsInput): { rallies: Rally[]; shots: Shot[] } {
   const hits = detectHits(input.track, input.tracks, {
     fps: input.fps,
@@ -480,7 +483,7 @@ export function buildShots(input: BuildShotsInput): { rallies: Rally[]; shots: S
         fit.start.p[2] >= 0.2 &&
         fit.start.p[2] <= 3.6 &&
         fit.speed * 3.6 <= 420;
-      const speedConfidence: Confidence = !goodFit
+      const fitConfidence: Confidence = !goodFit
         ? "low"
         : receiverPos && obs.length >= 6
           ? "high"
@@ -505,6 +508,11 @@ export function buildShots(input: BuildShotsInput): { rallies: Rally[]; shots: S
           : null,
       };
       const { type, confidence } = classifyShot(cues);
+      // A launch speed the shot type can't have ("net shot ~146 km/h") means
+      // the fit or the type is wrong: don't present the speed as measured.
+      const typeMax = SHOT_MAX_KMH[type];
+      const speedConfidence: Confidence =
+        goodFit && typeMax !== undefined && fit!.speed * 3.6 > typeMax ? "low" : fitConfidence;
 
       const id = `${rallyId}s${k + 1}`;
       ids.push(id);

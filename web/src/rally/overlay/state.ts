@@ -7,6 +7,9 @@ import { boxAt, pathLength, positionAt, smoothTrack } from "../engine/tracking/p
 import type { AnalysisResult, PlayerId, Shot, ShuttleSample } from "../engine/types";
 import { TRACK_HZ } from "../engine/types";
 
+/** Below this, an estimated (low-confidence) speed is noise, not a shot. */
+const MIN_SHOWN_FALLBACK_KMH = 15;
+
 export interface PreparedOverlay {
   result: AnalysisResult;
   /** Cumulative distance (m) per player per 10 Hz sample. */
@@ -93,11 +96,16 @@ export function frameState(p: PreparedOverlay, t: number): FrameState {
   const shotIndex = lastShot ? rallyShots.findIndex((s) => s.id === lastShot!.id) + 1 : 0;
   // Between rallies, show the last speed only while the shot label is up.
   const shotAge = lastShot ? t - lastShot.t : Infinity;
+  // A low-confidence fallback (average speed to the next contact) is only
+  // shown when plausible: "SMASH ~5 km/h" helps nobody.
+  const fallback = lastShot?.avgSpeedKmh ?? null;
   const speedKmh =
     lastShot && shotAge < 2.5
       ? lastShot.speedConfidence !== "low"
         ? lastShot.speedKmh
-        : lastShot.avgSpeedKmh
+        : fallback !== null && fallback >= MIN_SHOWN_FALLBACK_KMH
+          ? fallback
+          : null
       : null;
   return {
     t,

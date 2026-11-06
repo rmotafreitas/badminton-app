@@ -5,6 +5,7 @@
  */
 import { useDictionary } from "@/i18n";
 import type { AnalysisResult, Corrections, PlayerId, ShotType } from "../engine/types";
+import { clock, stamp, type ClipScope } from "../media/clips";
 
 const TYPES: ShotType[] = ["serve", "clear", "smash", "drop", "drive", "lift", "net", "other"];
 
@@ -17,10 +18,12 @@ interface Props {
   onSeek?: (t: number) => void;
   /** Add a hit the engine missed, at the player's current time. */
   onAdd?: () => void;
+  /** Export a rally or a shot as a clip. */
+  onClip?: (scope: ClipScope) => void;
   readOnly?: boolean;
 }
 
-export function ShotReview({ effective, draft, onDraft, names, onSeek, onAdd, readOnly }: Props) {
+export function ShotReview({ effective, draft, onDraft, names, onSeek, onAdd, onClip, readOnly }: Props) {
   const t = useDictionary().rally;
   const setShot = (id: string, fix: NonNullable<Corrections["shots"]>[string]) =>
     onDraft({ ...draft, shots: { ...draft.shots, [id]: { ...draft.shots?.[id], ...fix } } });
@@ -52,9 +55,27 @@ export function ShotReview({ effective, draft, onDraft, names, onSeek, onAdd, re
       )}
       {byRally.map(({ rally, shots }, ri) => (
         <div key={rally.id}>
-          <div className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1">
-            {t.session.rally} {ri + 1} · {shots.filter((s) => !s.deleted).length}{" "}
-            {t.session.shots.toLowerCase()}
+          <div className="flex items-center justify-between gap-2 mb-1">
+            <div className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+              {t.session.rally} {ri + 1} ·{" "}
+              <button
+                className="font-mono normal-case text-sky-600 hover:underline"
+                onClick={() => onSeek?.(Math.max(0, rally.start - 1))}
+              >
+                {clock(rally.start)}–{clock(rally.end)}
+              </button>{" "}
+              · {shots.filter((s) => !s.deleted).length} {t.session.shots.toLowerCase()}
+            </div>
+            {onClip && (
+              <button
+                className="button small light"
+                onClick={() => onClip({ kind: "rallies", ids: [rally.id] })}
+                title={t.exportDialog.clip}
+              >
+                <i aria-hidden className="mdi mdi-movie-open-play-outline mr-1" />
+                {t.exportDialog.clip}
+              </button>
+            )}
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -69,7 +90,7 @@ export function ShotReview({ effective, draft, onDraft, names, onSeek, onAdd, re
                         className="font-mono text-xs text-sky-600 hover:underline"
                         onClick={() => onSeek?.(Math.max(0, s.t - 0.6))}
                       >
-                        {s.t.toFixed(1)}s
+                        {stamp(s.t)}
                       </button>
                     </td>
                     <td className="py-1.5 pr-2">
@@ -114,7 +135,23 @@ export function ShotReview({ effective, draft, onDraft, names, onSeek, onAdd, re
                           : "—"}
                     </td>
                     <td className="py-1.5 text-right whitespace-nowrap">
-                      {s.reviewed && <i aria-hidden className="mdi mdi-check-decagram text-emerald-600 mr-1" title={t.session.reviewed} />}
+                      {s.reviewed && (
+                        <i
+                          aria-hidden
+                          className="mdi mdi-check-decagram text-emerald-600 mr-1"
+                          title={t.session.reviewed}
+                        />
+                      )}
+                      {onClip && !s.deleted && (
+                        <button
+                          className="button small light mr-1"
+                          onClick={() => onClip({ kind: "shot", id: s.id })}
+                          title={t.exportDialog.clip}
+                          aria-label={`${t.exportDialog.clip} ${stamp(s.t)}`}
+                        >
+                          <i aria-hidden className="mdi mdi-movie-open-play-outline" />
+                        </button>
+                      )}
                       {!readOnly && (
                         <button
                           className="button small light"

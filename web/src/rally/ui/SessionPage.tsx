@@ -12,7 +12,8 @@ import { invalidateQueries, useQuery } from "@/hooks/useQuery";
 import type { RallySession } from "@/core/domain/rally";
 import { applyCorrections } from "../engine/stats";
 import type { AnalysisResult, Calibration, Corrections, PlayerId, SessionFormat } from "../engine/types";
-import { canShareFile, downloadFile, exportWithOverlay, shareFile } from "../media/exporter";
+import type { ClipScope } from "../media/clips";
+import { downloadFile } from "../media/exporter";
 import { LABELS_EN, LABELS_PT } from "../overlay/theme";
 import { buddyTheme } from "../overlay/theme";
 import { summarise } from "../sessions/manager";
@@ -22,6 +23,7 @@ import { ShotReview } from "./ShotReview";
 import { AnalysisBadge, Pill, UploadBadge } from "./StatusBadges";
 import { formatDuration, useLocalSessions, useObjectUrl, useOnline, useSessionManager } from "./hooks";
 import { GpuNotice } from "./GpuNotice";
+import { ExportDialog } from "./ExportDialog";
 
 function Stat({ label, value }: { label: string; value: React.ReactNode }) {
   return (
@@ -161,9 +163,9 @@ export default function SessionPage() {
 
   // ── ui state ─────────────────────────────────────────────────────────────
   const [saving, setSaving] = useState(false);
-  const [exporting, setExporting] = useState<number | null>(null);
-  const [exportError, setExportError] = useState<string | null>(null);
-  const [exported, setExported] = useState<{ blob: Blob; name: string } | null>(null);
+  /** Open export sheet (with an optional preselected clip). */
+  const [exportOpen, setExportOpen] = useState<{ scope?: ClipScope; at: number } | null>(null);
+  const openExport = (scope?: ClipScope) => setExportOpen({ scope, at: playerRef.current?.currentTime() ?? 0 });
   const [cornerFrame, setCornerFrame] = useState<HTMLCanvasElement | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
 
@@ -227,30 +229,10 @@ export default function SessionPage() {
     setCornerFrame(c);
   };
 
-  const doExport = async () => {
-    if (!effective) return;
-    let blob = videoBlob;
-    if (!blob && remoteVideoUrl) blob = await (await fetch(remoteVideoUrl)).blob();
-    if (!blob) return;
-    setExporting(0);
-    setExportError(null);
-    try {
-      const out = await exportWithOverlay(blob, {
-        result: effective,
-        names,
-        theme: buddyTheme,
-        labels: lang === "pt-PT" ? LABELS_PT : LABELS_EN,
-        onProgress: (p) => setExporting(p),
-      });
-      setExported({
-        blob: out,
-        name: `${title.replace(/[^\w-]+/g, "_")}-rally.mp4`,
-      });
-    } catch (e) {
-      setExportError((e as Error).message);
-    } finally {
-      setExporting(null);
-    }
+  const getExportVideo = async () => {
+    if (videoBlob) return videoBlob;
+    if (remoteVideoUrl) return (await fetch(remoteVideoUrl)).blob();
+    return null;
   };
 
   const summaryOnly = !!server && server.access === "summary";
@@ -288,8 +270,8 @@ export default function SessionPage() {
               {local && <UploadBadge s={local} />}
             </div>
           </div>
-          {isOwner && (
-            <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-2">
+            {isOwner && (
               <select
                 value={format ?? ""}
                 onChange={(e) => {
@@ -310,44 +292,33 @@ export default function SessionPage() {
                   </option>
                 ))}
               </select>
-              {effective && videoSrc && (
-                <button className="button blue" disabled={exporting !== null} onClick={() => void doExport()}>
-                  <span className="icon">
-                    <i aria-hidden className="mdi mdi-share-variant" />
-                  </span>
-                  <span>
-                    {exporting !== null ? `${t.session.exporting} ${Math.round(exporting * 100)}%` : t.session.export}
-                  </span>
-                </button>
-              )}
-            </div>
-          )}
+            )}
+            {effective && videoSrc && (
+              <button className="button blue" onClick={() => openExport()}>
+                <span className="icon">
+                  <i aria-hidden className="mdi mdi-share-variant" />
+                </span>
+                <span>{t.session.export}</span>
+              </button>
+            )}
+          </div>
         </div>
       </section>
 
       <section className="section main-section space-y-4">
         {summaryOnly && <div className="notification blue">{t.session.summaryOnly}</div>}
-        {exportError && <div className="notification red">{exportError}</div>}
-        {exported && (
-          <div className="card">
-            <div className="card-content flex flex-wrap items-center gap-2">
-              <i aria-hidden className="mdi mdi-check-circle text-emerald-600 text-xl" />
-              <span className="flex-1 text-sm">{exported.name}</span>
-              {canShareFile(exported.blob, exported.name) && (
-                <button className="button green" onClick={() => void shareFile(exported.blob, exported.name)}>
-                  <i aria-hidden className="mdi mdi-share-variant mr-1" />
-                  {t.session.share}
-                </button>
-              )}
-              <button className="button blue" onClick={() => downloadFile(exported.blob, exported.name)}>
-                <i aria-hidden className="mdi mdi-download mr-1" />
-                {t.session.download}
-              </button>
-              <button className="button light" onClick={() => setExported(null)} aria-label="Close">
-                ✕
-              </button>
-            </div>
-          </div>
+        {exportOpen && effective && videoSrc && (
+          <ExportDialog
+            result={effective}
+            names={names}
+            labels={lang === "pt-PT" ? LABELS_PT : LABELS_EN}
+            src={videoSrc}
+            getVideo={getExportVideo}
+            title={title}
+            initialScope={exportOpen.scope}
+            currentTime={exportOpen.at}
+            onClose={() => setExportOpen(null)}
+          />
         )}
 
         {/* ── Player / analysis state ─────────────────────────────────────── */}
@@ -598,6 +569,7 @@ export default function SessionPage() {
                 onDraft={(c) => setDraft(c)}
                 names={names}
                 onSeek={(s) => playerRef.current?.seek(s)}
+                onClip={videoSrc ? openExport : undefined}
                 onAdd={() => {
                   const at = Math.round((playerRef.current?.currentTime() ?? 0) * 100) / 100;
                   setDraft((d) => ({
