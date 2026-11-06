@@ -15,10 +15,12 @@ interface Props {
   onDraft: (c: Corrections) => void;
   names: Partial<Record<PlayerId, string>>;
   onSeek?: (t: number) => void;
+  /** Add a hit the engine missed, at the player's current time. */
+  onAdd?: () => void;
   readOnly?: boolean;
 }
 
-export function ShotReview({ effective, draft, onDraft, names, onSeek, readOnly }: Props) {
+export function ShotReview({ effective, draft, onDraft, names, onSeek, onAdd, readOnly }: Props) {
   const t = useDictionary().rally;
   const setShot = (id: string, fix: NonNullable<Corrections["shots"]>[string]) =>
     onDraft({ ...draft, shots: { ...draft.shots, [id]: { ...draft.shots?.[id], ...fix } } });
@@ -30,6 +32,24 @@ export function ShotReview({ effective, draft, onDraft, names, onSeek, readOnly 
 
   return (
     <div className="space-y-4">
+      {!readOnly && (
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          {onAdd && (
+            <button className="button small light" onClick={onAdd}>
+              <i className="mdi mdi-plus mr-1" />
+              {t.session.addShot}
+            </button>
+          )}
+          <label className="flex items-center gap-2 text-xs text-gray-500">
+            <input
+              type="checkbox"
+              checked={!!draft.reviewedComplete}
+              onChange={(e) => onDraft({ ...draft, reviewedComplete: e.target.checked })}
+            />
+            {t.session.reviewedComplete}
+          </label>
+        </div>
+      )}
       {byRally.map(({ rally, shots }, ri) => (
         <div key={rally.id}>
           <div className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1">

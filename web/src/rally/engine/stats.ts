@@ -98,11 +98,46 @@ export function applyCorrections(result: AnalysisResult, c: Corrections | undefi
     const fix = c.shots?.[s.id];
     return fix ? { ...s, ...fix, reviewed: true } : s;
   });
+  // Missed hits added by a person go into the rally they fall in (or the
+  // nearest one), without physics.
+  let rallies = result.rallies.map((r) => ({ ...r, shotIds: [...r.shotIds] }));
+  for (const a of c.added ?? []) {
+    const fix = c.shots?.[a.id];
+    let rally = rallies.find((r) => a.t >= r.start - 1.5 && a.t <= r.end + 1.5);
+    if (!rally) {
+      rally = { id: `r-added-${a.id}`, start: a.t, end: a.t + 1.5, shotIds: [] };
+      rallies.push(rally);
+    }
+    rally.start = Math.min(rally.start, a.t);
+    rally.end = Math.max(rally.end, a.t);
+    rally.shotIds.push(a.id);
+    shots.push({
+      id: a.id,
+      rallyId: rally.id,
+      t: a.t,
+      hitter: a.hitter,
+      type: a.type,
+      typeConfidence: "high",
+      speedKmh: null,
+      avgSpeedKmh: null,
+      speedConfidence: "low",
+      contactHeight: null,
+      apexHeight: null,
+      flightTime: null,
+      landing: null,
+      reviewed: true,
+      ...fix,
+    });
+  }
+  shots.sort((x, y) => x.t - y.t);
+  rallies = rallies
+    .map((r) => ({ ...r, shotIds: shots.filter((s) => s.rallyId === r.id).map((s) => s.id) }))
+    .sort((x, y) => x.start - y.start);
   const players = result.players.map((p) => {
     const u = c.players?.[p.id];
     if (!u) return p;
     return u.userId ? { ...p, userId: u.userId } : { id: p.id, side: p.side };
   });
-  const next = { ...result, tracks, shots, players, format: c.format ?? result.format };
+  const next = { ...result, tracks, shots, rallies, players, format: c.format ?? result.format };
   return { ...next, stats: computeStats(next) };
 }

@@ -552,6 +552,13 @@ export default function SessionPage() {
                 onDraft={(c) => setDraft(c)}
                 names={names}
                 onSeek={(s) => playerRef.current?.seek(s)}
+                onAdd={() => {
+                  const at = Math.round((playerRef.current?.currentTime() ?? 0) * 100) / 100;
+                  setDraft((d) => ({
+                    ...d,
+                    added: [...(d.added ?? []), { id: `add-${Date.now().toString(36)}`, t: at, hitter: null, type: "other" }],
+                  }));
+                }}
                 readOnly={!isOwner}
               />
               {isOwner && (
@@ -633,6 +640,19 @@ export default function SessionPage() {
         )}
 
         <div className="flex flex-wrap gap-2 justify-end">
+          {isOwner && result && (
+            <button
+              className="button small light"
+              onClick={() =>
+                downloadFile(
+                  new Blob([JSON.stringify({ result, corrections: savedCorrections })], { type: "application/json" }),
+                  `${title.replace(/[^\w-]+/g, "_")}-analysis.json`,
+                )
+              }
+            >
+              {t.session.downloadAnalysis}
+            </button>
+          )}
           {local?.hasLocalVideo && local.upload.state === "done" && (
             <button className="button small light" onClick={() => void manager.dropLocalVideo(local.clientId)}>
               {t.session.deleteLocal}

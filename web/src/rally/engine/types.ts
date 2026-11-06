@@ -138,4 +138,11 @@ export interface Corrections {
   players?: Partial<Record<PlayerId, { userId?: string | null }>>;
   format?: SessionFormat;
   calibration?: Calibration["corners"];
+  /** Hits the engine missed, added by a person. */
+  added?: { id: string; t: number; hitter: PlayerId | null; type: ShotType }[];
+  /**
+   * The person reviewed every shot (nothing missing, nothing false): the
+   * corrected session can serve as ground truth for evaluating the engine.
+   */
+  reviewedComplete?: boolean;
 }

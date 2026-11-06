@@ -146,6 +146,28 @@ cd web && bun dev --host                # https://localhost:5173/analysis, /lab
 cd web && bunx vitest run src/rally     # engine tests (geometry, physics, tracking, events)
 ```
 
+### End-to-end check
+
+```bash
+cd web && RALLY_VIDEO=/path/clip.mp4 CHROME=/path/to/chrome bun ../tools/e2e/rally-e2e.mjs
+```
+
+Drives a real headless Chromium through import → court check → analysis →
+upload → review → export → download, saving screenshots and the export.
+
+### Measuring accuracy
+
+Review a session completely (fix types/hitters, delete false hits, "Add missed
+shot here", tick "I checked every shot"), then "Download analysis (JSON)" and:
+
+```bash
+bun tools/eval/evaluate.ts session-analysis.json [more.json …]
+```
+
+It reports hit precision/recall (±0.2 s), hitter and shot-type accuracy and a
+type confusion matrix — the engine's raw output vs. the reviewed truth. Keep
+reviewed clips from varied halls/angles as a regression set.
+
 `/lab` has the device benchmark, a full-engine run with manual corners, and a
 raw-detection dump (`window.__rallyLastResult.debug`) for replaying the
 tracking/events logic offline with Bun.
