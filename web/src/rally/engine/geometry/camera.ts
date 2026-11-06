@@ -27,7 +27,8 @@ export function priorFocal(width: number, height: number): number {
   return (Math.max(width, height) / 2) / Math.tan((68 / 2) * (Math.PI / 180));
 }
 
-function focalCandidates(h: Mat3): number[] {
+/** Focal length candidates from a principal-point-centred homography. */
+export function focalCandidates(h: Mat3): number[] {
   // Columns of the (centred) homography.
   const [h11, h12, , h21, h22, , h31, h32] = h;
   const out: number[] = [];
@@ -48,6 +49,17 @@ function focalCandidates(h: Mat3): number[] {
  * @param H floor (world x,y in metres) → image pixels homography
  * @param focal optional known focal length (px); estimated otherwise
  */
+/** Homography with the principal point moved to the origin. */
+export function centreHomography(H: Mat3, width: number, height: number): Mat3 {
+  const cx = width / 2;
+  const cy = height / 2;
+  return [
+    H[0] - cx * H[6], H[1] - cx * H[7], H[2] - cx * H[8],
+    H[3] - cy * H[6], H[4] - cy * H[7], H[5] - cy * H[8],
+    H[6], H[7], H[8],
+  ];
+}
+
 export function cameraFromHomography(
   H: Mat3,
   width: number,
@@ -115,6 +127,19 @@ export function cameraFromHomography(
  */
 export function isUpright(cam: Camera): boolean {
   return cam.centre[2] > 0;
+}
+
+/**
+ * A phone filming sport is held roughly upright and looks level or down at
+ * the court. Rejects "floors" that are really walls (window frames, doors):
+ * those imply a camera staring straight at the plane with no world-up.
+ */
+export function isPlausiblePhonePose(cam: Camera): boolean {
+  const R = cam.R;
+  // Image-up direction (−camera y) in world; and the optical axis in world.
+  const upZ = -R[5];
+  const forwardZ = R[8];
+  return upZ > 0.45 && forwardZ < 0.25 && forwardZ > -0.9;
 }
 
 /** World point (metres) → pixel. Null if behind the camera. */
