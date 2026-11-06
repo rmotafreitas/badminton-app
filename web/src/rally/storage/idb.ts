@@ -4,7 +4,7 @@
  */
 
 const DB_NAME = "rally-analysis";
-const DB_VERSION = 3;
+const DB_VERSION = 4;
 
 export const STORES = {
   /** Local session records (metadata, status, result, corrections). */
@@ -17,6 +17,8 @@ export const STORES = {
   results: "results",
   /** Players-removed still frames (JPEG) for the court check. */
   frames: "frames",
+  /** In-progress recording chunks (see sessions/recording-buffer.ts). */
+  recording: "recording",
 } as const;
 
 export type StoreName = (typeof STORES)[keyof typeof STORES];
@@ -33,7 +35,15 @@ export function openDb(): Promise<IDBDatabase> {
         if (!db.objectStoreNames.contains(name)) db.createObjectStore(name);
       }
     };
-    req.onsuccess = () => resolve(req.result);
+    req.onsuccess = () => {
+      const db = req.result;
+      // A newer app version in another tab wants to upgrade: let it.
+      db.onversionchange = () => {
+        db.close();
+        dbPromise = null;
+      };
+      resolve(db);
+    };
     req.onerror = () => {
       dbPromise = null;
       reject(req.error);
@@ -63,6 +73,37 @@ export const idbDelete = (store: StoreName, key: string) =>
 export const idbAll = <T>(store: StoreName) => tx<T[]>(store, "readonly", (s) => s.getAll() as IDBRequest<T[]>);
 export const idbKeys = (store: StoreName) =>
   tx<IDBValidKey[]>(store, "readonly", (s) => s.getAllKeys()).then((k) => k.map(String));
+
+/** How a Blob is kept where the browser can't store Blobs (see idbPutBlob). */
+interface StoredBytes {
+  __bytes: true;
+  type: string;
+  data: ArrayBuffer;
+}
+
+const isStoredBytes = (v: unknown): v is StoredBytes =>
+  typeof v === "object" && v !== null && (v as StoredBytes).__bytes === true;
+
+/**
+ * Stores a Blob. WebKit refuses Blobs in IndexedDB in private browsing (and
+ * some web views) — "Error preparing Blob/File data to be stored" — but takes
+ * ArrayBuffers, so fall back to the bytes. Use idbGetBlob to read it back.
+ */
+export async function idbPutBlob(store: StoreName, key: string, blob: Blob): Promise<void> {
+  try {
+    await idbPut(store, key, blob);
+  } catch (e) {
+    if (e instanceof DOMException && e.name === "QuotaExceededError") throw e;
+    const bytes: StoredBytes = { __bytes: true, type: blob.type, data: await blob.arrayBuffer() };
+    await idbPut(store, key, bytes);
+  }
+}
+
+export async function idbGetBlob(store: StoreName, key: string): Promise<Blob | undefined> {
+  const v = await idbGet<Blob | StoredBytes>(store, key);
+  if (isStoredBytes(v)) return new Blob([v.data], { type: v.type });
+  return v;
+}
 
 /** Ask the browser not to evict our data (iOS/Safari evicts aggressively). */
 export async function requestPersistence(): Promise<boolean> {

@@ -35,8 +35,13 @@ tools/models/                 reproducible model export (weights are not in git)
 
 ### Data flow
 
-1. **Record** (`/analysis/record`, MediaRecorder, live overlay + setup check) or
-   **import** a file. The session is stored locally (IndexedDB: metadata + video).
+1. **Record** (`/analysis/record`, MediaRecorder at ~4 Mbps, live overlay + setup
+   check incl. free storage) or **import** a file. While recording, 1 s chunks are
+   written straight to IndexedDB (`sessions/recording-buffer.ts`): memory stays
+   flat for long sessions, the screen is kept awake, and a recording cut short
+   (tab killed, battery) is turned back into a session on the next start. If the
+   device can't store it, the recorder offers a download instead of losing it.
+   The session is stored locally (IndexedDB: metadata + video).
 2. When online: registered on the server (idempotent on `clientId`); a 720p
    review copy is uploaded straight to object storage with a presigned PUT
    (transcoded on-device with WebCodecs only if needed).
@@ -85,7 +90,7 @@ Nobody else. Linked players can remove themselves.
 
    | Var | Value |
    | --- | --- |
-   | `S3_ENDPOINT` | `https://<account-id>.r2.cloudflarestorage.com` |
+   | `S3_ENDPOINT` | `https://<account-id>.r2.cloudflarestorage.com` (must be HTTPS: Safari blocks mixed content) |
    | `S3_REGION` | `auto` |
    | `S3_BUCKET` | your bucket |
    | `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY` | from the token |
@@ -137,7 +142,9 @@ analysis starts) are part of the normal Vite build.
 - Players switching ends during a long session keep their P-labels by side;
   use "swap labels" corrections.
 - No real-phone benchmark yet: run `/lab` on target phones (WebGPU required
-  for practical speed; WASM works but is ~10× slower).
+  for practical speed; WASM works but is ~10× slower — the app says so on
+  devices without WebGPU and suggests analysing on another device).
+- Recording needs ~1.8 GB per hour of free storage on the phone.
 
 ## Developing
 
@@ -155,7 +162,10 @@ cd web && bunx vitest run src/rally     # engine tests (geometry, physics, track
 cd web && RALLY_VIDEO=/path/clip.mp4 CHROME=/path/to/chrome bun ../tools/e2e/rally-e2e.mjs
 ```
 
-Drives a real headless Chromium through import → court check → analysis →
+`BROWSER=webkit` runs it in Safari's engine instead (two dev-only artefacts:
+headless Linux WebKit draws every video frame black, so the court can't be
+detected, and it blocks the `http://localhost:8333` SeaweedFS upload from the
+HTTPS app as mixed content — production storage must be HTTPS anyway). Drives a real headless browser through import → court check → analysis →
 upload → review → export → download, saving screenshots and the export.
 
 ### Measuring accuracy

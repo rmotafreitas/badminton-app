@@ -21,6 +21,7 @@ import { OverlayPlayer, type OverlayPlayerHandle } from "./OverlayPlayer";
 import { ShotReview } from "./ShotReview";
 import { AnalysisBadge, Pill, UploadBadge } from "./StatusBadges";
 import { formatDuration, useLocalSessions, useObjectUrl, useOnline, useSessionManager } from "./hooks";
+import { GpuNotice } from "./GpuNotice";
 
 function Stat({ label, value }: { label: string; value: React.ReactNode }) {
   return (
@@ -55,8 +56,14 @@ export default function SessionPage() {
 
   // ── video ────────────────────────────────────────────────────────────────
   // Async loads are keyed so stale results never show for another session.
-  const [loadedVideo, setLoadedVideo] = useState<{ key: string; blob: Blob | null } | null>(null);
-  const [loadedRemoteUrl, setLoadedRemoteUrl] = useState<{ key: string; url: string | null } | null>(null);
+  const [loadedVideo, setLoadedVideo] = useState<{
+    key: string;
+    blob: Blob | null;
+  } | null>(null);
+  const [loadedRemoteUrl, setLoadedRemoteUrl] = useState<{
+    key: string;
+    url: string | null;
+  } | null>(null);
   const videoKey = local?.hasLocalVideo ? local.clientId : null;
   useEffect(() => {
     if (!videoKey) return;
@@ -80,7 +87,10 @@ export default function SessionPage() {
   const videoSrc = localUrl ?? remoteVideoUrl;
 
   // ── result + corrections ────────────────────────────────────────────────
-  const [loadedResult, setLoadedResult] = useState<{ key: string; result: AnalysisResult | null } | null>(null);
+  const [loadedResult, setLoadedResult] = useState<{
+    key: string;
+    result: AnalysisResult | null;
+  } | null>(null);
   const resultKey =
     local?.analysis.state === "done"
       ? `local:${local.clientId}:${local.summary?.stats.shots ?? 0}`
@@ -112,7 +122,9 @@ export default function SessionPage() {
   const effective = useMemo(() => (result ? applyCorrections(result, draft) : null), [result, draft]);
 
   // ── names for linked players ────────────────────────────────────────────
-  const users = useQuery(["users"], () => userService.getAllUsers(), { enabled: online });
+  const users = useQuery(["users"], () => userService.getAllUsers(), {
+    enabled: online,
+  });
   const participants = useMemo(() => server?.participants ?? [], [server?.participants]);
   const names = useMemo(() => {
     const out: Partial<Record<PlayerId, string>> = {};
@@ -123,10 +135,15 @@ export default function SessionPage() {
     return out;
   }, [participants, users.data]);
 
-  const games = useQuery(["my-games"], () => gameService.getMyGames(), { enabled: online && isOwner });
+  const games = useQuery(["my-games"], () => gameService.getMyGames(), {
+    enabled: online && isOwner,
+  });
 
   // ── court check (players-removed frame + detected guess) ────────────────
-  const [courtFrame, setCourtFrame] = useState<{ key: string; bitmap: ImageBitmap } | null>(null);
+  const [courtFrame, setCourtFrame] = useState<{
+    key: string;
+    bitmap: ImageBitmap;
+  } | null>(null);
   const needsCourtKey = local?.analysis.state === "needs-court" ? local.clientId : null;
   useEffect(() => {
     if (!needsCourtKey) return;
@@ -164,7 +181,11 @@ export default function SessionPage() {
   const title = local?.title ?? server?.title ?? t.session.untitled;
   const recordedAt = new Date(local?.recordedAt ?? server?.recordedAt ?? 0);
   const durationS = local?.durationS ?? server?.durationS ?? 0;
-  const format: SessionFormat | null = (draft.format ?? local?.format ?? server?.format ?? effective?.format ?? null) as SessionFormat | null;
+  const format: SessionFormat | null = (draft.format ??
+    local?.format ??
+    server?.format ??
+    effective?.format ??
+    null) as SessionFormat | null;
   const stats = effective?.stats ?? local?.summary?.stats ?? server?.summary?.stats ?? null;
 
   const updateServer = async (patch: Parameters<typeof repo.update>[1]) => {
@@ -182,7 +203,11 @@ export default function SessionPage() {
         await repo.update(sid, { corrections: draft });
         const summary = summarise(result, draft);
         await repo
-          .submitResult(sid, { summary, format: summary.format, deviceId: "review" })
+          .submitResult(sid, {
+            summary,
+            format: summary.format,
+            deviceId: "review",
+          })
           .catch(() => undefined);
         remote.refetch();
       }
@@ -217,7 +242,10 @@ export default function SessionPage() {
         labels: lang === "pt-PT" ? LABELS_PT : LABELS_EN,
         onProgress: (p) => setExporting(p),
       });
-      setExported({ blob: out, name: `${title.replace(/[^\w-]+/g, "_")}-rally.mp4` });
+      setExported({
+        blob: out,
+        name: `${title.replace(/[^\w-]+/g, "_")}-rally.mp4`,
+      });
     } catch (e) {
       setExportError((e as Error).message);
     } finally {
@@ -249,7 +277,12 @@ export default function SessionPage() {
               {title}
             </h1>
             <div className="flex flex-wrap items-center gap-1.5 mt-1 text-sm text-gray-500">
-              <span>{recordedAt.toLocaleString(lang, { dateStyle: "medium", timeStyle: "short" })}</span>
+              <span>
+                {recordedAt.toLocaleString(lang, {
+                  dateStyle: "medium",
+                  timeStyle: "short",
+                })}
+              </span>
               <span>· {formatDuration(durationS)}</span>
               {local && <AnalysisBadge s={local} />}
               {local && <UploadBadge s={local} />}
@@ -353,6 +386,7 @@ export default function SessionPage() {
                   result={effective}
                   names={names}
                   labels={lang === "pt-PT" ? LABELS_PT : LABELS_EN}
+                  controlLabels={t.session}
                 />
               ) : videoSrc ? (
                 <div className="space-y-3">
@@ -368,6 +402,7 @@ export default function SessionPage() {
                       </span>
                     </div>
                   )}
+                  {local && local.analysis.state !== "running" && local.analysis.state !== "done" && <GpuNotice />}
                   {local?.analysis.state === "running" && (
                     <div>
                       <div className="text-sm">
@@ -377,10 +412,13 @@ export default function SessionPage() {
                       <div className="h-2 bg-gray-200 dark:bg-slate-700 rounded mt-2">
                         <div
                           className="h-2 rounded bg-emerald-500"
-                          style={{ width: `${Math.round((local.analysis.progress ?? 0) * 100)}%` }}
+                          style={{
+                            width: `${Math.round((local.analysis.progress ?? 0) * 100)}%`,
+                          }}
                         />
                       </div>
                       <p className="text-xs text-gray-500 mt-2">{t.keepOpen}</p>
+                      <GpuNotice className="mt-1" />
                     </div>
                   )}
                   {!local && server && isOwner && server.status !== "analysed" && (
@@ -466,7 +504,13 @@ export default function SessionPage() {
                                   onChange={(e) => {
                                     const others = participants.filter((x) => x.playerId !== p.id);
                                     const next = e.target.value
-                                      ? [...others, { playerId: p.id, userId: e.target.value }]
+                                      ? [
+                                          ...others,
+                                          {
+                                            playerId: p.id,
+                                            userId: e.target.value,
+                                          },
+                                        ]
                                       : others;
                                     void updateServer({ participants: next });
                                   }}
@@ -522,7 +566,9 @@ export default function SessionPage() {
                           )}
                           <td className="py-2 text-right font-mono">~{p.distanceM} m</td>
                           <td className="py-2 text-right font-mono">{p.shots}</td>
-                          <td className="py-2 text-right font-mono">{p.maxSpeedKmh ? `~${p.maxSpeedKmh} km/h` : "—"}</td>
+                          <td className="py-2 text-right font-mono">
+                            {p.maxSpeedKmh ? `~${p.maxSpeedKmh} km/h` : "—"}
+                          </td>
                         </tr>
                       );
                     })}
@@ -556,7 +602,15 @@ export default function SessionPage() {
                   const at = Math.round((playerRef.current?.currentTime() ?? 0) * 100) / 100;
                   setDraft((d) => ({
                     ...d,
-                    added: [...(d.added ?? []), { id: `add-${Date.now().toString(36)}`, t: at, hitter: null, type: "other" }],
+                    added: [
+                      ...(d.added ?? []),
+                      {
+                        id: `add-${Date.now().toString(36)}`,
+                        t: at,
+                        hitter: null,
+                        type: "other",
+                      },
+                    ],
                   }));
                 }}
                 readOnly={!isOwner}
@@ -598,7 +652,11 @@ export default function SessionPage() {
                     <input
                       type="date"
                       value={server.trainingDate ?? ""}
-                      onChange={(e) => void updateServer({ trainingDate: e.target.value || null })}
+                      onChange={(e) =>
+                        void updateServer({
+                          trainingDate: e.target.value || null,
+                        })
+                      }
                       className="w-full border rounded px-2 py-1 bg-transparent"
                     />
                   </label>

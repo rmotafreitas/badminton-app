@@ -10,10 +10,14 @@ import { useQuery } from "@/hooks/useQuery";
 import type { RallySession } from "@/core/domain/rally";
 import { AnalysisBadge, Pill, UploadBadge } from "./StatusBadges";
 import { formatBytes, formatDuration, useLocalSessions, useOnline, useSessionManager } from "./hooks";
+import { GpuNotice } from "./GpuNotice";
 import type { LocalSession } from "../sessions/manager";
 
 function when(iso: string | Date, locale: string) {
-  return new Date(iso).toLocaleString(locale, { dateStyle: "medium", timeStyle: "short" });
+  return new Date(iso).toLocaleString(locale, {
+    dateStyle: "medium",
+    timeStyle: "short",
+  });
 }
 
 function SummaryLine({ s }: { s: LocalSession["summary"] | RallySession["summary"] }) {
@@ -48,14 +52,20 @@ export default function SessionsPage() {
   const repo = useRallyRepo();
   const fileRef = useRef<HTMLInputElement>(null);
 
-  const remote = useQuery(["rally-sessions"], () => repo.list(), { enabled: online });
-  const usage = useQuery(["rally-usage"], () => repo.usage(), { enabled: online });
+  const remote = useQuery(["rally-sessions"], () => repo.list(), {
+    enabled: online,
+  });
+  const usage = useQuery(["rally-usage"], () => repo.usage(), {
+    enabled: online,
+  });
 
   // Server sessions not on this device (recorded/analysed elsewhere).
   const others = useMemo(() => {
     const localServerIds = new Set(local.map((s) => s.serverId).filter(Boolean));
     const localClientIds = new Set(local.map((s) => s.clientId));
-    return (remote.data ?? []).filter((r) => !localServerIds.has(r.id) && !(r.clientId && localClientIds.has(r.clientId)));
+    return (remote.data ?? []).filter(
+      (r) => !localServerIds.has(r.id) && !(r.clientId && localClientIds.has(r.clientId)),
+    );
   }, [remote.data, local]);
 
   const running = local.find((s) => s.analysis.state === "running");
@@ -125,10 +135,13 @@ export default function SessionsPage() {
                 <div className="h-2 bg-gray-200 dark:bg-slate-700 rounded mt-2">
                   <div
                     className="h-2 rounded bg-emerald-500 transition-all"
-                    style={{ width: `${Math.round((running.analysis.progress ?? 0) * 100)}%` }}
+                    style={{
+                      width: `${Math.round((running.analysis.progress ?? 0) * 100)}%`,
+                    }}
                   />
                 </div>
                 <p className="text-xs text-gray-500 mt-2">{t.keepOpen}</p>
+                <GpuNotice className="mt-1" />
               </div>
               <button className="button light" onClick={() => manager.cancel(running.clientId)}>
                 {t.cancel}
@@ -176,9 +189,7 @@ export default function SessionsPage() {
                       </div>
                       <SummaryLine s={s.summary} />
                     </div>
-                    {s.analysis.state === "needs-court" && (
-                      <span className="button small yellow">{t.needsCourt}</span>
-                    )}
+                    {s.analysis.state === "needs-court" && <span className="button small yellow">{t.needsCourt}</span>}
                     {(s.analysis.state === "waiting" || s.analysis.state === "failed") && (
                       <button
                         className="button small green"
@@ -246,7 +257,9 @@ export default function SessionsPage() {
             <div className="h-1.5 bg-gray-200 dark:bg-slate-700 rounded mt-1">
               <div
                 className={`h-1.5 rounded ${usage.data.usedBytes > usage.data.limitBytes ? "bg-red-500" : "bg-sky-500"}`}
-                style={{ width: `${Math.min(100, (usage.data.usedBytes / usage.data.limitBytes) * 100)}%` }}
+                style={{
+                  width: `${Math.min(100, (usage.data.usedBytes / usage.data.limitBytes) * 100)}%`,
+                }}
               />
             </div>
             <p className="mt-1">{t.storageNote}</p>

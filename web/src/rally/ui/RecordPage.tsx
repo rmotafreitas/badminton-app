@@ -15,10 +15,29 @@ import type { AnalysisResult, Calibration, PlayerId } from "../engine/types";
 import { LIVE_SKIN, renderOverlay } from "../overlay/renderer";
 import type { FrameState, PreparedOverlay } from "../overlay/state";
 import { buddyTheme, LABELS_EN, LABELS_PT } from "../overlay/theme";
+import { downloadFile } from "../media/exporter";
+import { RecordingBuffer } from "../sessions/recording-buffer";
 import { CornersEditor } from "./CornersEditor";
 import { useSessionManager } from "./hooks";
 
 const LIVE_LONG = 480; // must match live.worker SAMPLE_LONG
+/** 720p60 H.264/VP9: plenty for analysis, ~1.8 GB per hour. */
+const VIDEO_BPS = 4_000_000;
+const BYTES_PER_MIN = ((VIDEO_BPS + 128_000) / 8) * 60;
+
+type WakeLockSentinel = { release(): Promise<void> };
+const requestWakeLock = async (): Promise<WakeLockSentinel | null> => {
+  try {
+    const wl = (
+      navigator as Navigator & {
+        wakeLock?: { request(t: "screen"): Promise<WakeLockSentinel> };
+      }
+    ).wakeLock;
+    return (await wl?.request("screen")) ?? null;
+  } catch {
+    return null;
+  }
+};
 
 function pickMime(): string | undefined {
   const prefs = ["video/mp4;codecs=avc1", "video/mp4", "video/webm;codecs=vp9", "video/webm"];
@@ -29,7 +48,12 @@ function pickMime(): string | undefined {
 type Level = "ok" | "warn" | "bad" | "unknown";
 
 function CheckRow({ level, text }: { level: Level; text: string }) {
-  const icon = { ok: "mdi-check-circle text-emerald-400", warn: "mdi-alert text-amber-400", bad: "mdi-close-circle text-red-400", unknown: "mdi-help-circle text-gray-400" }[level];
+  const icon = {
+    ok: "mdi-check-circle text-emerald-400",
+    warn: "mdi-alert text-amber-400",
+    bad: "mdi-close-circle text-red-400",
+    unknown: "mdi-help-circle text-gray-400",
+  }[level];
   return (
     <li className="flex items-center gap-2">
       <i className={`mdi ${icon}`} />
@@ -48,9 +72,13 @@ export default function RecordPage() {
   const workerRef = useRef<Worker | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const recRef = useRef<MediaRecorder | null>(null);
-  const chunks = useRef<Blob[]>([]);
+  const wakeRef = useRef<WakeLockSentinel | null>(null);
   const busy = useRef(false);
-  const boxesRef = useRef<{ boxes: Box[]; w: number; h: number }>({ boxes: [], w: 1, h: 1 });
+  const boxesRef = useRef<{ boxes: Box[]; w: number; h: number }>({
+    boxes: [],
+    w: 1,
+    h: 1,
+  });
   const distRef = useRef<Map<PlayerId, { last: Vec2 | null; d: number }>>(new Map());
 
   const [status, setStatus] = useState<"starting" | "ready" | "denied" | "unsupported">("starting");
@@ -63,13 +91,25 @@ export default function RecordPage() {
   const [manual, setManual] = useState<Calibration["corners"] | null>(null);
   const [editFrame, setEditFrame] = useState<HTMLCanvasElement | null>(null);
   const [players, setPlayers] = useState(0);
+  const [saving, setSaving] = useState(false);
+  /** Recording that couldn't be saved on the device: offer a download. */
+  const [unsaved, setUnsaved] = useState<{
+    buffer: RecordingBuffer;
+    video: Blob;
+  } | null>(null);
+  const [storageFull, setStorageFull] = useState(false);
+  /** Free space in minutes of recording (null = unknown). */
+  const [freeMin, setFreeMin] = useState<number | null>(null);
 
   // Corners in full video px: manual beats auto.
   const cornersRef = useRef<Calibration["corners"] | null>(null);
   const autoCorners = (() => {
     if (!check?.corners || !videoSize) return null;
     const s = Math.max(videoSize.w, videoSize.h) / LIVE_LONG;
-    return check.corners.map((p) => ({ x: p.x * s, y: p.y * s })) as Calibration["corners"];
+    return check.corners.map((p) => ({
+      x: p.x * s,
+      y: p.y * s,
+    })) as Calibration["corners"];
   })();
   const corners = manual ?? autoCorners;
   useEffect(() => {
@@ -77,8 +117,7 @@ export default function RecordPage() {
   }, [corners]);
 
   const H: Mat3 | null = corners ? estimateHomography(COURT_CORNERS, corners) : null;
-  const camHeight =
-    H && videoSize ? (cameraFromHomography(H, videoSize.w, videoSize.h)?.centre[2] ?? null) : null;
+  const camHeight = H && videoSize ? (cameraFromHomography(H, videoSize.w, videoSize.h)?.centre[2] ?? null) : null;
 
   // ── camera + worker ──────────────────────────────────────────────────────
   useEffect(() => {
@@ -90,7 +129,12 @@ export default function RecordPage() {
       }
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: "environment", width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 60 } },
+          video: {
+            facingMode: "environment",
+            width: { ideal: 1280 },
+            height: { ideal: 720 },
+            frameRate: { ideal: 60 },
+          },
           audio: true,
         });
         if (cancelled) {
@@ -110,6 +154,14 @@ export default function RecordPage() {
       }
     };
     void start();
+    navigator.storage
+      ?.estimate?.()
+      .then((e) => {
+        if (!cancelled && e.quota !== undefined && e.usage !== undefined) {
+          setFreeMin(Math.floor((e.quota - e.usage) / BYTES_PER_MIN));
+        }
+      })
+      .catch(() => undefined);
 
     const w = new Worker(new URL("../engine/live/live.worker.ts", import.meta.url), { type: "module" });
     workerRef.current = w;
@@ -129,6 +181,7 @@ export default function RecordPage() {
       cancelled = true;
       w.terminate();
       streamRef.current?.getTracks().forEach((tr) => tr.stop());
+      void wakeRef.current?.release().catch(() => undefined);
     };
   }, []);
 
@@ -156,7 +209,13 @@ export default function RecordPage() {
     };
     raf = requestAnimationFrame(() => void loop());
     // Court check: often until found, then occasionally (phone might move).
-    const tick = setInterval(() => workerRef.current?.postMessage({ type: "detect-court" } satisfies LiveRequest), 3000);
+    const tick = setInterval(
+      () =>
+        workerRef.current?.postMessage({
+          type: "detect-court",
+        } satisfies LiveRequest),
+      3000,
+    );
     return () => {
       cancelAnimationFrame(raf);
       clearInterval(tick);
@@ -211,7 +270,10 @@ export default function RecordPage() {
     }
     if (labelled.length !== players) setPlayers(labelled.length);
     const prepared = {
-      result: { video: { width: v.videoWidth, height: v.videoHeight }, calibration: Hm ? { H: Hm } : null } as unknown as AnalysisResult,
+      result: {
+        video: { width: v.videoWidth, height: v.videoHeight },
+        calibration: Hm ? { H: Hm } : null,
+      } as unknown as AnalysisResult,
       cumDistance: new Map(),
       shots: [],
       names: {},
@@ -239,7 +301,11 @@ export default function RecordPage() {
       c.getContext("2d")!,
       prepared,
       state,
-      { width: cw, height: ch, video: { x: (cw - w) / 2, y: (ch - h) / 2, w, h } },
+      {
+        width: cw,
+        height: ch,
+        video: { x: (cw - w) / 2, y: (ch - h) / 2, w, h },
+      },
       buddyTheme,
       lang === "pt-PT" ? LABELS_PT : LABELS_EN,
       skin,
@@ -259,36 +325,80 @@ export default function RecordPage() {
   useEffect(() => {
     if (!recording) return;
     const id = setInterval(() => setNow(Date.now()), 500);
-    return () => clearInterval(id);
+    // Browsers drop the wake lock when the page is hidden; take it back.
+    const onVisible = () => {
+      if (document.visibilityState === "visible") {
+        void requestWakeLock().then((l) => {
+          wakeRef.current = l;
+        });
+      }
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      clearInterval(id);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
   }, [recording]);
 
   // ── recording ────────────────────────────────────────────────────────────
+  const save = async (buffer: RecordingBuffer, video: Blob) => {
+    setSaving(true);
+    try {
+      const id = await manager.addVideo(video, {
+        source: "camera",
+        recordedAt: new Date(buffer.startedAt),
+        corners: manual ?? undefined,
+        autoAnalyse: false,
+      });
+      await buffer.discard().catch(() => undefined);
+      navigate(`/analysis/${id}`);
+    } catch {
+      setUnsaved({ buffer, video });
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const startRecording = () => {
     const stream = streamRef.current;
     const mime = pickMime();
     if (!stream || !mime) return;
-    chunks.current = [];
     distRef.current.clear();
-    const rec = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 5_000_000 });
-    rec.ondataavailable = (e) => e.data.size && chunks.current.push(e.data);
-    rec.onstop = async () => {
-      const blob = new Blob(chunks.current, { type: mime.split(";")[0] });
-      const id = await manager.addVideo(blob, {
-        source: "camera",
-        recordedAt: new Date(startedAt ?? Date.now()),
-        corners: manual ?? undefined,
-        autoAnalyse: false,
-      });
-      navigate(`/analysis/${id}`);
+    setStorageFull(false);
+    // Chunks go to IndexedDB every second: memory stays flat however long
+    // the session, and a killed tab loses at most a second.
+    const buffer = new RecordingBuffer(mime);
+    const rec = new MediaRecorder(stream, {
+      mimeType: mime,
+      videoBitsPerSecond: VIDEO_BPS,
+      audioBitsPerSecond: 128_000,
+    });
+    rec.ondataavailable = (e) => {
+      buffer.append(e.data);
+      if (buffer.storageError) setStorageFull(true);
     };
+    rec.onstop = async () => {
+      void wakeRef.current?.release().catch(() => undefined);
+      wakeRef.current = null;
+      const video = await buffer.finish().catch(() => null);
+      if (!video?.size) return;
+      await save(buffer, video);
+    };
+    // The camera can be taken away (call, app switch on iOS): keep what we have.
+    for (const tr of stream.getVideoTracks()) tr.onended = () => rec.state !== "inactive" && stopRecording();
     rec.start(1000);
     recRef.current = rec;
-    setStartedAt(Date.now());
+    setStartedAt(buffer.startedAt);
     setRecording(true);
+    // Screen auto-lock would stop the camera mid-rally.
+    void requestWakeLock().then((l) => {
+      if (rec.state === "inactive") void l?.release().catch(() => undefined);
+      else wakeRef.current = l;
+    });
   };
 
   const stopRecording = () => {
-    recRef.current?.stop();
+    if (recRef.current?.state !== "inactive") recRef.current?.stop();
     setRecording(false);
   };
 
@@ -304,19 +414,40 @@ export default function RecordPage() {
 
   // ── setup check summary ──────────────────────────────────────────────────
   const ck = t.recorder.check;
-  const court: Level = manual ? "ok" : check ? (check.corners ? (check.courtScore >= 0.7 ? "ok" : "warn") : "bad") : "unknown";
+  const court: Level = manual
+    ? "ok"
+    : check
+      ? check.corners
+        ? check.courtScore >= 0.7
+          ? "ok"
+          : "warn"
+        : "bad"
+      : "unknown";
   const playersL: Level = players > 0 ? "ok" : check ? "warn" : "unknown";
   const stable: Level = check ? (check.stability > 0.75 ? "ok" : check.stability > 0.45 ? "warn" : "bad") : "unknown";
   const lightL: Level = check ? (check.light > 70 ? "ok" : check.light > 40 ? "warn" : "bad") : "unknown";
   const fpsL: Level = fps === null ? "unknown" : fps >= 50 ? "ok" : "warn";
   const heightL: Level = camHeight === null ? "unknown" : camHeight >= 1.9 ? "ok" : "warn";
-  const levels = [court, playersL, stable, lightL, fpsL, heightL];
-  const overall = levels.includes("bad") ? "poor" : levels.filter((l) => l === "warn").length >= 2 ? "fair" : levels.every((l) => l === "ok") ? "good" : "fair";
+  const storageL: Level = freeMin === null ? "unknown" : freeMin >= 60 ? "ok" : freeMin >= 15 ? "warn" : "bad";
+  const levels = [court, playersL, stable, lightL, fpsL, heightL, storageL];
+  const overall = levels.includes("bad")
+    ? "poor"
+    : levels.filter((l) => l === "warn").length >= 2
+      ? "fair"
+      : levels.every((l) => l === "ok")
+        ? "good"
+        : "fair";
   const portrait = !!videoSize && videoSize.h > videoSize.w;
   const elapsed = startedAt ? Math.floor((now - startedAt) / 1000) : 0;
 
   return (
-    <div className="fixed inset-0 z-40 bg-black text-white flex flex-col" style={{ paddingTop: "env(safe-area-inset-top)", paddingBottom: "env(safe-area-inset-bottom)" }}>
+    <div
+      className="fixed inset-0 z-40 bg-black text-white flex flex-col"
+      style={{
+        paddingTop: "env(safe-area-inset-top)",
+        paddingBottom: "env(safe-area-inset-bottom)",
+      }}
+    >
       <div className="relative flex-1 min-h-0">
         <video ref={videoRef} playsInline muted className="absolute inset-0 w-full h-full object-contain" />
         <canvas ref={canvasRef} className="absolute inset-0 w-full h-full pointer-events-none" />
@@ -340,7 +471,13 @@ export default function RecordPage() {
         {status !== "ready" && (
           <div className="absolute inset-0 flex items-center justify-center p-6 text-center">
             <div className="max-w-sm space-y-3">
-              <p>{status === "starting" ? t.recorder.starting : status === "denied" ? t.recorder.denied : t.recorder.unsupported}</p>
+              <p>
+                {status === "starting"
+                  ? t.recorder.starting
+                  : status === "denied"
+                    ? t.recorder.denied
+                    : t.recorder.unsupported}
+              </p>
               {status !== "starting" && (
                 <Link to="/analysis" className="button blue">
                   {t.import}
@@ -354,7 +491,11 @@ export default function RecordPage() {
           <div className="absolute left-3 bottom-3 sm:top-16 sm:bottom-auto max-w-xs rounded-xl bg-black/65 backdrop-blur px-3 py-2 text-xs space-y-1">
             <div className="flex items-center justify-between gap-3 font-semibold text-sm">
               <span>{ck.title}</span>
-              <span className={overall === "good" ? "text-emerald-400" : overall === "fair" ? "text-amber-400" : "text-red-400"}>
+              <span
+                className={
+                  overall === "good" ? "text-emerald-400" : overall === "fair" ? "text-amber-400" : "text-red-400"
+                }
+              >
                 {ck[overall]}
               </span>
             </div>
@@ -365,6 +506,15 @@ export default function RecordPage() {
               <CheckRow level={lightL} text={ck.light} />
               <CheckRow level={fpsL} text={fpsL === "warn" ? ck.fps30 : ck.fps} />
               <CheckRow level={heightL} text={heightL === "warn" ? ck.heightLow : ck.height} />
+              {freeMin !== null && (
+                <CheckRow
+                  level={storageL}
+                  text={(storageL === "ok" ? ck.storage : ck.storageLow).replace(
+                    "{time}",
+                    freeMin >= 120 ? `${Math.floor(freeMin / 60)} h` : `${freeMin} min`,
+                  )}
+                />
+              )}
             </ul>
             {portrait && <p className="text-amber-300">{t.recorder.tipLandscape}</p>}
             <button className="underline text-sky-300" onClick={openEditor}>
@@ -373,19 +523,80 @@ export default function RecordPage() {
           </div>
         )}
 
-        <Link to="/analysis" className="absolute top-3 left-3 rounded-full bg-black/50 w-10 h-10 flex items-center justify-center" aria-label="Close">
-          <i aria-hidden className="mdi mdi-close text-xl" />
-        </Link>
+        {!recording && !saving && (
+          <Link
+            to="/analysis"
+            className="absolute top-3 left-3 rounded-full bg-black/50 w-10 h-10 flex items-center justify-center"
+            aria-label="Close"
+          >
+            <i aria-hidden className="mdi mdi-close text-xl" />
+          </Link>
+        )}
         {recording && (
-          <div className="absolute top-3 left-1/2 -translate-x-1/2 rounded-full bg-red-600 px-3 py-1 text-sm font-mono">
-            ● {Math.floor(elapsed / 60)}:{String(elapsed % 60).padStart(2, "0")}
+          <div className="absolute top-3 left-1/2 -translate-x-1/2 flex flex-col items-center gap-1">
+            <div className="rounded-full bg-red-600 px-3 py-1 text-sm font-mono">
+              ● {Math.floor(elapsed / 60)}:{String(elapsed % 60).padStart(2, "0")}
+            </div>
+            {storageFull && (
+              <div role="alert" className="rounded-lg bg-amber-500 text-black px-3 py-1 text-xs font-semibold">
+                {t.recorder.storageFull}
+              </div>
+            )}
+          </div>
+        )}
+
+        {saving && (
+          <div className="absolute inset-0 bg-black/70 flex items-center justify-center text-sm">
+            {t.recorder.saving}
+          </div>
+        )}
+
+        {unsaved && (
+          <div role="alertdialog" className="absolute inset-0 bg-black/90 flex items-center justify-center p-6">
+            <div className="max-w-sm space-y-4 text-center">
+              <p className="font-semibold">{t.recorder.saveFailed}</p>
+              <p className="text-sm text-white/70">{t.recorder.saveFailedHint}</p>
+              <div className="flex flex-col gap-2">
+                <button
+                  className="button green"
+                  onClick={() =>
+                    downloadFile(
+                      unsaved.video,
+                      `rally-${new Date(unsaved.buffer.startedAt).toISOString().slice(0, 16).replace(/[:T]/g, "-")}.${unsaved.video.type.includes("webm") ? "webm" : "mp4"}`,
+                    )
+                  }
+                >
+                  {t.recorder.download}
+                </button>
+                <button
+                  className="button blue"
+                  onClick={() => {
+                    const u = unsaved;
+                    setUnsaved(null);
+                    void save(u.buffer, u.video);
+                  }}
+                >
+                  {t.retry}
+                </button>
+                <button
+                  className="button"
+                  onClick={() => {
+                    if (!window.confirm(t.recorder.discardConfirm)) return;
+                    void unsaved.buffer.discard();
+                    setUnsaved(null);
+                  }}
+                >
+                  {t.recorder.discard}
+                </button>
+              </div>
+            </div>
           </div>
         )}
       </div>
 
       <div className="flex items-center justify-center py-4">
         <button
-          disabled={status !== "ready"}
+          disabled={status !== "ready" || saving || !!unsaved}
           onClick={recording ? stopRecording : startRecording}
           aria-label={recording ? t.recorder.stop : t.recorder.start}
           className="rounded-full border-4 border-white w-18 h-18 flex items-center justify-center disabled:opacity-40"

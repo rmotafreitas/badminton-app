@@ -7,11 +7,12 @@
  *
  * Env: APP_URL (https://localhost:5173), RALLY_EMAIL/RALLY_PASSWORD
  * (seeded admin), RALLY_VIDEO (required), CHROME (executable, optional),
+ * BROWSER=webkit (Safari's engine; no WebGPU on Linux, so analysis uses WASM),
  * OUT_DIR (screenshots + export, default ./rally-e2e-out).
  * Needs the dev stack (Mongo, SeaweedFS, backend, web) and models in
  * web/public/models. WebGPU flags are passed; without a GPU it falls back to WASM.
  */
-import { chromium } from "playwright";
+import { chromium, webkit } from "playwright";
 import { mkdirSync, readFileSync } from "node:fs";
 
 const APP = process.env.APP_URL ?? "https://localhost:5173";
@@ -20,11 +21,14 @@ const OUT = (process.env.OUT_DIR ?? "rally-e2e-out") + "/";
 if (!VIDEO) throw new Error("Set RALLY_VIDEO to a video file");
 mkdirSync(OUT, { recursive: true });
 
-const browser = await chromium.launch({
-  headless: true,
-  executablePath: process.env.CHROME,
-  args: ["--enable-unsafe-webgpu", "--enable-features=Vulkan", "--use-angle=vulkan", "--ignore-gpu-blocklist"],
-});
+const browser =
+  process.env.BROWSER === "webkit"
+    ? await webkit.launch({ headless: true })
+    : await chromium.launch({
+        headless: true,
+        executablePath: process.env.CHROME,
+        args: ["--enable-unsafe-webgpu", "--enable-features=Vulkan", "--use-angle=vulkan", "--ignore-gpu-blocklist"],
+      });
 const ctx = await browser.newContext({ ignoreHTTPSErrors: true, viewport: { width: 1280, height: 900 }, acceptDownloads: true });
 const page = await ctx.newPage();
 const log = (...a) => console.log(new Date().toISOString().slice(11, 19), ...a);

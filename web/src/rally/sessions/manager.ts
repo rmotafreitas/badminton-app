@@ -19,7 +19,16 @@ import type { CalibrationCheck } from "../engine/analysis/analyze";
 import type { AnalysisResult, Calibration, Corrections, SessionFormat } from "../engine/types";
 import { applyCorrections } from "../engine/stats";
 import { defaultTranscoder, fitsReviewCopy, REVIEW_COPY, type VideoTranscoder } from "../media/transcoder";
-import { idbAll, idbDelete, idbGet, idbPut, requestPersistence, STORES } from "../storage/idb";
+import { idbAll, idbDelete, idbGet, idbGetBlob, idbPut, idbPutBlob, requestPersistence, STORES } from "../storage/idb";
+import { discardRecording, leftoverRecordings } from "./recording-buffer";
+
+/** The device couldn't store a video (usually: storage full). */
+export class StorageError extends Error {
+  constructor(cause: unknown) {
+    super("Not enough storage on this device to keep the video.", { cause });
+    this.name = "StorageError";
+  }
+}
 
 export type UploadState = "pending" | "transcoding" | "uploading" | "done" | "failed" | "unavailable";
 export type AnalysisState = "waiting" | "queued" | "needs-court" | "running" | "done" | "failed";
@@ -38,11 +47,21 @@ export interface LocalSession {
   fps: number;
   hasLocalVideo: boolean;
   upload: { state: UploadState; progress?: number; error?: string };
-  analysis: { state: AnalysisState; progress?: number; phase?: string; error?: string };
+  analysis: {
+    state: AnalysisState;
+    progress?: number;
+    phase?: string;
+    error?: string;
+  };
   /** Court corners confirmed by a person (setup, court check, adjust). */
   corners?: Calibration["corners"];
   /** Auto-detected corners awaiting confirmation, and their score. */
-  courtGuess?: { corners: Calibration["corners"] | null; score: number; width: number; height: number };
+  courtGuess?: {
+    corners: Calibration["corners"] | null;
+    score: number;
+    width: number;
+    height: number;
+  };
   format?: SessionFormat;
   corrections?: Corrections;
   resultUploaded?: boolean;
@@ -162,8 +181,30 @@ export class SessionManager {
     }
     this.emit();
     void requestPersistence();
+    // Not awaited: it goes through addVideo, which waits for `ready`.
+    void this.recoverRecordings();
     void this.sync();
     void this.pump();
+  }
+
+  /** Turns recordings cut short (tab killed, battery died) back into sessions. */
+  private async recoverRecordings() {
+    try {
+      for (const r of await leftoverRecordings()) {
+        try {
+          await this.addVideo(r.video, {
+            source: "camera",
+            recordedAt: new Date(r.startedAt),
+            autoAnalyse: false,
+          });
+          await discardRecording(r.id);
+        } catch {
+          // Unreadable or still no room: keep the chunks for the next start.
+        }
+      }
+    } catch {
+      // IndexedDB unavailable.
+    }
   }
 
   // ── subscription ─────────────────────────────────────────────────────────
@@ -235,9 +276,17 @@ export class SessionManager {
       corners: meta.corners,
       updatedAt: Date.now(),
     };
-    await idbPut(STORES.videos, clientId, video).catch(() => undefined);
+    // The video is the one thing that can't be recreated: if it can't be
+    // stored (quota, private mode), fail loudly so the caller can offer a
+    // download instead of creating a session with no video behind it.
+    try {
+      await idbPutBlob(STORES.videos, clientId, video);
+      await idbPut(STORES.sessions, clientId, s);
+    } catch (e) {
+      await idbDelete(STORES.videos, clientId).catch(() => undefined);
+      throw new StorageError(e);
+    }
     this.sessions.set(clientId, s);
-    await idbPut(STORES.sessions, clientId, s).catch(() => undefined);
     this.emit();
     void this.sync();
     void this.pump();
@@ -263,7 +312,7 @@ export class SessionManager {
   }
 
   async getVideo(clientId: string): Promise<Blob | undefined> {
-    return idbGet<Blob>(STORES.videos, clientId).catch(() => undefined);
+    return idbGetBlob(STORES.videos, clientId).catch(() => undefined);
   }
 
   async getResult(clientId: string): Promise<AnalysisResult | undefined> {
@@ -281,7 +330,7 @@ export class SessionManager {
   // ── edits ────────────────────────────────────────────────────────────────
 
   async getCourtFrame(clientId: string): Promise<Blob | undefined> {
-    return idbGet<Blob>(STORES.frames, clientId).catch(() => undefined);
+    return idbGetBlob(STORES.frames, clientId).catch(() => undefined);
   }
 
   async setCorners(clientId: string, corners: Calibration["corners"], reanalyse = true) {
@@ -297,7 +346,10 @@ export class SessionManager {
   async setFormat(clientId: string, format: SessionFormat) {
     const s = this.sessions.get(clientId);
     if (!s) return;
-    await this.patch(clientId, { format, corrections: { ...s.corrections, format } });
+    await this.patch(clientId, {
+      format,
+      corrections: { ...s.corrections, format },
+    });
     if (s.serverId) await this.repo.update(s.serverId, { format }).catch(() => undefined);
   }
 
@@ -311,7 +363,11 @@ export class SessionManager {
       await this.repo.update(s.serverId, { corrections }).catch(() => undefined);
       if (summary && result) {
         await this.repo
-          .submitResult(s.serverId, { summary, format: summary.format, deviceId: deviceId() })
+          .submitResult(s.serverId, {
+            summary,
+            format: summary.format,
+            deviceId: deviceId(),
+          })
           .catch(() => undefined);
       }
     }
@@ -355,7 +411,10 @@ export class SessionManager {
 
   cancel(clientId: string) {
     if (this.running === clientId) {
-      this.worker?.postMessage({ type: "cancel", jobId: clientId } satisfies AnalysisRequest);
+      this.worker?.postMessage({
+        type: "cancel",
+        jobId: clientId,
+      } satisfies AnalysisRequest);
     }
     void this.patch(clientId, { analysis: { state: "waiting" } });
   }
@@ -382,7 +441,9 @@ export class SessionManager {
     const s = this.sessions.get(clientId);
     const video = await this.getVideo(clientId);
     if (!s || !video) {
-      await this.patch(clientId, { analysis: { state: "failed", error: "Video not on this device" } });
+      await this.patch(clientId, {
+        analysis: { state: "failed", error: "Video not on this device" },
+      });
       return;
     }
     this.running = clientId;
@@ -394,7 +455,10 @@ export class SessionManager {
         } catch (e) {
           if ((e as { response?: { status?: number } })?.response?.status === 409) {
             await this.patch(clientId, {
-              analysis: { state: "waiting", error: "Another device is analysing this session" },
+              analysis: {
+                state: "waiting",
+                error: "Another device is analysing this session",
+              },
             });
             return;
           }
@@ -402,18 +466,25 @@ export class SessionManager {
         }
       }
       await this.acquireWakeLock();
-      await this.patch(clientId, { analysis: { state: "running", progress: 0, phase: "prepare" } });
+      await this.patch(clientId, {
+        analysis: { state: "running", progress: 0, phase: "prepare" },
+      });
       let corners = s.corners;
       if (!corners) {
         // Quick court check: a wrong court ruins everything downstream, and
         // confirming it is one tap. Only very confident detections skip it.
         const check = await this.calibrate(clientId, video);
-        await idbPut(STORES.frames, clientId, check.frame).catch(() => undefined);
+        await idbPutBlob(STORES.frames, clientId, check.frame).catch(() => undefined);
         const cal = check.calibration;
         if (!cal || cal.score < AUTO_CONFIRM_SCORE) {
           await this.patch(clientId, {
             analysis: { state: "needs-court" },
-            courtGuess: { corners: cal?.corners ?? null, score: cal?.score ?? 0, width: check.width, height: check.height },
+            courtGuess: {
+              corners: cal?.corners ?? null,
+              score: cal?.score ?? 0,
+              width: check.width,
+              height: check.height,
+            },
           });
           if (s.serverId && navigator.onLine) await this.repo.unlock(s.serverId, dev).catch(() => undefined);
           return;
@@ -468,7 +539,11 @@ export class SessionManager {
         }
       };
       worker.addEventListener("message", onMessage);
-      worker.postMessage({ type: "calibrate", jobId: clientId, file: video } satisfies AnalysisRequest);
+      worker.postMessage({
+        type: "calibrate",
+        jobId: clientId,
+        file: video,
+      } satisfies AnalysisRequest);
     });
   }
 
@@ -485,7 +560,11 @@ export class SessionManager {
           if (now - lastEmit > 500 || m.progress.progress >= 1) {
             lastEmit = now;
             void this.patch(clientId, {
-              analysis: { state: "running", progress: m.progress.progress, phase: m.progress.phase },
+              analysis: {
+                state: "running",
+                progress: m.progress.progress,
+                phase: m.progress.phase,
+              },
             });
           }
           return;
@@ -508,8 +587,13 @@ export class SessionManager {
 
   private async acquireWakeLock() {
     try {
-      const wl = (navigator as Navigator & { wakeLock?: { request(t: "screen"): Promise<{ release(): Promise<void> }> } })
-        .wakeLock;
+      const wl = (
+        navigator as Navigator & {
+          wakeLock?: {
+            request(t: "screen"): Promise<{ release(): Promise<void> }>;
+          };
+        }
+      ).wakeLock;
       this.wakeLock = (await wl?.request("screen")) ?? null;
     } catch {
       this.wakeLock = null;
@@ -566,20 +650,33 @@ export class SessionManager {
       let body = original;
       const info = await this.transcoder.probe(original);
       if (!fitsReviewCopy(info) && (await this.transcoder.supported())) {
-        await this.patch(clientId, { upload: { state: "transcoding", progress: 0 } });
+        await this.patch(clientId, {
+          upload: { state: "transcoding", progress: 0 },
+        });
         body = await this.transcoder.transcode(original, {
           ...REVIEW_COPY,
-          onProgress: (p) => void this.patch(clientId, { upload: { state: "transcoding", progress: p } }),
+          onProgress: (p) =>
+            void this.patch(clientId, {
+              upload: { state: "transcoding", progress: p },
+            }),
         });
       }
-      const type = body.type.includes("webm") ? "video/webm" : body.type.includes("quicktime") ? "video/quicktime" : "video/mp4";
+      const type = body.type.includes("webm")
+        ? "video/webm"
+        : body.type.includes("quicktime")
+          ? "video/quicktime"
+          : "video/mp4";
       const up = await this.repo.requestVideoUpload(s.serverId, body.size, type);
-      await this.patch(clientId, { upload: { state: "uploading", progress: 0 } });
+      await this.patch(clientId, {
+        upload: { state: "uploading", progress: 0 },
+      });
       let last = 0;
       await putWithProgress(up.url, body, type, (p) => {
         if (p - last > 0.02 || p >= 1) {
           last = p;
-          void this.patch(clientId, { upload: { state: "uploading", progress: p } });
+          void this.patch(clientId, {
+            upload: { state: "uploading", progress: p },
+          });
         }
       });
       await this.repo.completeVideoUpload(s.serverId, up.key, body.size);
@@ -587,7 +684,10 @@ export class SessionManager {
     } catch (e) {
       const status = (e as { response?: { status?: number } })?.response?.status;
       await this.patch(clientId, {
-        upload: { state: status === 409 ? "unavailable" : "failed", error: errMsg(e) },
+        upload: {
+          state: status === 409 ? "unavailable" : "failed",
+          error: errMsg(e),
+        },
       });
     }
   }

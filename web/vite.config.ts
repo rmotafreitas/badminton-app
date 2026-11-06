@@ -13,15 +13,18 @@ function crossOriginIsolateLab(): Plugin {
     name: "cross-origin-isolate-lab",
     configureServer(server) {
       server.middlewares.use((req, res, next) => {
-        // The page itself, plus everything it loads (worker scripts must carry
-        // COEP too for the worker to be isolated).
-        const referer = req.headers.referer ?? "";
-        const fromLab =
-          /^https?:\/\/[^/]+\/lab(\/|\?|$)/.test(referer) || referer.includes("/src/rally/");
         // Same-origin subresources must opt in to being loaded by an isolated
         // context; harmless for every other page.
         res.setHeader("Cross-Origin-Resource-Policy", "same-origin");
-        if (req.url?.startsWith("/lab") || fromLab) {
+        // Only /lab is an isolated *document*. Every non-document response
+        // (scripts, worker modules and their imports) also carries COEP so a
+        // worker started by /lab stays isolated: WebKit sends no Referer for a
+        // worker's nested imports, so they can't be told apart. COEP on a
+        // subresource of a non-isolated page has no effect.
+        const dest = req.headers["sec-fetch-dest"];
+        const isDocument =
+          dest === "document" || dest === "iframe" || (!dest && (req.headers.accept ?? "").includes("text/html"));
+        if (req.url?.startsWith("/lab") || !isDocument) {
           res.setHeader("Cross-Origin-Opener-Policy", "same-origin");
           res.setHeader("Cross-Origin-Embedder-Policy", "require-corp");
         }
