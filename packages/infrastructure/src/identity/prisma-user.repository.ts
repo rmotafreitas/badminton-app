@@ -1,4 +1,4 @@
-import { type CreateUserInput, normalizePhone, type UserRepository } from "@bb/application";
+import { type AccountChanges, type CreateUserInput, type InvitedUserInput, normalizePhone, type UserRepository } from "@bb/application";
 import { type AuthProvider, isObjectId, type Role, type User } from "@bb/domain";
 import type { Database } from "@/shared/database";
 import { toUser, userWithProfile } from "./user-rows";
@@ -52,6 +52,31 @@ export class PrismaUserRepository implements UserRepository {
       ...userWithProfile,
     });
     return toUser(row);
+  }
+
+  async createInvited(input: InvitedUserInput): Promise<User> {
+    const row = await this.db.user.create({
+      data: {
+        email: input.email ?? null,
+        phone: input.phone ?? null,
+        roles: [...input.roles],
+        clubId: input.clubId,
+        profile: { create: { name: input.name ?? "" } },
+      },
+      ...userWithProfile,
+    });
+    return toUser(row);
+  }
+
+  async updateAccount(userId: string, changes: AccountChanges): Promise<void> {
+    if (!isObjectId(userId)) return;
+    await this.db.user.update({ where: { id: userId }, data: { ...changes } });
+  }
+
+  /** Prisma emulates the schema's `onDelete: Cascade` on MongoDB: profile, sign-in methods, sessions, reviews go too. */
+  async delete(userId: string): Promise<void> {
+    if (!isObjectId(userId)) return;
+    await this.db.user.delete({ where: { id: userId } });
   }
 
   async linkAuthMethod(userId: string, provider: AuthProvider, providerId: string): Promise<void> {

@@ -1,2 +1,2 @@
 export * from "./api";
-export { ClubsPage } from "./components/clubs-page";
+export { ClubDialog, ClubsPage } from "./components/clubs-page";

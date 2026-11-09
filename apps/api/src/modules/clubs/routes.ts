@@ -1,4 +1,5 @@
 import {
+  AddMemberBodySchema,
   AssignClubBodySchema,
   ClubDetailSchema,
   ClubFormSchema,
@@ -7,14 +8,18 @@ import {
   CreateClubFormSchema,
   ErrorResponseSchema,
   IdParamsSchema,
+  MemberParamsSchema,
+  MemberRolesResponseSchema,
+  SetMemberRolesBodySchema,
+  UserSummarySchema,
 } from "@bb/contracts";
 import { Elysia } from "elysia";
 import { z } from "zod";
 import { type Authentication, toUpload } from "@/http";
 import type { ApiDeps } from "@/modules/deps";
-import { presentClub, presentClubDetail } from "@/modules/presenters";
+import { presentClub, presentClubDetail, presentUserSummary } from "@/modules/presenters";
 
-const errors = { 401: ErrorResponseSchema, 403: ErrorResponseSchema, 404: ErrorResponseSchema, 409: ErrorResponseSchema, 422: ErrorResponseSchema };
+const errors = { 400: ErrorResponseSchema, 401: ErrorResponseSchema, 403: ErrorResponseSchema, 404: ErrorResponseSchema, 409: ErrorResponseSchema, 422: ErrorResponseSchema };
 
 const clubInput = async (form: z.infer<typeof ClubFormSchema>) => ({
   name: form.name,
@@ -64,5 +69,26 @@ export function clubRoutes(auth: Authentication, deps: ApiDeps) {
         return status(204, undefined);
       },
       { auth: true, params: IdParamsSchema, response: { 204: z.void(), ...errors } },
+    )
+    // Membership: club admins manage their own club, system admins any club.
+    .post(
+      "/:id/members",
+      async ({ actor, params, body }) => presentUserSummary(await deps.addClubMember.execute({ actor, clubId: params.id, input: body })),
+      { auth: true, params: IdParamsSchema, body: AddMemberBodySchema, response: { 200: UserSummarySchema, ...errors } },
+    )
+    .put(
+      "/:id/members/:userId/roles",
+      async ({ actor, params, body }) => ({
+        roles: await deps.setMemberRoles.execute({ actor, clubId: params.id, userId: params.userId, roles: body.roles }),
+      }),
+      { auth: true, params: MemberParamsSchema, body: SetMemberRolesBodySchema, response: { 200: MemberRolesResponseSchema, ...errors } },
+    )
+    .delete(
+      "/:id/members/:userId",
+      async ({ actor, params, status }) => {
+        await deps.removeClubMember.execute({ actor, clubId: params.id, userId: params.userId });
+        return status(204, undefined);
+      },
+      { auth: true, params: MemberParamsSchema, response: { 204: z.void(), ...errors } },
     );
 }

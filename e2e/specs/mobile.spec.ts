@@ -103,3 +103,31 @@ test("phone: the install card explains how to add the app, and 'not now' sticks"
   await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
   await expect(page.getByText("Install Badminton Buddy")).toBeHidden();
 });
+
+test("phone: club admins manage members and browse data as cards and sheets", async ({ page }) => {
+  await signIn(page, PEOPLE.clara.email);
+  await page.getByRole("button", { name: "Toggle Sidebar" }).click();
+  await page.getByRole("dialog").getByRole("link", { name: "Members" }).click();
+  await expect(page.getByRole("button", { name: "Add member" })).toBeVisible();
+  await shot(page, "members-club-admin");
+
+  await page.getByRole("button", { name: "Toggle Sidebar" }).click();
+  await page.getByRole("dialog").getByRole("link", { name: "Data" }).click();
+  await shot(page, "data-index");
+  await page.getByRole("main").getByRole("link", { name: /Members/ }).click();
+  // Rows are cards on a phone: tap one, its details come up in a bottom sheet.
+  await page.getByRole("button", { name: new RegExp(PEOPLE.ana.name) }).click();
+  await expect(page.getByRole("dialog", { name: PEOPLE.ana.name })).toBeVisible();
+  await shot(page, "data-record");
+});
+
+test("phone: the registration form, from the sidebar to the details sheet", async ({ page }) => {
+  await signIn(page, PEOPLE.rui.email);
+  await page.getByRole("button", { name: "Toggle Sidebar" }).click();
+  await page.getByRole("dialog").getByRole("link", { name: "Registration" }).click();
+  await expect(page.getByRole("button", { name: "Download form (PDF)" })).toBeVisible();
+  await shot(page, "registration");
+  await page.getByRole("button", { name: "Edit details" }).click();
+  await expect(page.getByRole("dialog", { name: "Your details" }).getByLabel("Postal code").first()).toBeVisible();
+  await shot(page, "registration-details");
+});

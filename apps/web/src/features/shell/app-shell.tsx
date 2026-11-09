@@ -1,8 +1,8 @@
 import type { SessionUser } from "@bb/contracts";
 import { Link, useRouterState } from "@tanstack/react-router";
-import { Activity, Building2, CalendarCheck, Home, Trophy, UserRound, Users, Video, WifiOff } from "lucide-react";
+import { Activity, Building2, CalendarCheck, Database, FileCheck2, FileSignature, Home, Trophy, UserRound, Users, Video, WifiOff } from "lucide-react";
 import type { ReactNode } from "react";
-import { hasRole } from "@/features/auth";
+import { hasRole, isStaff } from "@/features/auth";
 import { Brand } from "@/shared/components/logo";
 import { useOnline } from "@/shared/hooks/use-online";
 import { useDictionary } from "@/shared/i18n";
@@ -47,9 +47,17 @@ function useNav(user: SessionUser) {
       items: [
         { to: "/users", label: nav.members, icon: Users },
         ...(hasRole(user, "SYSTEM_ADMIN") ? [{ to: "/clubs", label: nav.clubs, icon: Building2 }] : []),
+        ...(user.clubId && hasRole(user, "SYSTEM_ADMIN", "CLUB_ADMIN") ? [{ to: "/club-registrations", label: nav.registrations, icon: FileCheck2 }] : []),
+        ...(isStaff(user) ? [{ to: "/data", label: nav.data, icon: Database }] : []),
       ],
     },
-    { label: nav.me, items: [{ to: "/profile", label: nav.profile, icon: UserRound, exact: true }] },
+    {
+      label: nav.me,
+      items: [
+        { to: "/profile", label: nav.profile, icon: UserRound, exact: true },
+        ...(user.clubId ? [{ to: "/registration", label: nav.registration, icon: FileSignature }] : []),
+      ],
+    },
   ];
   return groups;
 }

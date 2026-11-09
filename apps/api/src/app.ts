@@ -1,6 +1,7 @@
 import { Elysia } from "elysia";
 import { authentication, csrfGuard, errorHandling, requestContext } from "./http";
 import { clubRoutes } from "./modules/clubs/routes";
+import { dataRoutes } from "./modules/data/routes";
 import type { ApiDeps } from "./modules/deps";
 import { gameRoutes } from "./modules/games/routes";
 import { identityRoutes } from "./modules/identity/routes";
@@ -8,6 +9,7 @@ import { maintenanceRoutes } from "./modules/maintenance";
 import { mediaRoutes } from "./modules/media/routes";
 import { profileRoutes } from "./modules/profiles/routes";
 import { rallyRoutes } from "./modules/rally/routes";
+import { registrationRoutes } from "./modules/registrations/routes";
 import { trainingRoutes } from "./modules/training/routes";
 
 export type { ApiDeps } from "./modules/deps";
@@ -36,6 +38,8 @@ export function buildApp(deps: ApiDeps) {
     .use(trainingRoutes(auth, deps))
     .use(rallyRoutes(auth, deps))
     .use(mediaRoutes(auth, deps))
+    .use(dataRoutes(auth, deps))
+    .use(registrationRoutes(auth, deps))
     .use(maintenanceRoutes(deps));
 }
 

@@ -22,6 +22,8 @@ export interface GameRepository {
   /** Every game of the club, for a rating replay. */
   listAllByClub(clubId: string): Promise<Game[]>;
   listByPlayer(userId: string): Promise<Game[]>;
+  /** Games the user played in or registered (an account with games can't be deleted). */
+  countForUser(userId: string): Promise<number>;
   listShared(userA: string, userB: string): Promise<Game[]>;
 }
 

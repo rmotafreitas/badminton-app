@@ -72,6 +72,11 @@ export class PrismaGameRepository implements GameRepository {
     return rows.map(toGame);
   }
 
+  async countForUser(userId: string): Promise<number> {
+    if (!isObjectId(userId)) return 0;
+    return this.db.game.count({ where: { OR: [involving(userId), { registeredById: userId }] } });
+  }
+
   async listShared(userA: string, userB: string): Promise<Game[]> {
     const rows = await this.db.game.findMany({ where: { AND: [involving(userA), involving(userB)] }, orderBy: newestFirst });
     return rows.map(toGame);

@@ -25,6 +25,8 @@ import type {
 } from "@bb/application";
 import { normalizePhone } from "@bb/application";
 import type { Infrastructure } from "@bb/bootstrap";
+import { fakeRecords } from "./fake-records";
+import { fakeMemberDetails, fakeRegistrationForms, fakeRegistrations, fakeRegistrationTables } from "./fake-registrations";
 import {
   type AuthProvider,
   type Club,
@@ -75,6 +77,8 @@ export class FakeStore {
   sent: { channel: "link" | "email-code" | "sms"; to: string; secret: string }[] = [];
   storageObjects = new Set<string>();
   deletedObjects: string[] = [];
+  /** Registration details, club form settings and registrations. */
+  registration = fakeRegistrationTables();
   /** Readiness probe answer (tests flip it to simulate a database outage). */
   healthy = true;
 
@@ -139,6 +143,22 @@ export function fakeUsers(store: FakeStore): UserRepository {
       const user = store.addUser({ email: input.email, phone: input.phone, name: input.name });
       store.authMethods.set(`${input.provider}:${input.providerId}`, user.id);
       return user;
+    },
+    async createInvited(input) {
+      return store.addUser({ email: input.email, phone: input.phone, name: input.name, roles: [...input.roles], clubId: input.clubId });
+    },
+    updateAccount: async (userId, changes) => {
+      const row = store.users.get(userId);
+      if (row) store.users.set(userId, { ...row, ...changes });
+    },
+    delete: async (userId) => {
+      store.users.delete(userId);
+      store.profiles.delete(userId);
+      for (const [key, id] of store.authMethods) if (id === userId) store.authMethods.delete(key);
+      for (const s of [...store.sessions.values()]) if (s.userId === userId) store.sessions.delete(s.id);
+      for (const r of [...store.reviews.values()]) if (r.userId === userId) store.reviews.delete(r.id);
+      store.registration.details.delete(userId);
+      for (const r of [...store.registration.registrations.values()]) if (r.userId === userId) store.registration.registrations.delete(r.id);
     },
     linkAuthMethod: async (userId, provider, providerId) => {
       store.authMethods.set(`${provider}:${providerId}`, userId);
@@ -311,6 +331,7 @@ export function fakeGames(store: FakeStore): GameRepository {
     listByClub: async (clubId, limit) => [...store.games.values()].filter((g) => g.clubId === clubId).sort(newest).slice(0, limit),
     listAllByClub: async (clubId) => [...store.games.values()].filter((g) => g.clubId === clubId),
     listByPlayer: async (id) => [...store.games.values()].filter((g) => involves(g, id)).sort(newest),
+    countForUser: async (id) => [...store.games.values()].filter((g) => involves(g, id) || g.registeredById === id).length,
     listShared: async (a, b) => [...store.games.values()].filter((g) => involves(g, a) && involves(g, b)).sort(newest),
   };
 }
@@ -494,6 +515,10 @@ export function fakeInfrastructure(options: { storageConfigured?: boolean } = {}
     profiles: fakeProfiles(store),
     reviews: fakeReviews(store),
     rally: fakeRally(store),
+    records: fakeRecords(store),
+    memberDetails: fakeMemberDetails(store, store.registration),
+    registrationForms: fakeRegistrationForms(store.registration),
+    registrations: fakeRegistrations(store, store.registration),
   };
   return { infra, store, clock, limiter, players };
 }

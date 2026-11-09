@@ -5,3 +5,4 @@ export * from "./stats";
 export { GameDetailPage } from "./game-detail-page";
 export { GamesPage } from "./games-page";
 export { LiveScorePage } from "./live-score";
+export { ScorePicker } from "./score-picker";

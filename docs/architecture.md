@@ -74,6 +74,47 @@ reaches another feature only through its `index.ts`, and `shared/` imports no fe
    `response` for every status, so Eden types it.
 5. Test with `tests/support.ts`: `testApi()` runs the real HTTP layer and use cases over `@bb/testing` fakes.
 
+### Data screens (generic CRUD per table)
+
+`/data` gives club staff and system admins a list / search / filter / sort / page / CSV / view / create / edit / delete
+screen for every collection, from one table registry: `packages/application/src/data/registry.ts`. Each table lists
+its fields (label in en/pt, type, and whether it is listed, searched, sorted, filtered, created, edited) and `access` per
+role: `scope: "all"` or `"club"` (only rows of the actor's club, via `clubField`), plus create / update / delete and
+which fields that role may set. Players see no tables.
+
+- **Reads** go through the `RecordStore` port (`PrismaRecordStore`): it selects only registry fields, so secrets
+  (password and token hashes) never leave the server. Search terms are regex-escaped: Prisma's MongoDB `contains`
+  does **not** escape them.
+- **Writes never touch the store directly.** Each table's handler (`data/data.ts`) calls the use case that owns the
+  rules: clubs → `CreateClub`/`UpdateClub`/`DeleteClub`; users → `CreateAccount`/`UpdateAccount`/`DeleteAccount`
+  (system admins) or `AddClubMember`/`SetMemberRoles`/`RemoveClubMember` (club admins); games → `UpdateGame`/`DeleteGame`
+  (ratings replay). Fields a role may not set are a 400, not silently dropped.
+- **Add a table:** an entry in `TABLES`, a mapping in `PrismaRecordStore` (and the fake in `@bb/testing`), and a handler
+  if anything can be changed. The web renders it with no further code.
+
+**Club membership** (`clubs/members.ts`): club admins add people to their own club (an unknown email/phone becomes an
+invite: the account is created now and linked on first sign-in, even with registration closed), change roles (never
+SYSTEM_ADMIN) and remove members (club roles go, games stay). A club always keeps one club admin.
+
+### Registration form ("Ficha de Inscrição")
+
+Members print their club's season registration form pre-filled, sign it and hand it in; the club admin records it.
+
+- **Details** (`MemberDetails`: BI/CC, NIF, address, NIB, a legal guardian for minors) are private: the person, their
+  club's admins and system admins (`canSeePersonalDetails`); not coaches. The person can erase them. Gaps are filled
+  from the profile/account (name, sex, birthday, phone, email). The web never persists these queries to IndexedDB.
+- **Form text** is per club (`Club.registrationForm`: season, fee, declaration with `{fee}` `{season}` `{club}`,
+  footer), defaulting to CFBG's 2024 form (`DEFAULT_REGISTRATION_FORM`). The logo is the club picture.
+- **The PDF is drawn in the browser** (`features/registrations/pdf.ts`, pdf-lib, standard fonts, always Portuguese).
+  pdf-lib loads only when someone taps Download. Phones get the share sheet (print, Files, WhatsApp).
+- **One `Registration` per member, club and season**, created when the form is first downloaded. The club admin ticks
+  "signed form received" and then "approved" (fills "Aprovado em"); un-ticking received withdraws the approval.
+- **Signed scans** go to object storage (R2) through a presigned PUT, like rally videos, and are read through
+  10-minute links. Without a bucket (`storageConfigured: false`) the upload is hidden and the checkbox is the record.
+  Deleting an account deletes its scans.
+
+After deploying: `bun run db:push` (new collections and the unique `userId+clubId+season` index).
+
 ## Web
 
 ```

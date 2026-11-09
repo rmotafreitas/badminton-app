@@ -8,6 +8,22 @@ export interface CreateUserInput {
   readonly providerId: string;
 }
 
+export interface InvitedUserInput {
+  /** Already normalised (`normalizeEmail`). */
+  readonly email?: string;
+  /** Already normalised (`normalizePhone`). */
+  readonly phone?: string;
+  readonly name?: string;
+  readonly roles: readonly Role[];
+  readonly clubId: string | null;
+}
+
+export interface AccountChanges {
+  readonly email?: string | null;
+  readonly phone?: string | null;
+  readonly isActive?: boolean;
+}
+
 export interface UserRepository {
   findById(id: string): Promise<User | null>;
   findByIds(ids: readonly string[]): Promise<User[]>;
@@ -17,6 +33,14 @@ export interface UserRepository {
   findByAuthMethod(provider: AuthProvider, providerId: string): Promise<User | null>;
   /** Creates the user, its first sign-in method and an empty profile together. */
   create(input: CreateUserInput): Promise<User>;
+  /**
+   * An account nobody has signed in to yet (an invite). The first sign-in with this email or phone finds it by that
+   * address and links the sign-in method, so the person lands in their club with their roles.
+   */
+  createInvited(input: InvitedUserInput): Promise<User>;
+  updateAccount(userId: string, changes: AccountChanges): Promise<void>;
+  /** Deletes the account with its profile, sign-in methods, sessions and training reviews. */
+  delete(userId: string): Promise<void>;
   linkAuthMethod(userId: string, provider: AuthProvider, providerId: string): Promise<void>;
   setClub(userId: string, clubId: string | null): Promise<void>;
   /** Moves every member of a club to "no club" (before the club is deleted). */

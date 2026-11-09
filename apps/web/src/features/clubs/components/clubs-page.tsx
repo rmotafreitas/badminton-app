@@ -30,7 +30,7 @@ import { Skeleton } from "@/shared/ui/skeleton";
 import { Spinner } from "@/shared/ui/spinner";
 import { clubsQuery, createClub, deleteClub, invalidateClubs, updateClub } from "@/features/clubs/api";
 
-function ClubDialog({ club, open, onOpenChange }: { club?: Club; open: boolean; onOpenChange: (open: boolean) => void }) {
+export function ClubDialog({ club, open, onOpenChange }: { club?: Club; open: boolean; onOpenChange: (open: boolean) => void }) {
   const dict = useDictionary().ui;
   const { queryClient } = useAppContext();
   const [name, setName] = useState(club?.name ?? "");

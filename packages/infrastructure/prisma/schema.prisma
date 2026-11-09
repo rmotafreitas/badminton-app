@@ -31,6 +31,8 @@ model User {
     club            Club?        @relation(fields: [clubId], references: [id])
     registeredGames Game[]       @relation("GameRegistrar")
     trainingReviews TrainingSessionReview[]
+    memberDetails   MemberDetails?
+    registrations   Registration[]
 
     @@index([email])
     @@index([phone])
@@ -64,11 +66,14 @@ model Club {
     /// Content hash of `profilePicture` / `banner` (see Profile.photoVersion).
     pictureVersion String?
     bannerVersion  String?
+    /// The club's registration form text (season, fee, declaration, footer). Null = the default form.
+    registrationForm Json?
     createdAt      DateTime @default(now())
     updatedAt      DateTime @updatedAt
 
-    users User[]
-    games Game[]
+    users         User[]
+    games         Game[]
+    registrations Registration[]
 }
 
 enum GameType {
@@ -217,4 +222,59 @@ enum Role {
     CLUB_ADMIN
     COACH
     PLAYER
+}
+
+// Registration ("Ficha de Inscrição"): personal details the club needs, kept privately per member, and one
+// registration per member, club and season with the club's side (signed copy received, approved).
+
+type PersonalDetails {
+    fullName     String?
+    sex          String?
+    birthday     String?
+    nationality  String?
+    address      String?
+    locality     String?
+    municipality String?
+    postalCode   String?
+    idNumber     String?
+    idValidUntil String?
+    nif          String?
+    phone        String?
+    email        String?
+    profession   String?
+}
+
+/// Private: the member, their club's admins and system admins. Erasable by the member.
+model MemberDetails {
+    id        String           @id @default(auto()) @map("_id") @db.ObjectId
+    userId    String           @unique @db.ObjectId
+    person    PersonalDetails
+    nib       String?
+    guardian  PersonalDetails?
+    updatedAt DateTime         @updatedAt
+
+    user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Registration {
+    id             String    @id @default(auto()) @map("_id") @db.ObjectId
+    userId         String    @db.ObjectId
+    clubId         String    @db.ObjectId
+    season         String
+    categories     String[]
+    signedReceived Boolean   @default(false)
+    /// Object-storage key of the signed scan (R2), when one was uploaded.
+    signedFileKey  String?
+    signedFileType String?
+    approvedAt     DateTime?
+    approvedById   String?   @db.ObjectId
+    notes          String?
+    createdAt      DateTime  @default(now())
+    updatedAt      DateTime  @updatedAt
+
+    user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+    club Club @relation(fields: [clubId], references: [id], onDelete: Cascade)
+
+    @@unique([userId, clubId, season])
+    @@index([clubId, season])
 }

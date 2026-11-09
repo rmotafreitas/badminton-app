@@ -29,6 +29,7 @@
     "lucide-react": "0.563.0",
     "mediabunny": "1.65.2",
     "onnxruntime-web": "1.31.1",
+    "pdf-lib": "1.17.1",
     "radix-ui": "1.8.1",
     "react": "19.3.1",
     "react-dom": "19.3.1",

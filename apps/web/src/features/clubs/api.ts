@@ -1,4 +1,4 @@
-import type { Club, ClubDetail } from "@bb/contracts";
+import type { Club, ClubDetail, Role } from "@bb/contracts";
 import { type QueryClient, queryOptions } from "@tanstack/react-query";
 import { type Api, sendForm, setImageField, unwrap } from "@/app/api";
 import { staleTime } from "@/app/query-client";
@@ -51,3 +51,14 @@ export const invalidateClubs = (queryClient: QueryClient) =>
     queryClient.invalidateQueries({ queryKey: ["users"] }),
     queryClient.invalidateQueries({ queryKey: ["session"] }),
   ]);
+
+// ── Membership (club admins for their club, system admins for any) ──────────
+
+export type AddMemberInput = { userId: string } | { email?: string; phone?: string; name?: string; roles?: Role[] };
+
+export const addMember = async (api: Api, clubId: string, input: AddMemberInput) => unwrap(await api.clubs({ id: clubId }).members.post(input));
+
+export const setMemberRoles = async (api: Api, clubId: string, userId: string, roles: Role[]) =>
+  unwrap(await api.clubs({ id: clubId }).members({ userId }).roles.put({ roles }));
+
+export const removeMember = async (api: Api, clubId: string, userId: string) => unwrap(await api.clubs({ id: clubId }).members({ userId }).delete());

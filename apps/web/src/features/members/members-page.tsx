@@ -1,12 +1,12 @@
-import type { Club, ClubMember, Role, SessionUser, UserSummary } from "@bb/contracts";
+import type { Club, ClubDetail, Role, SessionUser, UserSummary } from "@bb/contracts";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { Search, UserPlus, Users } from "lucide-react";
+import { Pencil, Search, UserPlus, Users } from "lucide-react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { useAppContext } from "@/app/context";
 import { hasRole } from "@/features/auth";
-import { assignUser, clubQuery, clubsQuery, invalidateClubs } from "@/features/clubs";
+import { assignUser, ClubDialog, clubQuery, clubsQuery, invalidateClubs } from "@/features/clubs";
 import { usersQuery } from "@/features/users";
 import { Page, PageHeader } from "@/shared/components/page-header";
 import { PlayerAvatar } from "@/shared/components/player-avatar";
@@ -24,6 +24,7 @@ import { Skeleton } from "@/shared/ui/skeleton";
 import { Spinner } from "@/shared/ui/spinner";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/shared/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/shared/ui/tabs";
+import { AddMemberSheet, MemberActions } from "./member-management";
 
 function RoleBadges({ roles }: { roles: Role[] }) {
   const dict = useDictionary().ui;
@@ -47,7 +48,9 @@ function SearchBox({ value, onChange, placeholder }: { value: string; onChange: 
   );
 }
 
-function Roster({ members, viewerId }: { members: ClubMember[]; viewerId: string }) {
+/** The club's roster. Club admins (and system admins) get a ⋯ menu per member: roles, remove. */
+function Roster({ club, viewerId, canManage }: { club: ClubDetail; viewerId: string; canManage: boolean }) {
+  const members = club.members;
   const dict = useDictionary().ui;
   const { lang } = useLanguage();
   const [query, setQuery] = useState("");
@@ -72,7 +75,8 @@ function Roster({ members, viewerId }: { members: ClubMember[]; viewerId: string
               <TableHead className="hidden md:table-cell">{dict.members.roles}</TableHead>
               <TableHead className="text-right">{dict.common.singles}</TableHead>
               <TableHead className="pr-3 text-right sm:pr-2">{dict.common.doubles}</TableHead>
-              <TableHead className="hidden pr-6 text-right lg:table-cell">{dict.members.joined}</TableHead>
+              <TableHead className={canManage ? "hidden text-right lg:table-cell" : "hidden pr-6 text-right lg:table-cell"}>{dict.members.joined}</TableHead>
+              {canManage && <TableHead className="w-12 pr-3 sm:pr-4"><span className="sr-only">{dict.members.actions}</span></TableHead>}
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -94,7 +98,14 @@ function Roster({ members, viewerId }: { members: ClubMember[]; viewerId: string
                 </TableCell>
                 <TableCell className="tabular text-right font-semibold">{Math.round(m.eloSingles)}</TableCell>
                 <TableCell className="tabular pr-3 text-right font-semibold sm:pr-2">{Math.round(m.eloDoubles)}</TableCell>
-                <TableCell className="hidden pr-6 text-right text-muted-foreground lg:table-cell">{formatDate(m.joinedAt, lang)}</TableCell>
+                <TableCell className={canManage ? "hidden text-right text-muted-foreground lg:table-cell" : "hidden pr-6 text-right text-muted-foreground lg:table-cell"}>
+                  {formatDate(m.joinedAt, lang)}
+                </TableCell>
+                {canManage && (
+                  <TableCell className="pr-1 text-right sm:pr-4">
+                    <MemberActions club={club} member={m} />
+                  </TableCell>
+                )}
               </TableRow>
             ))}
           </TableBody>
@@ -211,10 +222,14 @@ export function MembersPage({ user }: { user: SessionUser }) {
   const club = useQuery({ ...clubQuery(api, user.clubId ?? ""), enabled: !!user.clubId });
   const users = useQuery({ ...usersQuery(api), enabled: admin });
   const clubs = useQuery({ ...clubsQuery(api), enabled: admin });
+  // Club admins manage their own club; system admins can too when they're in one.
+  const canManage = !!user.clubId && hasRole(user, "SYSTEM_ADMIN", "CLUB_ADMIN");
+  const [adding, setAdding] = useState(false);
+  const [editingClub, setEditingClub] = useState(false);
 
   const roster = user.clubId ? (
     club.data ? (
-      <Roster members={club.data.members} viewerId={user.id} />
+      <Roster club={club.data} viewerId={user.id} canManage={canManage} />
     ) : (
       <Skeleton className="h-96 rounded-xl" />
     )
@@ -232,7 +247,25 @@ export function MembersPage({ user }: { user: SessionUser }) {
 
   return (
     <Page>
-      <PageHeader title={dict.members.title} description={club.data ? fmt(dict.members.subtitle, { club: club.data.name }) : undefined} />
+      <PageHeader
+        title={dict.members.title}
+        description={club.data ? fmt(dict.members.subtitle, { club: club.data.name }) : undefined}
+        actions={
+          canManage &&
+          club.data && (
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={() => setEditingClub(true)}>
+                <Pencil /> {dict.members.editClub}
+              </Button>
+              <Button onClick={() => setAdding(true)}>
+                <UserPlus /> {dict.members.add}
+              </Button>
+            </div>
+          )
+        }
+      />
+      {club.data && adding && <AddMemberSheet club={club.data} open onOpenChange={setAdding} />}
+      {club.data && editingClub && <ClubDialog club={club.data} open onOpenChange={setEditingClub} />}
       {admin ? (
         <>
           {users.data && clubs.data && <AssignCard users={users.data} clubs={clubs.data} />}

@@ -14,8 +14,10 @@ import { Route as AppRouteImport } from './routes/_app'
 import { Route as LabRouteImport } from './routes/lab'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as LogoutRouteImport } from './routes/logout'
+import { Route as AppClubRegistrationsRouteImport } from './routes/_app/club-registrations'
 import { Route as AppClubsRouteImport } from './routes/_app/clubs'
 import { Route as AppDashboardRouteImport } from './routes/_app/dashboard'
+import { Route as AppRegistrationRouteImport } from './routes/_app/registration'
 import { Route as AppScoreRouteImport } from './routes/_app/score'
 import { Route as AppTrainingReviewRouteImport } from './routes/_app/training-review'
 import { Route as AppUsersRouteImport } from './routes/_app/users'
@@ -23,6 +25,8 @@ import { Route as AuthCallbackRouteImport } from './routes/auth.callback'
 import { Route as AppAnalysisIndexRouteImport } from './routes/_app/analysis.index'
 import { Route as AppAnalysisKeyRouteImport } from './routes/_app/analysis.$key'
 import { Route as AppAnalysisRecordRouteImport } from './routes/_app/analysis.record'
+import { Route as AppDataIndexRouteImport } from './routes/_app/data.index'
+import { Route as AppDataTableRouteImport } from './routes/_app/data.$table'
 import { Route as AppGamesIndexRouteImport } from './routes/_app/games.index'
 import { Route as AppGamesGameIdRouteImport } from './routes/_app/games.$gameId'
 import { Route as AppProfileIndexRouteImport } from './routes/_app/profile.index'
@@ -53,6 +57,11 @@ const LogoutRoute = LogoutRouteImport.update({
   path: '/logout',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AppClubRegistrationsRoute = AppClubRegistrationsRouteImport.update({
+  id: '/club-registrations',
+  path: '/club-registrations',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppClubsRoute = AppClubsRouteImport.update({
   id: '/clubs',
   path: '/clubs',
@@ -61,6 +70,11 @@ const AppClubsRoute = AppClubsRouteImport.update({
 const AppDashboardRoute = AppDashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppRegistrationRoute = AppRegistrationRouteImport.update({
+  id: '/registration',
+  path: '/registration',
   getParentRoute: () => AppRoute,
 } as any)
 const AppScoreRoute = AppScoreRouteImport.update({
@@ -98,6 +112,16 @@ const AppAnalysisRecordRoute = AppAnalysisRecordRouteImport.update({
   path: '/analysis/record',
   getParentRoute: () => AppRoute,
 } as any)
+const AppDataIndexRoute = AppDataIndexRouteImport.update({
+  id: '/data/',
+  path: '/data/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppDataTableRoute = AppDataTableRouteImport.update({
+  id: '/data/$table',
+  path: '/data/$table',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppGamesIndexRoute = AppGamesIndexRouteImport.update({
   id: '/games/',
   path: '/games/',
@@ -129,17 +153,21 @@ export interface FileRoutesByFullPath {
   '/lab': typeof LabRoute
   '/login': typeof LoginRoute
   '/logout': typeof LogoutRoute
+  '/club-registrations': typeof AppClubRegistrationsRoute
   '/clubs': typeof AppClubsRoute
   '/dashboard': typeof AppDashboardRoute
+  '/registration': typeof AppRegistrationRoute
   '/score': typeof AppScoreRoute
   '/training-review': typeof AppTrainingReviewRoute
   '/users': typeof AppUsersRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/analysis/$key': typeof AppAnalysisKeyRoute
   '/analysis/record': typeof AppAnalysisRecordRoute
+  '/data/$table': typeof AppDataTableRoute
   '/games/$gameId': typeof AppGamesGameIdRoute
   '/profile/$userId': typeof AppProfileUserIdRoute
   '/analysis/': typeof AppAnalysisIndexRoute
+  '/data/': typeof AppDataIndexRoute
   '/games/': typeof AppGamesIndexRoute
   '/profile/': typeof AppProfileIndexRoute
   '/analysis/s/$serverId': typeof AppAnalysisSServerIdRoute
@@ -149,17 +177,21 @@ export interface FileRoutesByTo {
   '/lab': typeof LabRoute
   '/login': typeof LoginRoute
   '/logout': typeof LogoutRoute
+  '/club-registrations': typeof AppClubRegistrationsRoute
   '/clubs': typeof AppClubsRoute
   '/dashboard': typeof AppDashboardRoute
+  '/registration': typeof AppRegistrationRoute
   '/score': typeof AppScoreRoute
   '/training-review': typeof AppTrainingReviewRoute
   '/users': typeof AppUsersRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/analysis/$key': typeof AppAnalysisKeyRoute
   '/analysis/record': typeof AppAnalysisRecordRoute
+  '/data/$table': typeof AppDataTableRoute
   '/games/$gameId': typeof AppGamesGameIdRoute
   '/profile/$userId': typeof AppProfileUserIdRoute
   '/analysis': typeof AppAnalysisIndexRoute
+  '/data': typeof AppDataIndexRoute
   '/games': typeof AppGamesIndexRoute
   '/profile': typeof AppProfileIndexRoute
   '/analysis/s/$serverId': typeof AppAnalysisSServerIdRoute
@@ -171,17 +203,21 @@ export interface FileRoutesById {
   '/lab': typeof LabRoute
   '/login': typeof LoginRoute
   '/logout': typeof LogoutRoute
+  '/_app/club-registrations': typeof AppClubRegistrationsRoute
   '/_app/clubs': typeof AppClubsRoute
   '/_app/dashboard': typeof AppDashboardRoute
+  '/_app/registration': typeof AppRegistrationRoute
   '/_app/score': typeof AppScoreRoute
   '/_app/training-review': typeof AppTrainingReviewRoute
   '/_app/users': typeof AppUsersRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/_app/analysis/$key': typeof AppAnalysisKeyRoute
   '/_app/analysis/record': typeof AppAnalysisRecordRoute
+  '/_app/data/$table': typeof AppDataTableRoute
   '/_app/games/$gameId': typeof AppGamesGameIdRoute
   '/_app/profile/$userId': typeof AppProfileUserIdRoute
   '/_app/analysis/': typeof AppAnalysisIndexRoute
+  '/_app/data/': typeof AppDataIndexRoute
   '/_app/games/': typeof AppGamesIndexRoute
   '/_app/profile/': typeof AppProfileIndexRoute
   '/_app/analysis/s/$serverId': typeof AppAnalysisSServerIdRoute
@@ -193,17 +229,21 @@ export interface FileRouteTypes {
     | '/lab'
     | '/login'
     | '/logout'
+    | '/club-registrations'
     | '/clubs'
     | '/dashboard'
+    | '/registration'
     | '/score'
     | '/training-review'
     | '/users'
     | '/auth/callback'
     | '/analysis/$key'
     | '/analysis/record'
+    | '/data/$table'
     | '/games/$gameId'
     | '/profile/$userId'
     | '/analysis/'
+    | '/data/'
     | '/games/'
     | '/profile/'
     | '/analysis/s/$serverId'
@@ -213,17 +253,21 @@ export interface FileRouteTypes {
     | '/lab'
     | '/login'
     | '/logout'
+    | '/club-registrations'
     | '/clubs'
     | '/dashboard'
+    | '/registration'
     | '/score'
     | '/training-review'
     | '/users'
     | '/auth/callback'
     | '/analysis/$key'
     | '/analysis/record'
+    | '/data/$table'
     | '/games/$gameId'
     | '/profile/$userId'
     | '/analysis'
+    | '/data'
     | '/games'
     | '/profile'
     | '/analysis/s/$serverId'
@@ -234,17 +278,21 @@ export interface FileRouteTypes {
     | '/lab'
     | '/login'
     | '/logout'
+    | '/_app/club-registrations'
     | '/_app/clubs'
     | '/_app/dashboard'
+    | '/_app/registration'
     | '/_app/score'
     | '/_app/training-review'
     | '/_app/users'
     | '/auth/callback'
     | '/_app/analysis/$key'
     | '/_app/analysis/record'
+    | '/_app/data/$table'
     | '/_app/games/$gameId'
     | '/_app/profile/$userId'
     | '/_app/analysis/'
+    | '/_app/data/'
     | '/_app/games/'
     | '/_app/profile/'
     | '/_app/analysis/s/$serverId'
@@ -296,6 +344,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LogoutRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_app/club-registrations': {
+      id: '/_app/club-registrations'
+      path: '/club-registrations'
+      fullPath: '/club-registrations'
+      preLoaderRoute: typeof AppClubRegistrationsRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/clubs': {
       id: '/_app/clubs'
       path: '/clubs'
@@ -308,6 +363,13 @@ declare module '@tanstack/react-router' {
       path: '/dashboard'
       fullPath: '/dashboard'
       preLoaderRoute: typeof AppDashboardRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/registration': {
+      id: '/_app/registration'
+      path: '/registration'
+      fullPath: '/registration'
+      preLoaderRoute: typeof AppRegistrationRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/score': {
@@ -359,6 +421,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppAnalysisRecordRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/data/': {
+      id: '/_app/data/'
+      path: '/data'
+      fullPath: '/data/'
+      preLoaderRoute: typeof AppDataIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/data/$table': {
+      id: '/_app/data/$table'
+      path: '/data/$table'
+      fullPath: '/data/$table'
+      preLoaderRoute: typeof AppDataTableRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/games/': {
       id: '/_app/games/'
       path: '/games'
@@ -398,32 +474,40 @@ declare module '@tanstack/react-router' {
 }
 
 interface AppRouteChildren {
+  AppClubRegistrationsRoute: typeof AppClubRegistrationsRoute
   AppClubsRoute: typeof AppClubsRoute
   AppDashboardRoute: typeof AppDashboardRoute
+  AppRegistrationRoute: typeof AppRegistrationRoute
   AppScoreRoute: typeof AppScoreRoute
   AppTrainingReviewRoute: typeof AppTrainingReviewRoute
   AppUsersRoute: typeof AppUsersRoute
   AppAnalysisKeyRoute: typeof AppAnalysisKeyRoute
   AppAnalysisRecordRoute: typeof AppAnalysisRecordRoute
+  AppDataTableRoute: typeof AppDataTableRoute
   AppGamesGameIdRoute: typeof AppGamesGameIdRoute
   AppProfileUserIdRoute: typeof AppProfileUserIdRoute
   AppAnalysisIndexRoute: typeof AppAnalysisIndexRoute
+  AppDataIndexRoute: typeof AppDataIndexRoute
   AppGamesIndexRoute: typeof AppGamesIndexRoute
   AppProfileIndexRoute: typeof AppProfileIndexRoute
   AppAnalysisSServerIdRoute: typeof AppAnalysisSServerIdRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
+  AppClubRegistrationsRoute: AppClubRegistrationsRoute,
   AppClubsRoute: AppClubsRoute,
   AppDashboardRoute: AppDashboardRoute,
+  AppRegistrationRoute: AppRegistrationRoute,
   AppScoreRoute: AppScoreRoute,
   AppTrainingReviewRoute: AppTrainingReviewRoute,
   AppUsersRoute: AppUsersRoute,
   AppAnalysisKeyRoute: AppAnalysisKeyRoute,
   AppAnalysisRecordRoute: AppAnalysisRecordRoute,
+  AppDataTableRoute: AppDataTableRoute,
   AppGamesGameIdRoute: AppGamesGameIdRoute,
   AppProfileUserIdRoute: AppProfileUserIdRoute,
   AppAnalysisIndexRoute: AppAnalysisIndexRoute,
+  AppDataIndexRoute: AppDataIndexRoute,
   AppGamesIndexRoute: AppGamesIndexRoute,
   AppProfileIndexRoute: AppProfileIndexRoute,
   AppAnalysisSServerIdRoute: AppAnalysisSServerIdRoute,

@@ -1,5 +1,29 @@
 import {
   AcquireAnalysisLock,
+  CompleteSignedUpload,
+  DeleteRegistration,
+  EraseMyDetails,
+  GetRegistrationForm,
+  GetRegistrationSheet,
+  GetSignedFileUrl,
+  ListClubRegistrations,
+  type MemberDetailsRepository,
+  PrepareRegistration,
+  type RegistrationFormRepository,
+  type RegistrationRepository,
+  RemoveSignedFile,
+  RequestSignedUpload,
+  SaveMemberDetails,
+  UpdateRegistration,
+  UpdateRegistrationForm,
+  AddClubMember,
+  CreateAccount,
+  DataTables,
+  DeleteAccount,
+  RemoveClubMember,
+  type RecordStore,
+  SetMemberRoles,
+  UpdateAccount,
   AssignUserToClub,
   type ClubRepository,
   type Clock,
@@ -81,6 +105,10 @@ import {
   PrismaGameRepository,
   PrismaPlayerDirectory,
   PrismaProfileRepository,
+  PrismaMemberDetailsRepository,
+  PrismaRecordStore,
+  PrismaRegistrationFormRepository,
+  PrismaRegistrationRepository,
   PrismaRallySessionRepository,
   PrismaSessionRepository,
   PrismaTrainingReviewRepository,
@@ -112,6 +140,10 @@ export interface Infrastructure {
   readonly profiles: ProfileRepository;
   readonly reviews: TrainingReviewRepository;
   readonly rally: RallySessionRepository;
+  readonly records: RecordStore;
+  readonly memberDetails: MemberDetailsRepository;
+  readonly registrationForms: RegistrationFormRepository;
+  readonly registrations: RegistrationRepository;
 }
 
 export type InfrastructureOverrides = Partial<Infrastructure>;
@@ -149,6 +181,10 @@ export function createInfrastructure(config: Config, overrides: InfrastructureOv
     profiles: new PrismaProfileRepository(db),
     reviews: new PrismaTrainingReviewRepository(db),
     rally: new PrismaRallySessionRepository(db),
+    records: new PrismaRecordStore(db),
+    memberDetails: new PrismaMemberDetailsRepository(db),
+    registrationForms: new PrismaRegistrationFormRepository(db),
+    registrations: new PrismaRegistrationRepository(db),
     ...overrides,
   };
 }
@@ -197,7 +233,44 @@ export function createClubsModule(infra: Infrastructure) {
     updateClub: new UpdateClub(deps),
     deleteClub: new DeleteClub(deps),
     assignUserToClub: new AssignUserToClub(deps),
+    addClubMember: new AddClubMember(deps),
+    removeClubMember: new RemoveClubMember(deps),
+    setMemberRoles: new SetMemberRoles(deps),
   };
+}
+
+/** Accounts (system admins) and the generic Data screens, which write through the other modules' use cases. */
+export function createDataModule(
+  infra: Infrastructure,
+  modules: Pick<
+    ReturnType<typeof createClubsModule> & ReturnType<typeof createGamesModule>,
+    "createClub" | "updateClub" | "deleteClub" | "addClubMember" | "removeClubMember" | "setMemberRoles" | "updateGame" | "deleteGame"
+  >,
+) {
+  const accountDeps = {
+    users: infra.users,
+    clubs: infra.clubs,
+    profiles: infra.profiles,
+    games: infra.games,
+    rally: infra.rally,
+    registrations: infra.registrations,
+    storage: infra.storage,
+  };
+  const accounts = {
+    createAccount: new CreateAccount(accountDeps),
+    updateAccount: new UpdateAccount(accountDeps),
+    deleteAccount: new DeleteAccount(accountDeps),
+  };
+  const dataTables = new DataTables({
+    ...modules,
+    ...accounts,
+    store: infra.records,
+    storage: infra.storage,
+    sessions: infra.sessions,
+    reviews: infra.reviews,
+    rally: infra.rally,
+  });
+  return { ...accounts, dataTables };
 }
 
 export function createGamesModule(infra: Infrastructure) {
@@ -258,15 +331,47 @@ export function createRallyModule(infra: Infrastructure) {
   };
 }
 
+export function createRegistrationsModule(infra: Infrastructure) {
+  const deps = {
+    users: infra.users,
+    clubs: infra.clubs,
+    profiles: infra.profiles,
+    details: infra.memberDetails,
+    forms: infra.registrationForms,
+    registrations: infra.registrations,
+    storage: infra.storage,
+    clock: infra.clock,
+  };
+  return {
+    getRegistrationSheet: new GetRegistrationSheet(deps),
+    saveMemberDetails: new SaveMemberDetails(deps),
+    eraseMyDetails: new EraseMyDetails(deps),
+    prepareRegistration: new PrepareRegistration(deps),
+    listClubRegistrations: new ListClubRegistrations(deps),
+    updateRegistration: new UpdateRegistration(deps),
+    requestSignedUpload: new RequestSignedUpload(deps),
+    completeSignedUpload: new CompleteSignedUpload(deps),
+    getSignedFileUrl: new GetSignedFileUrl(deps),
+    removeSignedFile: new RemoveSignedFile(deps),
+    deleteRegistration: new DeleteRegistration(deps),
+    getRegistrationForm: new GetRegistrationForm(deps),
+    updateRegistrationForm: new UpdateRegistrationForm(deps),
+  };
+}
+
 /** Everything the API needs, as one object (`ApiDeps` in apps/api mirrors it). */
 export function createModules(infra: Infrastructure, settings: AppSettings) {
+  const clubs = createClubsModule(infra);
+  const games = createGamesModule(infra);
   return {
     ...createIdentityModule(infra, settings),
-    ...createClubsModule(infra),
-    ...createGamesModule(infra),
+    ...clubs,
+    ...games,
+    ...createDataModule(infra, { ...clubs, ...games }),
     ...createProfilesModule(infra),
     ...createTrainingModule(infra),
     ...createRallyModule(infra),
+    ...createRegistrationsModule(infra),
   };
 }
 
