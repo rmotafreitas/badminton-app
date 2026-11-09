@@ -34,7 +34,7 @@ import {
 } from "@/shared/ui/alert-dialog";
 import { Button } from "@/shared/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/shared/ui/card";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/shared/ui/dialog";
+import { ResponsiveSheet } from "@/shared/components/responsive-sheet";
 import { Field, FieldLabel } from "@/shared/ui/field";
 import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
@@ -65,26 +65,27 @@ function RenameDialog({ title, open, onOpenChange, onSave }: { title: string; op
   const dict = useDictionary();
   const [value, setValue] = useState(title);
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>{dict.rally.session.rename}</DialogTitle>
-        </DialogHeader>
-        <form
-          className="space-y-4"
-          onSubmit={(e) => {
-            e.preventDefault();
-            onSave(value.trim() || null);
-            onOpenChange(false);
-          }}
-        >
-          <Input value={value} onChange={(e) => setValue(e.target.value)} maxLength={120} autoFocus />
-          <DialogFooter>
-            <Button type="submit">{dict.ui.common.save}</Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
+    <ResponsiveSheet
+      open={open}
+      onOpenChange={onOpenChange}
+      title={dict.rally.session.rename}
+      footer={
+        <Button type="submit" form="rally-rename-form" className="h-12 w-full text-base">
+          {dict.ui.common.save}
+        </Button>
+      }
+    >
+      <form
+        id="rally-rename-form"
+        onSubmit={(e) => {
+          e.preventDefault();
+          onSave(value.trim() || null);
+          onOpenChange(false);
+        }}
+      >
+        <Input value={value} onChange={(e) => setValue(e.target.value)} maxLength={120} autoFocus className="h-11" aria-label={dict.rally.session.rename} />
+      </form>
+    </ResponsiveSheet>
   );
 }
 

@@ -36,7 +36,7 @@ export function ImageField({
       <div
         className={cn(
           "group relative flex items-center justify-center overflow-hidden rounded-xl border border-dashed bg-muted/40",
-          aspect === "square" ? "size-28" : "aspect-[3/1] w-full",
+          aspect === "square" ? "size-24 sm:size-28" : "aspect-[3/1] w-full",
         )}
       >
         {shown ? <img src={shown} alt="" className="size-full object-cover" /> : <ImagePlus className="size-6 text-muted-foreground" />}

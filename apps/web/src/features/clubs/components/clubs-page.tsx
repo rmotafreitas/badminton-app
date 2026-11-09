@@ -21,7 +21,7 @@ import {
 } from "@/shared/ui/alert-dialog";
 import { Button } from "@/shared/ui/button";
 import { Card, CardContent } from "@/shared/ui/card";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/shared/ui/dialog";
+import { ResponsiveSheet } from "@/shared/components/responsive-sheet";
 import { Empty, EmptyContent, EmptyHeader, EmptyMedia, EmptyTitle } from "@/shared/ui/empty";
 import { Field, FieldLabel } from "@/shared/ui/field";
 import { Input } from "@/shared/ui/input";
@@ -48,41 +48,39 @@ function ClubDialog({ club, open, onOpenChange }: { club?: Club; open: boolean; 
     },
   });
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[92svh] overflow-y-auto sm:max-w-lg">
-        <DialogHeader>
-          <DialogTitle>{club ? dict.clubs.editTitle : dict.clubs.createTitle}</DialogTitle>
-        </DialogHeader>
-        <form
-          className="space-y-5"
-          onSubmit={(e) => {
-            e.preventDefault();
-            save.mutate();
-          }}
-        >
-          <ImageField label={dict.clubs.banner} aspect="banner" current={club?.bannerUrl ?? null} value={banner} onChange={setBanner} removeLabel={dict.clubs.remove} />
-          <div className="flex gap-4">
-            <ImageField label={dict.clubs.picture} current={club?.pictureUrl ?? null} value={picture} onChange={setPicture} removeLabel={dict.clubs.remove} />
-            <div className="flex-1 space-y-4">
-              <Field>
-                <FieldLabel htmlFor="club-name">{dict.clubs.name}</FieldLabel>
-                <Input id="club-name" value={name} onChange={(e) => setName(e.target.value)} minLength={2} maxLength={80} required />
-              </Field>
-              <Field>
-                <FieldLabel htmlFor="club-location">{dict.clubs.location}</FieldLabel>
-                <Input id="club-location" value={location} onChange={(e) => setLocation(e.target.value)} maxLength={120} />
-              </Field>
-            </div>
-          </div>
-          {save.error && <p className="text-sm text-destructive">{save.error.message}</p>}
-          <DialogFooter>
-            <Button type="submit" disabled={save.isPending}>
-              {save.isPending && <Spinner />} {dict.common.save}
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
+    <ResponsiveSheet
+      open={open}
+      onOpenChange={onOpenChange}
+      title={club ? dict.clubs.editTitle : dict.clubs.createTitle}
+      footer={
+        <Button type="submit" form="club-form" className="h-12 w-full text-base" disabled={save.isPending}>
+          {save.isPending && <Spinner />} {dict.common.save}
+        </Button>
+      }
+    >
+      <form
+        id="club-form"
+        className="space-y-5"
+        onSubmit={(e) => {
+          e.preventDefault();
+          save.mutate();
+        }}
+      >
+        <ImageField label={dict.clubs.banner} aspect="banner" current={club?.bannerUrl ?? null} value={banner} onChange={setBanner} removeLabel={dict.clubs.remove} />
+        <div className="flex items-end gap-4">
+          <ImageField label={dict.clubs.picture} current={club?.pictureUrl ?? null} value={picture} onChange={setPicture} removeLabel={dict.clubs.remove} />
+          <Field className="min-w-0 flex-1">
+            <FieldLabel htmlFor="club-name">{dict.clubs.name}</FieldLabel>
+            <Input id="club-name" value={name} onChange={(e) => setName(e.target.value)} minLength={2} maxLength={80} required className="h-11" />
+          </Field>
+        </div>
+        <Field>
+          <FieldLabel htmlFor="club-location">{dict.clubs.location}</FieldLabel>
+          <Input id="club-location" value={location} onChange={(e) => setLocation(e.target.value)} maxLength={120} className="h-11" />
+        </Field>
+        {save.error && <p className="text-sm text-destructive">{save.error.message}</p>}
+      </form>
+    </ResponsiveSheet>
   );
 }
 
