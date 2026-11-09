@@ -29,7 +29,11 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: 1.4.3
-      - run: docker compose -f docker-compose.dev.yml up -d --wait mongo mongo-init seaweedfs seaweedfs-init
+      # One-shot init containers exit when done; `up --wait` would count that as a failure.
+      - run: |
+          docker compose -f docker-compose.dev.yml up -d --wait mongo seaweedfs
+          docker compose -f docker-compose.dev.yml run --rm mongo-init
+          docker compose -f docker-compose.dev.yml run --rm seaweedfs-init
       - run: bun install --frozen-lockfile
       - run: cp .env.example .env
       - run: bun run test:integration
@@ -43,7 +47,11 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: 1.4.3
-      - run: docker compose -f docker-compose.dev.yml up -d --wait mongo mongo-init seaweedfs seaweedfs-init mailpit
+      # One-shot init containers exit when done; `up --wait` would count that as a failure.
+      - run: |
+          docker compose -f docker-compose.dev.yml up -d --wait mongo seaweedfs mailpit
+          docker compose -f docker-compose.dev.yml run --rm mongo-init
+          docker compose -f docker-compose.dev.yml run --rm seaweedfs-init
       - run: bun install --frozen-lockfile
       - run: cp .env.example .env
       - run: sudo apt-get install -y libnss3-tools && curl -sL "https://dl.filippo.io/mkcert/latest?for=linux/amd64" -o /usr/local/bin/mkcert && chmod +x /usr/local/bin/mkcert && mkcert -install
