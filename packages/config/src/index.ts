@@ -11,6 +11,10 @@ const optional = z
   .optional()
   .transform((v) => (v?.trim() ? v.trim() : undefined));
 
+/** Every sign-in method the API knows. */
+export const SIGN_IN_PROVIDERS = ["google", "email", "email-code", "phone", "password"] as const;
+export type SignInProvider = (typeof SIGN_IN_PROVIDERS)[number];
+
 const EnvSchema = z.object({
   NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
   DATABASE_URL: z.string().min(1, "DATABASE_URL is required"),
@@ -21,6 +25,12 @@ const EnvSchema = z.object({
   /** Serve the API over local HTTPS (mkcert) when running it directly in dev. */
   API_LOCAL_HTTPS: flag(false),
   ENABLE_REGISTRATION: flag(true),
+  /** Comma-separated sign-in methods the API accepts, e.g. `password`. Unset: all of them. */
+  SIGN_IN_PROVIDERS: z
+    .string()
+    .optional()
+    .transform((v) => (v?.trim() ? v.split(",").map((p) => p.trim()).filter(Boolean) : undefined))
+    .pipe(z.array(z.enum(SIGN_IN_PROVIDERS)).min(1).optional()),
   GOOGLE_CLIENT_ID: optional,
   SMTP_HOST: optional,
   SMTP_PORT: z.coerce.number().int().positive().default(587),
@@ -49,6 +59,8 @@ export interface Config {
   readonly apiPort: number;
   readonly apiLocalHttps: boolean;
   readonly registrationOpen: boolean;
+  /** Undefined: every method. */
+  readonly signInProviders: readonly SignInProvider[] | undefined;
   readonly googleClientId: string | undefined;
   readonly smtp:
     | { host: string; port: number; secure: boolean; username?: string; password?: string; from: string; fromName: string }
@@ -76,6 +88,7 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     apiPort: e.API_PORT,
     apiLocalHttps: e.API_LOCAL_HTTPS,
     registrationOpen: e.ENABLE_REGISTRATION,
+    signInProviders: e.SIGN_IN_PROVIDERS,
     googleClientId: e.GOOGLE_CLIENT_ID,
     smtp:
       e.SMTP_HOST && e.SMTP_FROM

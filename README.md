@@ -33,7 +33,7 @@ Two projects from this repository:
 
 - **API**: root directory `apps/api` (its `vercel.json` installs from the repo root and builds the Build Output API).
   Env: `DATABASE_URL`, `APP_URL` (the web origin), `GOOGLE_CLIENT_ID`, `SMTP_*`, `TWILIO_*`, `S3_*`, `CRON_SECRET`,
-  `ENABLE_REGISTRATION`, and `API_REGION` (e.g. `dub1`, `fra1`, `cdg1`: the Vercel region closest to your MongoDB
+  `ENABLE_REGISTRATION`, `SIGN_IN_PROVIDERS` (production: `password`, matching the phone + password login form), and `API_REGION` (e.g. `dub1`, `fra1`, `cdg1`: the Vercel region closest to your MongoDB
   Atlas cluster; every request makes several database round trips). Keep **Fluid compute** on (project settings →
   Functions) so warm instances are reused. A daily cron (`/api/maintenance/daily`) purges expired videos, sessions, codes and rate-limit
   windows; uptime checks can use `/api/health/ready` (503 when MongoDB doesn't answer). To keep the API warm, point a free

@@ -35,6 +35,13 @@ export type CompleteSignInInput =
 
 const NO_ACCOUNT = "No account found. Ask your club administrator to create one.";
 
+export type SignInProvider = CompleteSignInInput["provider"];
+
+/** Methods switched off by configuration answer like an unknown method: nothing is sent, nothing is verified. */
+function ensureEnabled(enabled: ReadonlySet<SignInProvider> | undefined, provider: SignInProvider): void {
+  if (enabled && !enabled.has(provider)) throw new BadRequest("This sign-in method is turned off.", "provider_unavailable");
+}
+
 interface StartDeps {
   readonly users: UserRepository;
   readonly challenges: SignInChallengeRepository;
@@ -44,6 +51,8 @@ interface StartDeps {
   readonly clock: Clock;
   readonly appOrigin: string;
   readonly registrationOpen: boolean;
+  /** Undefined: every method. */
+  readonly enabledProviders?: ReadonlySet<SignInProvider>;
 }
 
 /** Sends a magic link or a one-time code. */
@@ -52,6 +61,7 @@ export class StartSignIn {
 
   async execute(input: StartSignInInput): Promise<{ readonly message: string }> {
     const { users, limiter } = this.deps;
+    ensureEnabled(this.deps.enabledProviders, input.provider);
     if (input.provider === "phone") {
       const phone = normalizePhone(input.phone);
       if (phone.length < 6) throw new BusinessRuleViolation("Enter a valid phone number.", "invalid_phone");
@@ -97,6 +107,8 @@ interface CompleteDeps {
   readonly limiter: RateLimiter;
   readonly clock: Clock;
   readonly registrationOpen: boolean;
+  /** Undefined: every method. */
+  readonly enabledProviders?: ReadonlySet<SignInProvider>;
 }
 
 export interface IssuedSession {
@@ -111,6 +123,7 @@ export class CompleteSignIn {
   constructor(private readonly deps: CompleteDeps) {}
 
   async execute(input: CompleteSignInInput, context: { userAgent: string | null }): Promise<IssuedSession> {
+    ensureEnabled(this.deps.enabledProviders, input.provider);
     const identity = await this.verify(input);
     const user = await this.findOrCreate(identity);
     if (!user.isActive) throw new Forbidden("This account is deactivated.");

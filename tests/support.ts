@@ -1,5 +1,6 @@
 import { buildApp } from "@bb/api/src/app";
 import { createModules } from "@bb/bootstrap";
+import type { SignInProvider } from "@bb/config";
 import type { User } from "@bb/domain";
 import { fakeInfrastructure } from "@bb/testing";
 import { treaty } from "@elysiajs/eden";
@@ -10,10 +11,16 @@ export const APP_ORIGIN = "https://app.badminton.test";
  * The whole backend in-process: real HTTP layer and use cases, in-memory adapters. `as(user)` gives a typed Eden
  * client carrying that user's session cookie (and the app's Origin, as a browser on our page would send).
  */
-export function testApi(options: { registrationOpen?: boolean; storageConfigured?: boolean; cronSecret?: string } = {}) {
+export function testApi(
+  options: { registrationOpen?: boolean; storageConfigured?: boolean; cronSecret?: string; signInProviders?: readonly SignInProvider[] } = {},
+) {
   const fake = fakeInfrastructure({ storageConfigured: options.storageConfigured });
   const { infra, store } = fake;
-  const modules = createModules(infra, { appOrigin: APP_ORIGIN, registrationOpen: options.registrationOpen ?? true });
+  const modules = createModules(infra, {
+    appOrigin: APP_ORIGIN,
+    registrationOpen: options.registrationOpen ?? true,
+    signInProviders: options.signInProviders,
+  });
   const app = buildApp({ ...modules, clock: infra.clock, log: infra.logger, appOrigin: APP_ORIGIN, cronSecret: options.cronSecret });
 
   /** Synchronous on purpose: an async function can't return an Eden client (it is a thenable Proxy). */

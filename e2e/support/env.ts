@@ -37,9 +37,9 @@ export const E2E = {
 
 /** Seeded people (global-setup). Passwords are all `E2E.password`. */
 export const PEOPLE = {
-  admin: { email: "admin@e2e.test", name: "Ada Admin" },
-  coach: { email: "carla@e2e.test", name: "Carla Coach" },
-  ana: { email: "ana@e2e.test", name: "Ana Silva" },
-  bruno: { email: "bruno@e2e.test", name: "Bruno Costa" },
+  admin: { email: "admin@e2e.test", name: "Ada Admin", phone: "+351911000001" },
+  coach: { email: "carla@e2e.test", name: "Carla Coach", phone: "+351911000002" },
+  ana: { email: "ana@e2e.test", name: "Ana Silva", phone: "+351911000003" },
+  bruno: { email: "bruno@e2e.test", name: "Bruno Costa", phone: "+351911000004" },
   rui: { email: "rui@e2e.test", name: "Rui Santos", phone: "+351911000222" },
 } as const;

@@ -1,15 +1,13 @@
 import { expect, test } from "@playwright/test";
 import { E2E, PEOPLE } from "../support/env";
-import { latestEmail, shot, signIn } from "../support/helpers";
+import { fillSignIn, shot, signIn } from "../support/helpers";
 
 test.describe("authentication", () => {
   test("a guarded page sends you to sign in, then back where you were", async ({ page }) => {
     await page.goto("/training-review");
     await expect(page).toHaveURL(/\/login\?redirect=%2Ftraining-review/);
     await shot(page, "login");
-    await page.getByRole("tab", { name: "Password" }).click();
-    await page.locator("#signin-identifier").fill(PEOPLE.ana.email);
-    await page.locator("#signin-password").fill(E2E.password);
+    await fillSignIn(page, PEOPLE.ana.email);
     await page.getByRole("button", { name: "Sign in", exact: true }).click();
     await expect(page).toHaveURL(/\/training-review$/);
     await expect(page.getByRole("heading", { name: "Training", exact: true })).toBeVisible();
@@ -17,37 +15,26 @@ test.describe("authentication", () => {
 
   test("a wrong password says so, without revealing whether the account exists", async ({ page }) => {
     await page.goto("/login");
-    await page.getByRole("tab", { name: "Password" }).click();
-    await page.locator("#signin-identifier").fill(PEOPLE.ana.email);
-    await page.locator("#signin-password").fill("nope");
+    await fillSignIn(page, PEOPLE.ana.email, "nope");
     await page.getByRole("button", { name: "Sign in", exact: true }).click();
     await expect(page.getByText("Wrong email/phone or password.")).toBeVisible();
     await expect(page).toHaveURL(/\/login/);
   });
 
-  test("email code: the code arrives by email and signs you in", async ({ page, request }) => {
+  test("only phone and password: Portugal is preselected, and a number that can't exist is caught first", async ({ page }) => {
     await page.goto("/login");
-    await page.locator("#signin-email").fill(PEOPLE.bruno.email);
-    await page.getByRole("button", { name: "Send code" }).click();
-    await expect(page.getByText(`Enter the 6-digit code we sent to ${PEOPLE.bruno.email}.`)).toBeVisible();
-    const mail = await latestEmail(request, PEOPLE.bruno.email);
-    const code = mail.text.match(/\b(\d{6})\b/)?.[1];
-    expect(mail.subject).toContain(code);
-    await shot(page, "login-code");
-    await page.keyboard.type(code!);
+    await expect(page.getByLabel("Country")).toHaveValue("PT");
+    await expect(page.getByRole("tab")).toHaveCount(0);
+    await expect(page.getByRole("button", { name: /Google/ })).toHaveCount(0);
+    await page.locator("#signin-phone").fill("12");
+    await page.locator("#signin-password").fill(E2E.password);
+    await page.getByRole("button", { name: "Sign in", exact: true }).click();
+    await expect(page.getByText("That doesn't look like a valid number for this country.")).toBeVisible();
+    // Typed in full with another country's prefix, the number still wins over the picker.
+    await page.getByLabel("Country").selectOption("ES");
+    await page.locator("#signin-phone").fill(PEOPLE.ana.phone);
+    await page.getByRole("button", { name: "Sign in", exact: true }).click();
     await expect(page).toHaveURL(/\/dashboard/);
-    await expect(page.getByRole("heading", { name: /Bruno/ })).toBeVisible();
-  });
-
-  test("a new email address creates an account (registration open) without a club", async ({ page, request }) => {
-    const email = `new-${Date.now()}@e2e.test`;
-    await page.goto("/login");
-    await page.locator("#signin-email").fill(email);
-    await page.getByRole("button", { name: "Send code" }).click();
-    const code = (await latestEmail(request, email)).text.match(/\b(\d{6})\b/)?.[1];
-    await page.keyboard.type(code!);
-    await expect(page).toHaveURL(/\/dashboard/);
-    await expect(page.getByText("You're not in a club yet")).toBeVisible();
   });
 
   test("the session survives a reload, and sign-out ends it everywhere in the app", async ({ page }) => {

@@ -140,6 +140,19 @@ describe("sign-in", () => {
     expect(res.data?.user.id).toBe(existing.id);
   });
 
+  it("only the configured methods work: the others send nothing and verify nothing", async () => {
+    const api = testApi({ signInProviders: ["password"] });
+    api.store.addUser({ phone: "+351912345678", passwordHash: "pw:pw" });
+    const start = await api.anonymous.auth["sign-in"].start.post({ provider: "phone", phone: "+351912345678" });
+    expect(start.status).toBe(400);
+    expect(start.error?.value).toMatchObject({ code: "provider_unavailable" });
+    expect(api.store.sent).toHaveLength(0);
+    const code = await api.anonymous.auth["sign-in"].complete.post({ provider: "email-code", email: "a@test.pt", code: "123456" });
+    expect(code.error?.value).toMatchObject({ code: "provider_unavailable" });
+    const ok = await api.anonymous.auth["sign-in"].complete.post({ provider: "password", identifier: "+351 912 345 678", password: "pw" });
+    expect(ok.status).toBe(200);
+  });
+
   it("password: wrong password and unknown user answer the same", async () => {
     const api = testApi();
     api.store.addUser({ email: "e@test.pt", passwordHash: "pw:secret" });

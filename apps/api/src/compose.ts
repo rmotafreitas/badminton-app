@@ -5,7 +5,11 @@ import { buildApp } from "./app";
 /** The production app from a config: adapters → use cases → HTTP. Shared by the local server and Vercel. */
 export function composeApp(config: Config, overrides: InfrastructureOverrides = {}) {
   const infra = createInfrastructure(config, overrides);
-  const modules = createModules(infra, { appOrigin: config.appOrigin, registrationOpen: config.registrationOpen });
+  const modules = createModules(infra, {
+    appOrigin: config.appOrigin,
+    registrationOpen: config.registrationOpen,
+    signInProviders: config.signInProviders,
+  });
   const app = buildApp({
     ...modules,
     clock: infra.clock,

@@ -67,7 +67,7 @@ import {
   UpdateRallySession,
   type UserRepository,
 } from "@bb/application";
-import type { Config } from "@bb/config";
+import type { Config, SignInProvider } from "@bb/config";
 import {
   bcryptPasswords,
   consoleLogger,
@@ -122,6 +122,8 @@ export type InfrastructureOverrides = Partial<Infrastructure>;
 export interface AppSettings {
   readonly appOrigin: string;
   readonly registrationOpen: boolean;
+  /** Undefined: every sign-in method. */
+  readonly signInProviders?: readonly SignInProvider[];
 }
 
 export function createInfrastructure(config: Config, overrides: InfrastructureOverrides = {}): Infrastructure {
@@ -157,6 +159,7 @@ export function createInfrastructure(config: Config, overrides: InfrastructureOv
 
 /** One factory per bounded context: the use cases, constructed with their adapters. */
 export function createIdentityModule(infra: Infrastructure, settings: AppSettings) {
+  const enabledProviders = settings.signInProviders ? new Set(settings.signInProviders) : undefined;
   const common = { users: infra.users, secrets: infra.secrets, limiter: infra.limiter, clock: infra.clock };
   return {
     startSignIn: new StartSignIn({
@@ -165,6 +168,7 @@ export function createIdentityModule(infra: Infrastructure, settings: AppSetting
       messenger: infra.messenger,
       appOrigin: settings.appOrigin,
       registrationOpen: settings.registrationOpen,
+      enabledProviders,
     }),
     completeSignIn: new CompleteSignIn({
       ...common,
@@ -173,6 +177,7 @@ export function createIdentityModule(infra: Infrastructure, settings: AppSetting
       google: infra.google,
       passwords: infra.passwords,
       registrationOpen: settings.registrationOpen,
+      enabledProviders,
     }),
     resolveSession: new ResolveSession({ sessions: infra.sessions, users: infra.users, secrets: infra.secrets, clock: infra.clock }),
     signOut: new SignOut({ sessions: infra.sessions }),
