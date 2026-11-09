@@ -11,7 +11,7 @@ import { clubGamesQuery, FormDots, GameFormDialog, GameRow, myGamesQuery, player
 import { trainingReviewsQuery } from "@/features/training";
 import { Page, PageHeader } from "@/shared/components/page-header";
 import { PlayerAvatar } from "@/shared/components/player-avatar";
-import { useDictionary } from "@/shared/i18n";
+import { useDictionary, useLanguage } from "@/shared/i18n";
 import { fmt } from "@/shared/i18n/ui";
 import { localDay } from "@/shared/lib/format";
 import { cn } from "@/shared/lib/utils";
@@ -150,6 +150,7 @@ function ClubCard({ clubId, viewerId }: { clubId: string; viewerId: string }) {
 
 function TrainingCard() {
   const dict = useDictionary().ui;
+  const { lang } = useLanguage();
   const { api } = useAppContext();
   const reviews = useQuery(trainingReviewsQuery(api));
   const week = useMemo(() => {
@@ -165,9 +166,9 @@ function TrainingCard() {
       const d = new Date(start);
       d.setDate(start.getDate() + i);
       const key = localDay(d);
-      return { key, label: d.toLocaleDateString(undefined, { weekday: "narrow" }), effort: week.find((r) => r.date === key)?.effort ?? 0 };
+      return { key, label: d.toLocaleDateString(lang, { weekday: "narrow" }), effort: week.find((r) => r.date === key)?.effort ?? 0 };
     });
-  }, [week]);
+  }, [week, lang]);
   return (
     <Card className="gap-4">
       <CardHeader>
@@ -219,7 +220,7 @@ export function DashboardPage({ user }: { user: SessionUser }) {
           label={dict.dashboard.played}
           value={stats?.total ?? 0}
           loading={!stats}
-          hint={stats ? `${stats.wins}W · ${stats.losses}L · ${stats.winRate}%` : undefined}
+          hint={stats ? `${fmt(dict.games.record, { w: stats.wins, l: stats.losses })} · ${stats.winRate}%` : undefined}
           icon={<Swords />}
         />
         <StatCard
@@ -229,7 +230,7 @@ export function DashboardPage({ user }: { user: SessionUser }) {
             stats?.streak ? (
               <span className={stats.streak.kind === "W" ? "text-win" : "text-loss"}>
                 {stats.streak.count}
-                {stats.streak.kind}
+                {dict.games.outcomeShort[stats.streak.kind]}
               </span>
             ) : (
               dict.dashboard.noStreak

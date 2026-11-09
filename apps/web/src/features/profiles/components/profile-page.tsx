@@ -107,7 +107,7 @@ export function ProfilePage({ userId, viewer }: { userId: string; viewer: Sessio
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         <Metric label={dict.dashboard.singlesRating} value={Math.round(p.eloSingles)} />
         <Metric label={dict.dashboard.doublesRating} value={Math.round(p.eloDoubles)} />
-        <Metric label={dict.common.games} value={stats?.total ?? "—"} hint={stats ? `${stats.wins}W · ${stats.losses}L` : undefined} />
+        <Metric label={dict.common.games} value={stats?.total ?? "—"} hint={stats ? fmt(dict.games.record, { w: stats.wins, l: stats.losses }) : undefined} />
         <Metric label={dict.common.winRate} value={stats ? `${stats.winRate}%` : "—"} hint={stats ? `${dict.profile.best}: ${stats.bestStreak}` : undefined} />
       </div>
 

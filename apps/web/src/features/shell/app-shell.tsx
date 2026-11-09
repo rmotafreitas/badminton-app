@@ -110,7 +110,7 @@ function BottomTabs() {
     </Link>
   );
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-40 border-t bg-background/90 px-safe pb-safe backdrop-blur-lg lg:hidden">
+    <nav className="fixed inset-x-0 bottom-0 z-40 border-t bg-background px-safe pb-safe lg:hidden">
       {/* Five equal columns: the + is exactly centred whatever the labels' lengths. */}
       <div className="grid grid-cols-5 items-center">
         {first && tab(first)}
@@ -173,7 +173,7 @@ export function AppShell({ user, children }: { user: SessionUser; children: Reac
         <SidebarRail />
       </Sidebar>
       <SidebarInset className="min-w-0">
-        <header className="sticky top-0 z-30 shrink-0 border-b bg-background/80 pt-safe backdrop-blur-lg lg:rounded-t-xl">
+        <header className="sticky top-0 z-30 shrink-0 border-b bg-background pt-safe lg:rounded-t-xl">
           <div className="flex h-14 items-center gap-2 px-3 short:h-11 lg:px-4">
             <SidebarTrigger className="-ml-1" />
             <Separator orientation="vertical" className="mr-1 data-[orientation=vertical]:h-4" />

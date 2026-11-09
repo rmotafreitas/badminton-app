@@ -29,12 +29,13 @@ export function OutcomeBadge({ outcome, className }: { outcome: Outcome; classNa
 
 /** A W/L dot per game, most recent first. */
 export function FormDots({ form }: { form: { gameId: string; outcome: Outcome }[] }) {
+  const t = useDictionary().ui.games;
   return (
     <div className="flex items-center gap-1">
       {form.map((f) => (
         <span
           key={f.gameId}
-          title={f.outcome}
+          title={f.outcome === "W" ? t.won : f.outcome === "L" ? t.lost : t.draw}
           className={cn(
             "flex size-6 items-center justify-center rounded-md text-[11px] font-bold",
             f.outcome === "W" && "bg-win/15 text-win",
@@ -42,7 +43,7 @@ export function FormDots({ form }: { form: { gameId: string; outcome: Outcome }[
             f.outcome === "D" && "bg-muted text-muted-foreground",
           )}
         >
-          {f.outcome}
+          {t.outcomeShort[f.outcome]}
         </span>
       ))}
     </div>
