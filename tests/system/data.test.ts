@@ -212,3 +212,46 @@ describe("club membership endpoints", () => {
     expect((res.data as any).user).toMatchObject({ name: "Guest", clubId: club.id });
   });
 });
+
+describe("account kinds: a system admin is never in a club and never a player", () => {
+  it("can't be created in a club, put in one, or added to one", async () => {
+    const w = world();
+    const cookie = w.cookie(w.admin);
+    expect((await write(w.api, cookie, "POST", "/api/data/users", { email: "ops@test.pt", roles: ["SYSTEM_ADMIN"], clubId: w.club.id })).status).toBe(422);
+    const ops = await json(await write(w.api, cookie, "POST", "/api/data/users", { email: "ops@test.pt", roles: ["SYSTEM_ADMIN", "PLAYER", "COACH"] }));
+    expect(ops.row.values).toMatchObject({ roles: ["SYSTEM_ADMIN"], clubId: null });
+    expect((await write(w.api, cookie, "PATCH", `/api/data/users/${ops.row.id}`, { clubId: w.club.id })).status).toBe(422);
+    expect((await w.api.as(w.admin).clubs.assignments.post({ userId: ops.row.id, clubId: w.club.id })).status).toBe(422);
+    expect((await w.api.as(w.clubAdmin).clubs({ id: w.club.id }).members.post({ email: "ops@test.pt" })).status).toBe(409);
+  });
+
+  it("making a member a system admin means taking them out of the club in the same change", async () => {
+    const w = world();
+    const cookie = w.cookie(w.admin);
+    expect((await write(w.api, cookie, "PATCH", `/api/data/users/${w.player.id}`, { roles: ["SYSTEM_ADMIN"] })).status).toBe(422);
+    const promoted = await json(await write(w.api, cookie, "PATCH", `/api/data/users/${w.player.id}`, { roles: ["SYSTEM_ADMIN"], clubId: null }));
+    expect(promoted.row.values).toMatchObject({ roles: ["SYSTEM_ADMIN"], clubId: null });
+  });
+
+  it("moving someone to another club drops their old club's roles", async () => {
+    const w = world();
+    await w.api.as(w.admin).clubs.assignments.post({ userId: w.clubAdmin.id, clubId: w.other.id });
+    expect(w.api.store.users.get(w.clubAdmin.id)).toMatchObject({ clubId: w.other.id, roles: ["PLAYER"] });
+    const moved = await json(await write(w.api, w.cookie(w.admin), "PATCH", `/api/data/users/${w.coach.id}`, { clubId: w.other.id }));
+    expect(moved.row.values).toMatchObject({ clubId: w.other.id, roles: ["PLAYER"] });
+  });
+
+  it("records when someone last used the app, at most hourly", async () => {
+    const w = world();
+    const cookie = w.cookie(w.player);
+    await get(w.api, cookie, "/api/auth/session");
+    const first = w.api.store.users.get(w.player.id)!.lastAccess;
+    expect(first).toEqual(w.api.clock.now());
+    w.api.clock.advance(10 * 60_000);
+    await get(w.api, cookie, "/api/auth/session");
+    expect(w.api.store.users.get(w.player.id)!.lastAccess).toEqual(first);
+    w.api.clock.advance(60 * 60_000);
+    await get(w.api, cookie, "/api/auth/session");
+    expect(w.api.store.users.get(w.player.id)!.lastAccess!.getTime()).toBeGreaterThan(first!.getTime());
+  });
+});

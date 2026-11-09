@@ -19,6 +19,7 @@ export function toUser(row: UserRow): User {
     isActive: row.isActive,
     clubId: row.clubId,
     createdAt: row.createdAt,
+    lastAccess: row.lastAccess,
     name: row.profile?.name || null,
     photoVersion: row.profile?.photoVersion ?? null,
   };

@@ -79,6 +79,11 @@ export class PrismaUserRepository implements UserRepository {
     await this.db.user.delete({ where: { id: userId } });
   }
 
+  async touch(userId: string, at: Date): Promise<void> {
+    if (!isObjectId(userId)) return;
+    await this.db.user.updateMany({ where: { id: userId }, data: { lastAccess: at } });
+  }
+
   async linkAuthMethod(userId: string, provider: AuthProvider, providerId: string): Promise<void> {
     await this.db.authMethod.upsert({
       where: { provider_providerId: { provider, providerId } },

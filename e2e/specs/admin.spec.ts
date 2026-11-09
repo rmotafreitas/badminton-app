@@ -17,13 +17,17 @@ test("a system admin creates a club, assigns someone, and deletes it again", asy
 
   await page.getByRole("link", { name: "Members" }).first().click();
   await page.getByRole("combobox").filter({ hasText: "User" }).click();
-  await page.getByRole("option", { name: PEOPLE.admin.name }).click();
+  await page.getByRole("option", { name: PEOPLE.nuno.name }).click();
   await page.getByRole("combobox").filter({ hasText: "Club" }).click();
   await page.getByRole("option", { name: "Smash Lisboa" }).click();
   await page.getByRole("button", { name: "Assign" }).click();
   await expect(page.getByText("Member added.")).toBeVisible();
   await page.getByRole("tab", { name: "All users" }).click();
-  await expect(page.getByRole("row", { name: new RegExp(`${PEOPLE.admin.name}.*Smash Lisboa`) })).toBeVisible();
+  await expect(page.getByRole("row", { name: new RegExp(`${PEOPLE.nuno.name}.*Smash Lisboa`) })).toBeVisible();
+  // System admins run the platform: they can't be put in a club.
+  await page.getByRole("combobox").filter({ hasText: PEOPLE.nuno.name }).click();
+  await expect(page.getByRole("option", { name: PEOPLE.admin.name })).toHaveCount(0);
+  await page.keyboard.press("Escape");
   await shot(page, "members-admin");
 
   await page.getByRole("link", { name: "All clubs" }).click();

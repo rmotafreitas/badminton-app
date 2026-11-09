@@ -32,7 +32,7 @@ function rowsOf(store: FakeStore, table: TableKey): RecordRow[] {
             eloSingles: u.eloSingles,
             eloDoubles: u.eloDoubles,
             isActive: u.isActive,
-            lastAccess: null,
+            lastAccess: u.lastAccess,
             createdAt: u.createdAt,
           },
         };

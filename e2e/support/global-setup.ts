@@ -34,6 +34,7 @@ export default async function globalSetup() {
   await person(PEOPLE.bruno, ["PLAYER"], club.id);
   await person(PEOPLE.rui, ["PLAYER"], club.id);
   await person(PEOPLE.clara, ["CLUB_ADMIN", "PLAYER"], club.id);
+  await person(PEOPLE.nuno, ["PLAYER"], null);
   await db.$disconnect();
 
   mkdirSync(".fixtures", { recursive: true });

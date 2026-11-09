@@ -143,7 +143,8 @@ function AssignCard({ users, clubs }: { users: UserSummary[]; clubs: Club[] }) {
             <SelectValue placeholder={dict.members.user} />
           </SelectTrigger>
           <SelectContent>
-            {users.map((u) => (
+            {/* System admins run the platform: they're never in a club. */}
+            {users.filter((u) => !u.roles.includes("SYSTEM_ADMIN")).map((u) => (
               <SelectItem key={u.id} value={u.id}>
                 {u.name || u.email || u.phone}
               </SelectItem>

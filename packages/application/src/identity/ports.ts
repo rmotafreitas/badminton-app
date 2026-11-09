@@ -41,6 +41,8 @@ export interface UserRepository {
   updateAccount(userId: string, changes: AccountChanges): Promise<void>;
   /** Deletes the account with its profile, sign-in methods, sessions and training reviews. */
   delete(userId: string): Promise<void>;
+  /** Records that the account was used ("last seen"). */
+  touch(userId: string, at: Date): Promise<void>;
   linkAuthMethod(userId: string, provider: AuthProvider, providerId: string): Promise<void>;
   setClub(userId: string, clubId: string | null): Promise<void>;
   /** Moves every member of a club to "no club" (before the club is deleted). */

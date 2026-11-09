@@ -1,5 +1,7 @@
 import {
+  accountShapeProblem,
   type Actor,
+  rolesAfterLeavingClub,
   BusinessRuleViolation,
   type Club,
   type ClubWithMembers,
@@ -106,10 +108,16 @@ export class AssignUserToClub {
   constructor(private readonly deps: Pick<Deps, "clubs" | "users">) {}
   async execute({ actor, userId, clubId }: { actor: Actor; userId: string; clubId: string | null }): Promise<void> {
     if (!isSystemAdmin(actor)) throw new Forbidden();
-    if (!isObjectId(userId) || !(await this.deps.users.findById(userId))) throw new NotFound("User not found.");
+    const user = isObjectId(userId) ? await this.deps.users.findById(userId) : null;
+    if (!user) throw new NotFound("User not found.");
     if (clubId !== null && (!isObjectId(clubId) || !(await this.deps.clubs.findById(clubId)))) {
       throw new NotFound("Club not found.");
     }
+    const shape = accountShapeProblem(user.roles, clubId);
+    if (shape) throw new BusinessRuleViolation(shape, "system_admin_no_club");
+    if (clubId === user.clubId) return;
     await this.deps.users.setClub(userId, clubId);
+    // Club roles belong to the old club: someone moved arrives as a player.
+    if (!isSystemAdmin(user)) await this.deps.users.setRoles(userId, rolesAfterLeavingClub(user.roles));
   }
 }

@@ -8,19 +8,23 @@ export type ClubRole = (typeof CLUB_ROLES)[number];
 export const isClubRole = (role: Role): role is ClubRole => (CLUB_ROLES as readonly Role[]).includes(role);
 
 /**
- * The roles a member ends up with after `actor` asks for `requested`. Everyone keeps PLAYER. SYSTEM_ADMIN is
- * platform-wide: only a system admin may grant or remove it, so anyone else's request keeps whatever the member had.
+ * The two kinds of account. A **system admin** runs the platform: never in a club, never a player (no games, no
+ * rating). **Everyone else** is a player of at most one club, optionally also its coach and/or club admin.
  */
-export function nextMemberRoles(actor: Actor, current: readonly Role[], requested: readonly Role[]): Role[] {
-  const wantsSystem = requested.includes("SYSTEM_ADMIN");
-  const system = isSystemAdmin(actor) ? wantsSystem : current.includes("SYSTEM_ADMIN");
-  const club = CLUB_ROLES.filter((r) => r === "PLAYER" || requested.includes(r));
-  return system ? ["SYSTEM_ADMIN", ...club] : [...club];
+export function accountRoles(requested: readonly Role[]): Role[] {
+  if (requested.includes("SYSTEM_ADMIN")) return ["SYSTEM_ADMIN"];
+  return clubMemberRoles(requested);
 }
 
-/** What a member keeps when they leave their club (club roles go, platform roles stay). */
-export const rolesAfterLeavingClub = (roles: readonly Role[]): Role[] =>
-  roles.includes("SYSTEM_ADMIN") ? ["SYSTEM_ADMIN", "PLAYER"] : ["PLAYER"];
+/** Roles inside a club: always player, plus coach / club admin when asked. SYSTEM_ADMIN can't be given here. */
+export const clubMemberRoles = (requested: readonly Role[]): Role[] => CLUB_ROLES.filter((r) => r === "PLAYER" || requested.includes(r));
+
+/** What a member keeps when they leave their club. */
+export const rolesAfterLeavingClub = (_roles: readonly Role[]): Role[] => ["PLAYER"];
+
+/** A system admin can't be in a club. Returns the problem, or null. */
+export const accountShapeProblem = (roles: readonly Role[], clubId: string | null): string | null =>
+  roles.includes("SYSTEM_ADMIN") && clubId ? "A system admin isn't a member of any club: take them out of the club first." : null;
 
 /**
  * A club must keep at least one club admin, or nobody but a system admin could manage it again. Returns the problem,

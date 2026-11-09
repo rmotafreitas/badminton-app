@@ -104,6 +104,7 @@ export class FakeStore {
       isActive: input.isActive ?? true,
       clubId: input.clubId ?? null,
       createdAt: now,
+      lastAccess: null,
     });
     this.profiles.set(id, {
       name: input.name ?? "",
@@ -159,6 +160,10 @@ export function fakeUsers(store: FakeStore): UserRepository {
       for (const r of [...store.reviews.values()]) if (r.userId === userId) store.reviews.delete(r.id);
       store.registration.details.delete(userId);
       for (const r of [...store.registration.registrations.values()]) if (r.userId === userId) store.registration.registrations.delete(r.id);
+    },
+    touch: async (userId, at) => {
+      const row = store.users.get(userId);
+      if (row) store.users.set(userId, { ...row, lastAccess: at });
     },
     linkAuthMethod: async (userId, provider, providerId) => {
       store.authMethods.set(`${provider}:${providerId}`, userId);

@@ -17,6 +17,8 @@ export interface User {
   readonly isActive: boolean;
   readonly clubId: string | null;
   readonly createdAt: Date;
+  /** Last time the account used the app (written at most hourly). */
+  readonly lastAccess: Date | null;
   /** Display data from the profile, when the repository loaded it. */
   readonly name: string | null;
   readonly photoVersion: string | null;

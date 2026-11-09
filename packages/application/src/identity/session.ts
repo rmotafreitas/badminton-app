@@ -5,6 +5,7 @@ import { SESSION_TTL_MS } from "./sign-in";
 
 /** A session is extended (sliding expiry) once less than this much of it is left. */
 const RENEW_BELOW_MS = 15 * 24 * 60 * 60_000;
+const LAST_ACCESS_EVERY_MS = 60 * 60_000;
 
 export interface ResolvedSession {
   readonly actor: Actor;
@@ -30,6 +31,10 @@ export class ResolveSession {
     }
     const user = await this.deps.users.findById(session.userId);
     if (!user?.isActive) return null;
+    // "Last seen", at most one write an hour per person (every request resolves the session).
+    if (!user.lastAccess || now - user.lastAccess.getTime() > LAST_ACCESS_EVERY_MS) {
+      await this.deps.users.touch(user.id, new Date(now));
+    }
     let renewedUntil: Date | null = null;
     if (session.expiresAt.getTime() - now < RENEW_BELOW_MS) {
       renewedUntil = new Date(now + SESSION_TTL_MS);

@@ -36,4 +36,6 @@ export const PEOPLE = {
   bruno: { email: "bruno@e2e.test", name: "Bruno Costa", phone: "+351911000004" },
   rui: { email: "rui@e2e.test", name: "Rui Santos", phone: "+351911000222" },
   clara: { email: "clara@e2e.test", name: "Clara Clube", phone: "+351911000005" },
+  /** A player in no club yet (system admins are never in one). */
+  nuno: { email: "nuno@e2e.test", name: "Nuno Novo", phone: "+351911000006" },
 } as const;

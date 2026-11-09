@@ -7,7 +7,9 @@ import {
   isObjectId,
   isSystemAdmin,
   NotFound,
-  nextMemberRoles,
+  accountRoles,
+  accountShapeProblem,
+  rolesAfterLeavingClub,
   type Role,
   type User,
 } from "@bb/domain";
@@ -82,11 +84,14 @@ export class CreateAccount {
     const contact = await contactFor(this.deps.users, input, null);
     if (!contact.email && !contact.phone) throw new BadRequest("Give an email or a phone number, so they can sign in.", "contact_required");
     await checkClub(this.deps.clubs, input.clubId);
+    const roles = accountRoles(input.roles ?? []);
+    const shape = accountShapeProblem(roles, input.clubId ?? null);
+    if (shape) throw new BusinessRuleViolation(shape, "system_admin_no_club");
     return this.deps.users.createInvited({
       email: contact.email ?? undefined,
       phone: contact.phone ?? undefined,
       name: input.name === undefined ? undefined : cleanPersonName(input.name),
-      roles: nextMemberRoles(actor, [], input.roles ?? []),
+      roles,
       clubId: input.clubId ?? null,
     });
   }
@@ -109,11 +114,16 @@ export class UpdateAccount {
       throw new BadRequest("An account needs an email or a phone number to sign in.", "contact_required");
     }
     await checkClub(this.deps.clubs, input.clubId);
+    const movesClub = input.clubId !== undefined && input.clubId !== user.clubId;
+    // Club roles belong to the old club: someone moved arrives as a player unless roles are set too.
+    const nextRoles = input.roles ? accountRoles(input.roles) : movesClub && !isSystemAdmin(user) ? rolesAfterLeavingClub(user.roles) : user.roles;
+    const shape = accountShapeProblem(nextRoles, input.clubId !== undefined ? input.clubId : user.clubId);
+    if (shape) throw new BusinessRuleViolation(shape, "system_admin_no_club");
     if (contact.email !== undefined || contact.phone !== undefined || input.isActive !== undefined) {
       await this.deps.users.updateAccount(userId, { ...contact, ...(input.isActive !== undefined && { isActive: input.isActive }) });
     }
     if (input.clubId !== undefined && input.clubId !== user.clubId) await this.deps.users.setClub(userId, input.clubId);
-    if (input.roles) await this.deps.users.setRoles(userId, nextMemberRoles(actor, user.roles, input.roles));
+    if (input.roles || movesClub) await this.deps.users.setRoles(userId, nextRoles);
     if (input.name !== undefined) await this.deps.profiles.update(userId, { name: cleanPersonName(input.name) });
     const updated = await this.deps.users.findById(userId);
     if (!updated) throw new NotFound("User not found.");

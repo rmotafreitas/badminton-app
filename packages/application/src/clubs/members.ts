@@ -11,7 +11,7 @@ import {
   isSystemAdmin,
   lastAdminProblem,
   NotFound,
-  nextMemberRoles,
+  clubMemberRoles,
   type Role,
   rolesAfterLeavingClub,
   type User,
@@ -69,11 +69,12 @@ export class AddClubMember {
           email: contact.email ?? undefined,
           phone: contact.phone ?? undefined,
           name: input.name === undefined ? undefined : cleanPersonName(input.name),
-          roles: nextMemberRoles(actor, [], input.roles ?? []),
+          roles: clubMemberRoles(input.roles ?? []),
           clubId,
         });
       }
     }
+    if (isSystemAdmin(user)) throw new Conflict("System admins run the platform: they aren't club members.", "system_admin_not_member");
     if (user.clubId === clubId) throw new Conflict("Already a member of this club.", "already_member");
     if (user.clubId && !isSystemAdmin(actor)) {
       throw new Conflict("This person belongs to another club. Ask a system admin to move them.", "in_other_club");
@@ -98,16 +99,13 @@ export class RemoveClubMember {
   }
 }
 
-/** Club admin, coach or player. Only a system admin can grant or remove SYSTEM_ADMIN. */
+/** Club admin, coach or player (always player). SYSTEM_ADMIN is never a club role. */
 export class SetMemberRoles {
   constructor(private readonly deps: Deps) {}
   async execute({ actor, clubId, userId, roles }: { actor: Actor; clubId: string; userId: string; roles: readonly Role[] }): Promise<Role[]> {
     const club = await managedClub(this.deps, actor, clubId);
     const member = memberOf(club.members, userId);
-    const next = nextMemberRoles(actor, member.roles, roles);
-    if (userId === actor.userId && member.roles.includes("SYSTEM_ADMIN") && !next.includes("SYSTEM_ADMIN")) {
-      throw new BusinessRuleViolation("You can't remove your own admin role.", "self_demote");
-    }
+    const next = clubMemberRoles(roles);
     const problem = lastAdminProblem(actor, club.members, userId, next);
     if (problem) throw new BusinessRuleViolation(problem, "last_club_admin");
     await this.deps.users.setRoles(userId, next);
