@@ -13,7 +13,7 @@ import { $ } from "bun";
 
 const root = path.resolve(import.meta.dir, "../../..");
 
-export async function runtimeDependencies(): Promise<Record<string, string>> {
+async function runtimeDependencies(): Promise<Record<string, string>> {
   const manifests = ["apps/api", "packages/infrastructure", "packages/contracts", "packages/config"].map((dir) =>
     Bun.file(path.join(root, dir, "package.json")).json(),
   );

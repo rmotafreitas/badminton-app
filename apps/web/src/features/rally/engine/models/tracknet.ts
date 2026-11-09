@@ -21,13 +21,13 @@ export interface ShuttlePoint {
 /** RGBA pixels of one 512×288 frame. */
 export type RgbaFrame = Uint8ClampedArray;
 
-/** Per-pixel median of sampled frames — the static background. */
-export function medianBackground(samples: readonly RgbaFrame[]): Uint8ClampedArray {
+/** Per-pixel median of sampled RGBA frames (all the same size) — the static background. */
+export function medianBackground(samples: readonly Uint8ClampedArray[]): Uint8ClampedArray {
   const n = samples.length;
-  const out = new Uint8ClampedArray(PLANE * 4);
+  const out = new Uint8ClampedArray(samples[0]?.length ?? 0);
   const buf = new Uint8Array(n);
   const mid = n >> 1;
-  for (let i = 0; i < PLANE * 4; i++) {
+  for (let i = 0; i < out.length; i++) {
     if ((i & 3) === 3) {
       out[i] = 255;
       continue;

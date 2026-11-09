@@ -1,7 +1,7 @@
 /** `__Host-` prefix: Secure, Path=/, no Domain, so no subdomain can overwrite it. */
 export const SESSION_COOKIE = "__Host-bb_session";
 /** The JWT cookies of the previous auth system: cleared whenever we see them. */
-export const LEGACY_COOKIES = ["auth_token", "refresh_token"] as const;
+const LEGACY_COOKIES = ["auth_token", "refresh_token"] as const;
 
 const ATTRIBUTES = "Path=/; Secure; HttpOnly; SameSite=Lax";
 

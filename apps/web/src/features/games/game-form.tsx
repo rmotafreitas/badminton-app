@@ -161,7 +161,7 @@ function GameFormBody({
           const err = setErrors.find((e): e is ScoreError => !!e && e !== "empty");
           return err ? t.scoreErrors[err] : null;
         })();
-  const rowLabel = (i: number) => (state.sets.length === 1 ? t.score : t.set.replace("{n}", String(i + 1)));
+  const rowLabel = (i: number) => (state.sets.length === 1 ? t.score : fmt(t.set, { n: i + 1 }));
   const teamLabel = (team: "team1" | "team2") => (team === "team1" ? t.team1 : t.team2);
 
   const save = useMutation({

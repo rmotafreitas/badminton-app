@@ -22,10 +22,6 @@ export class PrismaSessionRepository implements SessionRepository {
     await this.db.authSession.deleteMany({ where: { id } });
   }
 
-  async deleteForUser(userId: string): Promise<void> {
-    await this.db.authSession.deleteMany({ where: { userId } });
-  }
-
   async deleteExpired(now: Date): Promise<number> {
     return (await this.db.authSession.deleteMany({ where: { expiresAt: { lt: now } } })).count;
   }

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { CalendarDay, IdSchema, ImageUrlSchema, IsoDateTime, RoleSchema } from "./common";
+import { CalendarDay, IdSchema, ImageFileSchema, ImageUrlSchema, IsoDateTime, RoleSchema } from "./common";
 
 export const ProfileSchema = z.object({
   userId: IdSchema,
@@ -27,6 +27,6 @@ export const UpdateProfileFormSchema = z.object({
   birthday: z.union([CalendarDay, z.literal("")]).optional(),
   sex: z.string().max(20).optional(),
   bio: z.string().max(500).optional(),
-  photo: z.file().max(10 * 1024 * 1024).optional(),
-  banner: z.file().max(10 * 1024 * 1024).optional(),
+  photo: ImageFileSchema,
+  banner: ImageFileSchema,
 });

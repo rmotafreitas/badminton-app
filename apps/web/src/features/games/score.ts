@@ -1,17 +1,4 @@
 /**
- * Normalize a string for search: lowercase, remove accents, trim, collapse spaces.
- */
-export function normalizeSearch(str: string): string {
-  return str
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .replace(/[^a-z0-9\s]/g, "")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-/**
  * Validate a badminton score according to standard rules.
  * Returns null if valid, or an i18n error key if invalid.
  *

@@ -1,9 +1,6 @@
 import { z } from "zod";
 import { IdSchema, ImageUrlSchema, RoleSchema } from "./common";
 
-export const SignInProviderSchema = z.enum(["google", "email", "email-code", "phone", "password"]);
-export type SignInProvider = z.infer<typeof SignInProviderSchema>;
-
 /** `POST /api/auth/sign-in/start`: send a magic link or a code. */
 export const StartSignInBodySchema = z.discriminatedUnion("provider", [
   z.object({ provider: z.literal("email"), email: z.string().max(254) }),
@@ -51,14 +48,6 @@ export type SessionResponse = z.infer<typeof SessionResponseSchema>;
 export const SignInResponseSchema = z.object({ user: SessionUserSchema });
 
 /** `GET /api/users` (system admins). */
-export const UserSummarySchema = z.object({
-  id: IdSchema,
-  name: z.string().nullable(),
-  email: z.string().nullable(),
-  phone: z.string().nullable(),
-  roles: z.array(RoleSchema),
-  clubId: IdSchema.nullable(),
-  photoUrl: ImageUrlSchema,
-});
+export const UserSummarySchema = SessionUserSchema.omit({ eloSingles: true, eloDoubles: true });
 export type UserSummary = z.infer<typeof UserSummarySchema>;
 export const UserListSchema = z.array(UserSummarySchema);

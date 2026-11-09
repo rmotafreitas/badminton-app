@@ -12,13 +12,8 @@ import {
   NotFound,
 } from "@bb/domain";
 import type { UserRepository } from "@/identity";
-import type { ImageProcessor, ImageUpload } from "@/shared";
-import type { ClubImageKind, ClubRepository } from "./ports";
-
-const IMAGE_SIZES: Record<ClubImageKind, { maxWidth: number; maxHeight: number; quality: number }> = {
-  picture: { maxWidth: 512, maxHeight: 512, quality: 70 },
-  banner: { maxWidth: 1600, maxHeight: 534, quality: 60 },
-};
+import { type ImageProcessor, type ImageUpload, processUpload } from "@/shared";
+import type { ClubRepository } from "./ports";
 
 export interface ClubInput {
   readonly name?: string;
@@ -36,8 +31,7 @@ const cleanName = (name: string) => {
 async function applyImages(clubs: ClubRepository, images: ImageProcessor, id: string, input: ClubInput) {
   for (const kind of ["picture", "banner"] as const) {
     const upload = input[kind];
-    if (!upload) continue;
-    await clubs.setImage(id, kind, upload.kind === "remove" ? null : await images.toWebp(upload.bytes, IMAGE_SIZES[kind]));
+    if (upload) await clubs.setImage(id, kind, await processUpload(images, upload, kind === "picture" ? "square" : "banner"));
   }
 }
 

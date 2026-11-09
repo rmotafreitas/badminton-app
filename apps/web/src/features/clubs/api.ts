@@ -1,6 +1,6 @@
 import type { Club, ClubDetail } from "@bb/contracts";
 import { type QueryClient, queryOptions } from "@tanstack/react-query";
-import { type Api, sendForm, unwrap } from "@/app/api";
+import { type Api, sendForm, setImageField, unwrap } from "@/app/api";
 import { staleTime } from "@/app/query-client";
 
 export const clubKeys = {
@@ -33,11 +33,8 @@ const toForm = (values: ClubFormValues) => {
   const form = new FormData();
   if (values.name !== undefined) form.set("name", values.name);
   if (values.location !== undefined) form.set("location", values.location);
-  for (const key of ["picture", "banner"] as const) {
-    const file = values[key];
-    if (file === null) form.set(key, new File([], "empty"));
-    else if (file) form.set(key, file);
-  }
+  setImageField(form, "picture", values.picture);
+  setImageField(form, "banner", values.banner);
   return form;
 };
 

@@ -108,7 +108,7 @@ describe("rally sessions", () => {
     expect(done).toMatchObject({ status: "analysed", analysisLock: null });
   });
 
-  it("the cron purges expired unpinned videos but keeps stats; it needs the secret", async () => {
+  it("the daily cron purges expired unpinned videos but keeps stats", async () => {
     const { api, me, create } = setup({ cronSecret: "cron-secret" });
     const a = await create("client-old-01");
     const b = await create("client-pinned");
@@ -120,9 +120,8 @@ describe("rally sessions", () => {
     }
     await me["rally-sessions"]({ id: b.id }).patch({ pinned: true });
     api.clock.advance((RALLY_LIMITS.videoRetentionDays + 1) * 86_400_000);
-    expect((await api.request("/api/rally-sessions/maintenance/purge-videos")).status).toBe(401);
-    const res = await api.request("/api/rally-sessions/maintenance/purge-videos", { headers: { authorization: "Bearer cron-secret" } });
-    expect((await res.json()) as any).toEqual({ deleted: 1 });
+    const res = await api.request("/api/maintenance/daily", { headers: { authorization: "Bearer cron-secret" } });
+    expect(((await res.json()) as any).videos).toBe(1);
     expect(api.store.deletedObjects).toEqual([`sessions/${a.id}/review.mp4`]);
     expect(api.store.rally.get(a.id)).toMatchObject({ videoKey: null, summary: { shots: 1 } });
   });

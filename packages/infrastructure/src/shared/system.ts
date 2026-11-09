@@ -1,4 +1,4 @@
-import type { Cache, Clock, Logger } from "@bb/application";
+import type { Clock, Logger } from "@bb/application";
 
 export const systemClock: Clock = { now: () => new Date() };
 
@@ -14,9 +14,3 @@ export function consoleLogger(base: Record<string, unknown> = {}): Logger {
     error: (m, f) => write("error", m, f),
   };
 }
-
-/** The default cache: always a miss. Nothing mutable is cached until a measurement asks for it. */
-export const noopCache: Cache = {
-  getOrLoad: (_key, _ttl, load) => load(),
-  delete: async () => {},
-};

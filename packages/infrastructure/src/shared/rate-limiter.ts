@@ -11,11 +11,14 @@ export class MongoRateLimiter implements RateLimiter {
     private readonly now: () => Date = () => new Date(),
   ) {}
 
-  async hit(key: string, windowSeconds: number, max: number): Promise<RateLimitResult> {
-    const nowMs = this.now().getTime();
+  private windowStart(windowSeconds: number): Date {
     const windowMs = windowSeconds * 1000;
-    const windowStart = new Date(Math.floor(nowMs / windowMs) * windowMs);
-    const expiresAt = new Date(windowStart.getTime() + windowMs);
+    return new Date(Math.floor(this.now().getTime() / windowMs) * windowMs);
+  }
+
+  async hit(key: string, windowSeconds: number, max: number): Promise<RateLimitResult> {
+    const windowStart = this.windowStart(windowSeconds);
+    const expiresAt = new Date(windowStart.getTime() + windowSeconds * 1000);
     try {
       const bucket = await this.db.rateLimitBucket.upsert({
         where: { key_windowStart: { key, windowStart } },
@@ -23,7 +26,7 @@ export class MongoRateLimiter implements RateLimiter {
         update: { count: { increment: 1 } },
       });
       if (bucket.count <= max) return { allowed: true, retryAfterSeconds: 0 };
-      return { allowed: false, retryAfterSeconds: Math.max(1, Math.ceil((expiresAt.getTime() - nowMs) / 1000)) };
+      return { allowed: false, retryAfterSeconds: Math.max(1, Math.ceil((expiresAt.getTime() - this.now().getTime()) / 1000)) };
     } catch {
       // Fail open: a limiter outage must not lock everyone out of signing in.
       return { allowed: true, retryAfterSeconds: 0 };
@@ -31,8 +34,7 @@ export class MongoRateLimiter implements RateLimiter {
   }
 
   async refund(key: string, windowSeconds: number): Promise<void> {
-    const windowMs = windowSeconds * 1000;
-    const windowStart = new Date(Math.floor(this.now().getTime() / windowMs) * windowMs);
+    const windowStart = this.windowStart(windowSeconds);
     await this.db.rateLimitBucket.updateMany({ where: { key, windowStart, count: { gt: 0 } }, data: { count: { decrement: 1 } } });
   }
 

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { IdSchema, ImageUrlSchema, IsoDateTime, RoleSchema } from "./common";
+import { IdSchema, ImageFileSchema, ImageUrlSchema, IsoDateTime, RoleSchema } from "./common";
 
 export const ClubSchema = z.object({
   id: IdSchema,
@@ -35,8 +35,8 @@ export const ClubListSchema = z.array(ClubSchema);
 export const ClubFormSchema = z.object({
   name: z.string().min(2).max(80).optional(),
   location: z.string().max(120).optional(),
-  picture: z.file().max(10 * 1024 * 1024).optional(),
-  banner: z.file().max(10 * 1024 * 1024).optional(),
+  picture: ImageFileSchema,
+  banner: ImageFileSchema,
 });
 export const CreateClubFormSchema = ClubFormSchema.extend({ name: z.string().min(2).max(80) });
 

@@ -9,7 +9,6 @@ const PUBLIC = new Set([
   "POST /api/auth/sign-in/complete",
   "POST /api/auth/sign-out",
   "GET /api/maintenance/daily",
-  "GET /api/rally-sessions/maintenance/purge-videos",
 ]);
 
 const ID = "0000000000000000000000aa";

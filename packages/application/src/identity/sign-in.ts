@@ -1,4 +1,4 @@
-import { BadRequest, BusinessRuleViolation, Forbidden, type User, Unauthenticated, type VerifiedIdentity } from "@bb/domain";
+import { type AuthProvider, BadRequest, BusinessRuleViolation, Forbidden, type User, Unauthenticated, type VerifiedIdentity } from "@bb/domain";
 import { type Clock, enforceRateLimit, type RateLimiter } from "@/shared";
 import { isEmail, normalizeEmail, normalizePhone } from "./phone";
 import type {
@@ -35,10 +35,8 @@ export type CompleteSignInInput =
 
 const NO_ACCOUNT = "No account found. Ask your club administrator to create one.";
 
-export type SignInProvider = CompleteSignInInput["provider"];
-
 /** Methods switched off by configuration answer like an unknown method: nothing is sent, nothing is verified. */
-function ensureEnabled(enabled: ReadonlySet<SignInProvider> | undefined, provider: SignInProvider): void {
+function ensureEnabled(enabled: ReadonlySet<AuthProvider> | undefined, provider: AuthProvider): void {
   if (enabled && !enabled.has(provider)) throw new BadRequest("This sign-in method is turned off.", "provider_unavailable");
 }
 
@@ -52,7 +50,7 @@ interface StartDeps {
   readonly appOrigin: string;
   readonly registrationOpen: boolean;
   /** Undefined: every method. */
-  readonly enabledProviders?: ReadonlySet<SignInProvider>;
+  readonly enabledProviders?: ReadonlySet<AuthProvider>;
 }
 
 /** Sends a magic link or a one-time code. */
@@ -108,7 +106,7 @@ interface CompleteDeps {
   readonly clock: Clock;
   readonly registrationOpen: boolean;
   /** Undefined: every method. */
-  readonly enabledProviders?: ReadonlySet<SignInProvider>;
+  readonly enabledProviders?: ReadonlySet<AuthProvider>;
 }
 
 export interface IssuedSession {

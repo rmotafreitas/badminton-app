@@ -69,5 +69,3 @@ export function insideCourt(p: Vec2, format: CourtFormat = "doubles", margin = 0
   return Math.abs(p.x) <= halfW + margin && Math.abs(p.y) <= L + margin;
 }
 
-/** Which half a floor point is on: −1 near (y < 0), +1 far. */
-export const courtSide = (p: Vec2): -1 | 1 => (p.y < 0 ? -1 : 1);

@@ -1,4 +1,4 @@
-import type { CompleteSignInBody, SessionUser, StartSignInBody } from "@bb/contracts";
+import type { CompleteSignInBody, SessionUser } from "@bb/contracts";
 import { type QueryClient, queryOptions } from "@tanstack/react-query";
 import { type Api, unwrap } from "@/app/api";
 
@@ -16,10 +16,6 @@ export const readSession = (queryClient: QueryClient): SessionUser | null | unde
 
 export const writeSession = (queryClient: QueryClient, user: SessionUser | null) =>
   queryClient.setQueryData<SessionUser | null>(sessionKey, user);
-
-export async function startSignIn(api: Api, body: StartSignInBody) {
-  return unwrap(await api.auth["sign-in"].start.post(body));
-}
 
 export async function completeSignIn(api: Api, body: CompleteSignInBody): Promise<SessionUser> {
   return unwrap(await api.auth["sign-in"].complete.post(body)).user;

@@ -34,6 +34,9 @@ export async function withPlayers(directory: PlayerDirectory, games: readonly Ga
   return games.map((g) => ({ ...g, team1Players: g.team1PlayerIds.map(lookup), team2Players: g.team2PlayerIds.map(lookup) }));
 }
 
+const withPlayersOne = async (directory: PlayerDirectory, game: Game): Promise<GameWithPlayers> =>
+  (await withPlayers(directory, [game]))[0] as GameWithPlayers;
+
 /**
  * Ratings: a new game moves its players incrementally; an edit or delete replays the whole club, because it changes
  * every rating computed after the game. Rating failures are logged and never fail the write the user made.
@@ -107,8 +110,7 @@ export class RegisterGame {
       playedAt: input.playedAt ?? this.deps.clock.now(),
     });
     await this.deps.ratings.applyNewGame(game);
-    const [withNames] = await withPlayers(this.deps.players, [game]);
-    return withNames as GameWithPlayers;
+    return withPlayersOne(this.deps.players, game);
   }
 
   private async assertPlayersExist(ids: readonly string[]) {
@@ -127,8 +129,7 @@ async function loadVisible(deps: Pick<Deps, "games">, actor: Actor, gameId: stri
 export class GetGame {
   constructor(private readonly deps: Pick<Deps, "games" | "players">) {}
   async execute({ actor, gameId }: { actor: Actor; gameId: string }): Promise<GameWithPlayers> {
-    const [game] = await withPlayers(this.deps.players, [await loadVisible(this.deps, actor, gameId)]);
-    return game as GameWithPlayers;
+    return withPlayersOne(this.deps.players, await loadVisible(this.deps, actor, gameId));
   }
 }
 
@@ -147,8 +148,7 @@ export class UpdateGame {
     if (problem) throw new BusinessRuleViolation(problem, "invalid_lineup");
     const updated = await this.deps.games.update(gameId, changes);
     await this.deps.ratings.replayClub(game.clubId, [...game.team1PlayerIds, ...game.team2PlayerIds]);
-    const [withNames] = await withPlayers(this.deps.players, [updated]);
-    return withNames as GameWithPlayers;
+    return withPlayersOne(this.deps.players, updated);
   }
 }
 

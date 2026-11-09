@@ -39,7 +39,6 @@ export interface SessionRepository {
   findByTokenHash(tokenHash: string): Promise<StoredSession | null>;
   extend(id: string, expiresAt: Date): Promise<void>;
   delete(id: string): Promise<void>;
-  deleteForUser(userId: string): Promise<void>;
   /** Housekeeping: removes sessions that expired before `now`. Returns how many. */
   deleteExpired(now: Date): Promise<number>;
 }

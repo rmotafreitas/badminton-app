@@ -4,11 +4,11 @@ import { IdSchema, ImageUrlSchema, IsoDateTime } from "./common";
 export const GameTypeSchema = z.enum(["SINGLES", "DOUBLES"]);
 export type GameType = z.infer<typeof GameTypeSchema>;
 
-export const GameSetSchema = z.object({
-  team1Score: z.number().int().min(0).max(99),
-  team2Score: z.number().int().min(0).max(99),
-});
+const Score = z.number().int().min(0).max(99);
+export const GameSetSchema = z.object({ team1Score: Score, team2Score: Score });
 export type GameSet = z.infer<typeof GameSetSchema>;
+const Sets = z.array(GameSetSchema).min(1).max(5);
+const TeamIds = z.array(IdSchema).min(1).max(2);
 
 export const GamePlayerSchema = z.object({
   id: IdSchema,
@@ -35,32 +35,16 @@ export const GameSchema = z.object({
 export type Game = z.infer<typeof GameSchema>;
 export const GameListSchema = z.array(GameSchema);
 
-const Lineup = {
-  type: GameTypeSchema,
-  team1PlayerIds: z.array(IdSchema).min(1).max(2),
-  team2PlayerIds: z.array(IdSchema).min(1).max(2),
-  playedAt: IsoDateTime.optional(),
-};
+const Lineup = { type: GameTypeSchema, team1PlayerIds: TeamIds, team2PlayerIds: TeamIds, playedAt: IsoDateTime.optional() };
 
 /** Full sets, or a quick result entered as points of one set. */
 export const RegisterGameBodySchema = z.union([
-  z.object({ clubId: IdSchema, ...Lineup, sets: z.array(GameSetSchema).min(1).max(5) }),
-  z.object({
-    clubId: IdSchema,
-    ...Lineup,
-    team1Points: z.number().int().min(0).max(99),
-    team2Points: z.number().int().min(0).max(99),
-  }),
+  z.object({ clubId: IdSchema, ...Lineup, sets: Sets }),
+  z.object({ clubId: IdSchema, ...Lineup, team1Points: Score, team2Points: Score }),
 ]);
 export type RegisterGameBody = z.infer<typeof RegisterGameBodySchema>;
 
-export const UpdateGameBodySchema = z.object({
-  type: GameTypeSchema.optional(),
-  team1PlayerIds: z.array(IdSchema).min(1).max(2).optional(),
-  team2PlayerIds: z.array(IdSchema).min(1).max(2).optional(),
-  sets: z.array(GameSetSchema).min(1).max(5).optional(),
-  playedAt: IsoDateTime.optional(),
-});
+export const UpdateGameBodySchema = z.object({ ...Lineup, sets: Sets }).partial();
 export type UpdateGameBody = z.infer<typeof UpdateGameBodySchema>;
 
 export const RatingPointSchema = z.object({ gameId: IdSchema, playedAt: IsoDateTime, rating: z.number() });

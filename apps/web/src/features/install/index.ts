@@ -1,2 +1,1 @@
-export { installPlatform, isStandalone, useInstall } from "./install";
-export { InstallCard, InstalledToast, InstallGuide, useInstallAction } from "./install-ui";
+export { InstallCard, InstalledToast, useInstallAction } from "./install-ui";

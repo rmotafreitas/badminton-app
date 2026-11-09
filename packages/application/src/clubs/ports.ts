@@ -1,4 +1,5 @@
 import type { Club, ClubWithMembers } from "@bb/domain";
+import type { ProcessedImage } from "@/shared";
 
 export type ClubImageKind = "picture" | "banner";
 
@@ -10,7 +11,7 @@ export interface ClubRepository {
   listAll(): Promise<Club[]>;
   delete(id: string): Promise<void>;
   /** `null` removes the image. */
-  setImage(id: string, kind: ClubImageKind, image: { dataUrl: string; version: string } | null): Promise<void>;
+  setImage(id: string, kind: ClubImageKind, image: ProcessedImage | null): Promise<void>;
   getImage(id: string, kind: ClubImageKind): Promise<string | null>;
   countGames(id: string): Promise<number>;
 }

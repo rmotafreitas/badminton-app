@@ -312,13 +312,6 @@ export const DEFAULT_SKIN: OverlaySkin = {
   hud: [speedCard, shotCountCard, shotLabel, distancePanel, courtMap, footer],
 };
 
-/** Scene-only skin for clean exports. */
-export const MINIMAL_SKIN: OverlaySkin = {
-  id: "minimal",
-  scene: [groundRings, shuttleTrail, playerTags],
-  hud: [courtMap],
-};
-
 /** Live camera preview: court fit, players and the mini map. */
 export const LIVE_SKIN: OverlaySkin = {
   id: "live",

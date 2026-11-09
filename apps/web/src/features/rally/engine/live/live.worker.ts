@@ -6,6 +6,7 @@
  */
 import { hasWebGpu, ortJsepRuntime } from "@/features/rally/engine/runtime/ort-runtime";
 import { fetchModel } from "@/features/rally/engine/models/registry";
+import { medianBackground } from "@/features/rally/engine/models/tracknet";
 import { detectPeople, type Box } from "@/features/rally/engine/models/yolox";
 import { detectCourt, toGray } from "@/features/rally/engine/geometry/court-detect";
 import type { InferenceSession } from "@/features/rally/engine/runtime/types";
@@ -90,25 +91,8 @@ function sampleFrame(bitmap: ImageBitmap) {
   prevGray = gray;
 }
 
-function median(): Uint8ClampedArray | null {
-  if (samples.length < 3) return null;
-  const n = samples.length;
-  const out = new Uint8ClampedArray(samples[0]!.length);
-  const buf = new Uint8Array(n);
-  for (let i = 0; i < out.length; i++) {
-    if ((i & 3) === 3) {
-      out[i] = 255;
-      continue;
-    }
-    for (let k = 0; k < n; k++) buf[k] = samples[k]![i]!;
-    buf.sort();
-    out[i] = buf[n >> 1]!;
-  }
-  return out;
-}
-
 function courtCheck(): LiveCheck {
-  const med = median();
+  const med = samples.length < 3 ? null : medianBackground(samples);
   let corners: LiveCheck["corners"] = null;
   let courtScore = 0;
   if (med) {

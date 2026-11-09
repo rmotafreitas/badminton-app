@@ -3,6 +3,7 @@ import {
   BusinessRuleViolation,
   Conflict,
   Forbidden,
+  isCalendarDay,
   isObjectId,
   NotFound,
   RALLY_LIMITS,
@@ -63,9 +64,16 @@ export class RallyAccessPolicy {
   }
 }
 
+/** Base of every rally use case: the adapters, and the access rules over them. */
+export abstract class RallyUseCase {
+  protected readonly policy: RallyAccessPolicy;
+  constructor(protected readonly deps: RallyDeps) {
+    this.policy = new RallyAccessPolicy(deps);
+  }
+}
+
 /** Idempotent on (owner, clientId): sessions created offline sync safely. */
-export class CreateRallySession {
-  constructor(private readonly deps: RallyDeps) {}
+export class CreateRallySession extends RallyUseCase {
   async execute({
     actor,
     input,
@@ -91,18 +99,13 @@ export class CreateRallySession {
   }
 }
 
-export class ListMyRallySessions {
-  constructor(private readonly deps: RallyDeps) {}
+export class ListMyRallySessions extends RallyUseCase {
   execute({ actor }: { actor: Actor }): Promise<RallySession[]> {
     return this.deps.sessions.findForUser(actor.userId);
   }
 }
 
-export class ListGameRallySessions {
-  private readonly policy: RallyAccessPolicy;
-  constructor(private readonly deps: RallyDeps) {
-    this.policy = new RallyAccessPolicy(deps);
-  }
+export class ListGameRallySessions extends RallyUseCase {
   async execute({ actor, gameId }: { actor: Actor; gameId: string }): Promise<ViewedSession[]> {
     if (!isObjectId(gameId)) return [];
     const out: ViewedSession[] = [];
@@ -114,11 +117,7 @@ export class ListGameRallySessions {
   }
 }
 
-export class GetRallySession {
-  private readonly policy: RallyAccessPolicy;
-  constructor(deps: RallyDeps) {
-    this.policy = new RallyAccessPolicy(deps);
-  }
+export class GetRallySession extends RallyUseCase {
   execute({ actor, id }: { actor: Actor; id: string }): Promise<ViewedSession> {
     return this.policy.view(id, actor);
   }
@@ -135,11 +134,7 @@ export interface UpdateRallySessionInput {
   readonly shareForTraining?: boolean;
 }
 
-export class UpdateRallySession {
-  private readonly policy: RallyAccessPolicy;
-  constructor(private readonly deps: RallyDeps) {
-    this.policy = new RallyAccessPolicy(deps);
-  }
+export class UpdateRallySession extends RallyUseCase {
 
   async execute({ actor, id, input }: { actor: Actor; id: string; input: UpdateRallySessionInput }): Promise<RallySession> {
     const session = await this.policy.owned(id, actor);
@@ -151,7 +146,7 @@ export class UpdateRallySession {
       patch.gameId = input.gameId;
     }
     if (input.trainingDate !== undefined) {
-      if (input.trainingDate !== null && !/^\d{4}-\d{2}-\d{2}$/.test(input.trainingDate)) {
+      if (input.trainingDate !== null && !isCalendarDay(input.trainingDate)) {
         throw new BusinessRuleViolation("trainingDate must be YYYY-MM-DD.");
       }
       patch.trainingDate = input.trainingDate;
@@ -190,11 +185,7 @@ export class UpdateRallySession {
 }
 
 /** A linked player can remove themselves from someone else's session. */
-export class LeaveRallySession {
-  private readonly policy: RallyAccessPolicy;
-  constructor(private readonly deps: RallyDeps) {
-    this.policy = new RallyAccessPolicy(deps);
-  }
+export class LeaveRallySession extends RallyUseCase {
   async execute({ actor, id }: { actor: Actor; id: string }): Promise<void> {
     const session = await this.policy.load(id);
     if (!session.participants.some((p) => p.userId === actor.userId)) throw new NotFound("Session not found.");
@@ -202,11 +193,7 @@ export class LeaveRallySession {
   }
 }
 
-export class DeleteRallySession {
-  private readonly policy: RallyAccessPolicy;
-  constructor(private readonly deps: RallyDeps) {
-    this.policy = new RallyAccessPolicy(deps);
-  }
+export class DeleteRallySession extends RallyUseCase {
   async execute({ actor, id }: { actor: Actor; id: string }): Promise<void> {
     const session = await this.policy.owned(id, actor);
     await Promise.all(
@@ -223,18 +210,13 @@ async function usageOf(sessions: RallySessionRepository, userId: string) {
   return { usedBytes: mine.reduce((sum, s) => sum + (s.videoBytes ?? 0), 0), limitBytes: RALLY_LIMITS.quotaBytes };
 }
 
-export class GetRallyUsage {
-  constructor(private readonly deps: RallyDeps) {}
+export class GetRallyUsage extends RallyUseCase {
   execute({ actor }: { actor: Actor }) {
     return usageOf(this.deps.sessions, actor.userId);
   }
 }
 
-export class RequestVideoUpload {
-  private readonly policy: RallyAccessPolicy;
-  constructor(private readonly deps: RallyDeps) {
-    this.policy = new RallyAccessPolicy(deps);
-  }
+export class RequestVideoUpload extends RallyUseCase {
   async execute({ actor, id, bytes, contentType }: { actor: Actor; id: string; bytes: number; contentType: string }) {
     const session = await this.policy.owned(id, actor);
     if (!this.deps.storage.configured) throw new Conflict("Video storage is not configured.", "storage_unavailable");
@@ -255,11 +237,7 @@ export class RequestVideoUpload {
   }
 }
 
-export class CompleteVideoUpload {
-  private readonly policy: RallyAccessPolicy;
-  constructor(private readonly deps: RallyDeps) {
-    this.policy = new RallyAccessPolicy(deps);
-  }
+export class CompleteVideoUpload extends RallyUseCase {
   async execute({ actor, id, key, bytes }: { actor: Actor; id: string; key: string; bytes: number }): Promise<RallySession> {
     const session = await this.policy.owned(id, actor);
     if (!key.startsWith(sessionKeyPrefix(session.id))) throw new BusinessRuleViolation("Invalid key.");
@@ -273,11 +251,7 @@ export class CompleteVideoUpload {
   }
 }
 
-export class GetVideoUrl {
-  private readonly policy: RallyAccessPolicy;
-  constructor(private readonly deps: RallyDeps) {
-    this.policy = new RallyAccessPolicy(deps);
-  }
+export class GetVideoUrl extends RallyUseCase {
   async execute({ actor, id }: { actor: Actor; id: string }) {
     const { session, access } = await this.policy.view(id, actor);
     if (access !== "full") throw new Forbidden("The video is private to the players.");
@@ -289,11 +263,7 @@ export class GetVideoUrl {
 // ── Analysis ─────────────────────────────────────────────────────────────────
 
 /** Exactly one device analyses a session at a time (renewable lease). */
-export class AcquireAnalysisLock {
-  private readonly policy: RallyAccessPolicy;
-  constructor(private readonly deps: RallyDeps) {
-    this.policy = new RallyAccessPolicy(deps);
-  }
+export class AcquireAnalysisLock extends RallyUseCase {
   async execute({ actor, id, deviceId }: { actor: Actor; id: string; deviceId: string }) {
     await this.policy.owned(id, actor);
     const now = this.deps.clock.now();
@@ -305,11 +275,7 @@ export class AcquireAnalysisLock {
   }
 }
 
-export class ReleaseAnalysisLock {
-  private readonly policy: RallyAccessPolicy;
-  constructor(private readonly deps: RallyDeps) {
-    this.policy = new RallyAccessPolicy(deps);
-  }
+export class ReleaseAnalysisLock extends RallyUseCase {
   async execute({ actor, id, deviceId, failed = false }: { actor: Actor; id: string; deviceId: string; failed?: boolean }) {
     const session = await this.policy.owned(id, actor);
     if (session.analysisLock?.deviceId !== deviceId) return;
@@ -320,11 +286,7 @@ export class ReleaseAnalysisLock {
   }
 }
 
-export class RequestResultUpload {
-  private readonly policy: RallyAccessPolicy;
-  constructor(private readonly deps: RallyDeps) {
-    this.policy = new RallyAccessPolicy(deps);
-  }
+export class RequestResultUpload extends RallyUseCase {
   async execute({ actor, id }: { actor: Actor; id: string }) {
     const session = await this.policy.owned(id, actor);
     if (!this.deps.storage.configured) return null;
@@ -333,11 +295,7 @@ export class RequestResultUpload {
   }
 }
 
-export class SubmitAnalysisResult {
-  private readonly policy: RallyAccessPolicy;
-  constructor(private readonly deps: RallyDeps) {
-    this.policy = new RallyAccessPolicy(deps);
-  }
+export class SubmitAnalysisResult extends RallyUseCase {
   async execute({
     actor,
     id,
@@ -364,11 +322,7 @@ export class SubmitAnalysisResult {
   }
 }
 
-export class GetResultUrl {
-  private readonly policy: RallyAccessPolicy;
-  constructor(private readonly deps: RallyDeps) {
-    this.policy = new RallyAccessPolicy(deps);
-  }
+export class GetResultUrl extends RallyUseCase {
   async execute({ actor, id }: { actor: Actor; id: string }) {
     const { session, access } = await this.policy.view(id, actor);
     if (access !== "full") throw new Forbidden("The full analysis is private to the players.");
@@ -380,8 +334,7 @@ export class GetResultUrl {
 // ── Retention and profiles ───────────────────────────────────────────────────
 
 /** Deletes expired, unpinned review videos. Stats are kept forever. Run by the daily cron. */
-export class PurgeExpiredVideos {
-  constructor(private readonly deps: RallyDeps) {}
+export class PurgeExpiredVideos extends RallyUseCase {
   async execute(): Promise<number> {
     const expired = await this.deps.sessions.findExpiredVideos(this.deps.clock.now());
     for (const session of expired) {
@@ -393,11 +346,7 @@ export class PurgeExpiredVideos {
 }
 
 /** Analysed sessions a player took part in (their profile's rally stats), newest first. */
-export class ListProfileRallySessions {
-  private readonly policy: RallyAccessPolicy;
-  constructor(private readonly deps: RallyDeps) {
-    this.policy = new RallyAccessPolicy(deps);
-  }
+export class ListProfileRallySessions extends RallyUseCase {
   async execute({ actor, userId }: { actor: Actor; userId: string }) {
     if (!isObjectId(userId)) return [];
     const sessions = (await this.deps.sessions.findWithParticipant(userId)).filter((s) => s.status === "analysed" && s.summary);

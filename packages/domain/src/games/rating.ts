@@ -55,6 +55,10 @@ export function applyGame(table: Map<string, Ratings>, game: Pick<Game, "type" |
   return changes;
 }
 
+/** In the order they were played; games entered for the same moment, in the order they were entered. */
+const chronological = <G extends Pick<Game, "playedAt" | "createdAt">>(games: readonly G[]): G[] =>
+  [...games].sort((a, b) => a.playedAt.getTime() - b.playedAt.getTime() || a.createdAt.getTime() - b.createdAt.getTime());
+
 /**
  * Replays games in the order they were played, from the default rating. Used after an edit or a delete, because
  * a change to an old game moves every rating computed after it.
@@ -63,10 +67,7 @@ export function replayRatings(
   games: readonly Pick<Game, "type" | "team1PlayerIds" | "team2PlayerIds" | "sets" | "playedAt" | "createdAt">[],
 ): Map<string, Ratings> {
   const table = new Map<string, Ratings>();
-  const ordered = [...games].sort(
-    (a, b) => a.playedAt.getTime() - b.playedAt.getTime() || a.createdAt.getTime() - b.createdAt.getTime(),
-  );
-  for (const game of ordered) applyGame(table, game);
+  for (const game of chronological(games)) applyGame(table, game);
   return table;
 }
 
@@ -86,10 +87,7 @@ export function ratingTimeline(
 ): { singles: RatingPoint[]; doubles: RatingPoint[] } {
   const table = new Map<string, Ratings>();
   const out = { singles: [] as RatingPoint[], doubles: [] as RatingPoint[] };
-  const ordered = [...games].sort(
-    (a, b) => a.playedAt.getTime() - b.playedAt.getTime() || a.createdAt.getTime() - b.createdAt.getTime(),
-  );
-  for (const game of ordered) {
+  for (const game of chronological(games)) {
     const change = applyGame(table, game).find((c) => c.playerId === playerId);
     if (change) out[field(game.type)].push({ gameId: game.id, playedAt: game.playedAt, rating: change.after });
   }

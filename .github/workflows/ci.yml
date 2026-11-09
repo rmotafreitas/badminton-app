@@ -49,7 +49,7 @@ jobs:
           bun-version: 1.4.3
       # One-shot init containers exit when done; `up --wait` would count that as a failure.
       - run: |
-          docker compose -f docker-compose.dev.yml up -d --wait mongo seaweedfs mailpit
+          docker compose -f docker-compose.dev.yml up -d --wait mongo seaweedfs
           docker compose -f docker-compose.dev.yml run --rm mongo-init
           docker compose -f docker-compose.dev.yml run --rm seaweedfs-init
       - run: bun install --frozen-lockfile

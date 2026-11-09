@@ -177,9 +177,6 @@ export function fakeSessions(store: FakeStore): SessionRepository {
     delete: async (id) => {
       store.sessions.delete(id);
     },
-    deleteForUser: async (userId) => {
-      for (const s of store.sessions.values()) if (s.userId === userId) store.sessions.delete(s.id);
-    },
     deleteExpired: async (now) => {
       let n = 0;
       for (const s of [...store.sessions.values()]) if (s.expiresAt < now && store.sessions.delete(s.id)) n++;
@@ -476,7 +473,6 @@ export function fakeInfrastructure(options: { storageConfigured?: boolean } = {}
   const infra: Infrastructure = {
     clock,
     logger: silentLogger,
-    cache: { getOrLoad: (_k, _t, load) => load(), delete: async () => {} },
     health: { database: async () => store.healthy },
     limiter,
     secrets: fakeSecrets(),

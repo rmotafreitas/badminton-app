@@ -108,9 +108,9 @@ Nobody else. Linked players can remove themselves.
 
 5. Push the Prisma schema: `bun run db:push` (adds `RallySession`).
 
-The API build declares a daily Vercel Cron
-(`/api/rally-sessions/maintenance/purge-videos`) that deletes review videos older
-than 60 days unless pinned. Stats are kept forever.
+The API build declares a daily Vercel Cron (`/api/maintenance/daily`) that, among
+other housekeeping, deletes review videos older than 60 days unless pinned. Stats
+are kept forever.
 
 ### 2. Model files (~43 MB used by the app)
 

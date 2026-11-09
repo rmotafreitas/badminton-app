@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { useAppContext } from "@/app/context";
 import { Page, PageHeader } from "@/shared/components/page-header";
 import { useDictionary, useLanguage } from "@/shared/i18n";
-import { formatDate, localDay } from "@/shared/lib/format";
+import { formatDate, localDay, startOfWeek } from "@/shared/lib/format";
 import { tick } from "@/shared/lib/haptics";
 import { cn } from "@/shared/lib/utils";
 import { Button } from "@/shared/ui/button";
@@ -27,11 +27,9 @@ function EffortCalendar({ reviews, selected, onSelect }: { reviews: TrainingRevi
   const byDay = useMemo(() => new Map(reviews.map((r) => [r.date, r.effort])), [reviews]);
   const days = useMemo(() => {
     const end = new Date();
-    const start = new Date(end);
-    start.setDate(end.getDate() - ((end.getDay() + 6) % 7) - (weeks - 1) * 7);
+    const first = startOfWeek(end);
     return Array.from({ length: weeks * 7 }, (_, i) => {
-      const d = new Date(start);
-      d.setDate(start.getDate() + i);
+      const d = new Date(first.getFullYear(), first.getMonth(), first.getDate() + i - (weeks - 1) * 7);
       return { key: localDay(d), future: d > end, date: d };
     });
   }, []);
@@ -63,8 +61,10 @@ export function TrainingPage() {
   const { lang } = useLanguage();
   const { api, queryClient } = useAppContext();
   const reviews = useQuery(trainingReviewsQuery(api));
-  const [date, setDate] = useState(localDay());
-  const isCustomDay = date !== localDay() && date !== localDay(new Date(Date.now() - 86_400_000));
+  const today = localDay();
+  const yesterday = localDay(new Date(Date.now() - 86_400_000));
+  const [date, setDate] = useState(today);
+  const isCustomDay = date !== today && date !== yesterday;
   const existing = reviews.data?.find((r) => r.date === date);
   const [effort, setEffort] = useState(5);
   const [note, setNote] = useState("");
@@ -128,8 +128,8 @@ export function TrainingPage() {
                 <FieldLabel htmlFor="training-date">{t.date}</FieldLabel>
                 <div className="flex flex-wrap gap-2">
                   {[
-                    { label: dict.common.today, day: localDay() },
-                    { label: t.yesterday, day: localDay(new Date(Date.now() - 86_400_000)) },
+                    { label: dict.common.today, day: today },
+                    { label: t.yesterday, day: yesterday },
                   ].map((chip) => (
                     <Button
                       key={chip.day}
@@ -155,7 +155,7 @@ export function TrainingPage() {
                       aria-label={t.date}
                       className="absolute inset-0 size-full cursor-pointer opacity-0"
                       value={date}
-                      max={localDay()}
+                      max={today}
                       onClick={(e) => (e.currentTarget as HTMLInputElement & { showPicker?: () => void }).showPicker?.()}
                       onChange={(e) => e.target.value && setDate(e.target.value)}
                     />

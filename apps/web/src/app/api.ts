@@ -1,4 +1,5 @@
 import type { App } from "@bb/api";
+import type { ErrorResponse } from "@bb/contracts";
 import { type Treaty, treaty } from "@elysiajs/eden";
 
 /** A non-2xx answer, as a real error so Query, the router and the error boundaries all see it. */
@@ -73,11 +74,14 @@ interface EdenResult {
   response?: Response | undefined;
 }
 
-function errorBody(value: unknown) {
-  if (typeof value !== "object" || value === null) return null;
-  const body = value as Record<string, unknown>;
-  if (typeof body.code !== "string" || typeof body.message !== "string") return null;
-  return body as { code: string; message: string; requestId?: string; retryAfterSeconds?: number; issues?: { path: string; message: string }[] };
+/** An `ErrorResponse` body becomes an ApiError; anything else (a proxy's HTML page, say) a generic one. */
+function toApiError(status: number, value: unknown): ApiError {
+  const body = typeof value === "object" && value !== null ? (value as Record<string, unknown>) : {};
+  if (typeof body.code !== "string" || typeof body.message !== "string") {
+    return new ApiError(status, "unknown_error", `The request failed (HTTP ${status}).`);
+  }
+  const { code, message, requestId, retryAfterSeconds, issues } = body as ErrorResponse;
+  return new ApiError(status, code, message, requestId, retryAfterSeconds, issues);
 }
 
 /**
@@ -88,16 +92,7 @@ export function unwrap<R extends EdenResult>(result: R): Extract<R, { error: nul
   if (result.error === null || result.error === undefined) return result.data as Extract<R, { error: null }>["data"];
   const error = result.error as { status?: unknown; value?: unknown };
   if (result.response === undefined) throw new NetworkError({ cause: error.value });
-  const status = typeof error.status === "number" ? error.status : result.response.status;
-  const body = errorBody(error.value);
-  throw new ApiError(
-    status,
-    body?.code ?? "unknown_error",
-    body?.message ?? `The request failed (HTTP ${status}).`,
-    body?.requestId,
-    body?.retryAfterSeconds,
-    body?.issues,
-  );
+  throw toApiError(typeof error.status === "number" ? error.status : result.response.status, error.value);
 }
 
 /** Multipart writes (images) go through plain fetch: Eden would serialise them, and we want FormData as-is. */
@@ -109,9 +104,12 @@ export async function sendForm<T>(method: "POST" | "PATCH", path: string, form: 
     throw new NetworkError({ cause });
   }
   const body = await response.json().catch(() => null);
-  if (!response.ok) {
-    const parsed = errorBody(body);
-    throw new ApiError(response.status, parsed?.code ?? "unknown_error", parsed?.message ?? `HTTP ${response.status}`, parsed?.requestId, parsed?.retryAfterSeconds, parsed?.issues);
-  }
+  if (!response.ok) throw toApiError(response.status, body);
   return body as T;
+}
+
+/** An optional image in a multipart form: a File sets it, `null` removes it (an empty file), `undefined` leaves it. */
+export function setImageField(form: FormData, key: string, file: File | null | undefined) {
+  if (file === null) form.set(key, new File([], "empty"));
+  else if (file) form.set(key, file);
 }

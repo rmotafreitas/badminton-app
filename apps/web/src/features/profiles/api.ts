@@ -1,6 +1,6 @@
 import type { Profile } from "@bb/contracts";
 import { type QueryClient, queryOptions } from "@tanstack/react-query";
-import { type Api, sendForm, unwrap } from "@/app/api";
+import { type Api, sendForm, setImageField, unwrap } from "@/app/api";
 import { staleTime } from "@/app/query-client";
 
 export const profileKeys = {
@@ -29,11 +29,8 @@ export interface ProfileFormValues {
 export function updateMyProfile(values: ProfileFormValues) {
   const form = new FormData();
   for (const key of ["name", "birthday", "sex", "bio"] as const) if (values[key] !== undefined) form.set(key, values[key] ?? "");
-  for (const key of ["photo", "banner"] as const) {
-    const file = values[key];
-    if (file === null) form.set(key, new File([], "empty"));
-    else if (file) form.set(key, file);
-  }
+  setImageField(form, "photo", values.photo);
+  setImageField(form, "banner", values.banner);
   return sendForm<Profile>("PATCH", "/api/profiles/me", form);
 }
 

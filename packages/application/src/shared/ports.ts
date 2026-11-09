@@ -30,15 +30,6 @@ export interface HealthProbe {
   database(): Promise<boolean>;
 }
 
-/**
- * A read-through cache seam. Default adapter is `NoopCache`; only immutable or staleness-tolerant data may ever be
- * cached, and a cache failure is a miss (fail open).
- */
-export interface Cache {
-  getOrLoad<T>(key: string, ttlSeconds: number, load: () => Promise<T>): Promise<T>;
-  delete(key: string): Promise<void>;
-}
-
 /** S3-compatible object storage (R2 in production, SeaweedFS locally). */
 export interface ObjectStorage {
   /** False when no bucket is configured: stats still work, videos stay on the device. */

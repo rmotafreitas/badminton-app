@@ -3,7 +3,6 @@ import { useMutation } from "@tanstack/react-query";
 import type { CountryCode } from "libphonenumber-js/min";
 import { BarChart3, CalendarCheck, Video } from "lucide-react";
 import { type FormEvent, type ReactNode, useState } from "react";
-import { isApiError } from "@/app/api";
 import { useAppContext } from "@/app/context";
 import { Brand } from "@/shared/components/logo";
 import { useDictionary } from "@/shared/i18n";
@@ -15,12 +14,6 @@ import { Spinner } from "@/shared/ui/spinner";
 import { completeSignIn } from "@/features/auth/api";
 import { CourtArt } from "./court-art";
 import { DEFAULT_COUNTRY, PhoneField, toE164 } from "./phone-field";
-
-function errorMessage(error: unknown, fallback: string): string {
-  if (isApiError(error, 403) && error.message.includes("No account")) return error.message;
-  if (error instanceof Error && error.message) return error.message;
-  return fallback;
-}
 
 function PhonePasswordSignIn({ onSignedIn }: { onSignedIn: (user: SessionUser) => Promise<void> }) {
   const dict = useDictionary().ui;
@@ -79,7 +72,7 @@ function PhonePasswordSignIn({ onSignedIn }: { onSignedIn: (user: SessionUser) =
       </FieldGroup>
       {signIn.error && (
         <Alert variant="destructive">
-          <AlertDescription>{errorMessage(signIn.error, dict.errors.body)}</AlertDescription>
+          <AlertDescription>{signIn.error.message || dict.errors.body}</AlertDescription>
         </Alert>
       )}
       <Button type="submit" className="h-11 w-full" disabled={signIn.isPending || !number.trim() || !password}>

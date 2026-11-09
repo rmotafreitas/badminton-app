@@ -1,4 +1,4 @@
-import { type APIRequestContext, expect, type Page, test } from "@playwright/test";
+import { expect, type Page, test } from "@playwright/test";
 import { E2E, PEOPLE } from "./env";
 
 /** The seeded person's Portuguese number without +351, as they'd type it. */
@@ -22,28 +22,10 @@ export async function signIn(page: Page, email: string, password: string = E2E.p
   await expect(page).toHaveURL(/\/dashboard/);
 }
 
-/** The newest email Mailpit received for `to`. */
-export async function latestEmail(request: APIRequestContext, to: string): Promise<{ subject: string; text: string }> {
-  let found: { ID: string; Subject: string } | undefined;
-  await expect
-    .poll(async () => {
-      const res = await request.get(`${E2E.mailpitUrl}/api/v1/search?query=${encodeURIComponent(`to:${to}`)}`);
-      found = (await res.json()).messages?.[0];
-      return !!found;
-    }, { timeout: 15_000 })
-    .toBe(true);
-  const message = await (await request.get(`${E2E.mailpitUrl}/api/v1/message/${found!.ID}`)).json();
-  return { subject: message.Subject, text: message.Text };
-}
-
 /** Saves a screenshot next to the specs (`e2e/screenshots/`), for the release notes and reviews. */
 export async function shot(page: Page, name: string, options: { fullPage?: boolean } = {}) {
   await page.waitForLoadState("networkidle");
   await page.waitForTimeout(400);
   const project = test.info().project.name;
   await page.screenshot({ path: `screenshots/${project}-${name}.png`, fullPage: options.fullPage ?? false });
-}
-
-export async function setTheme(page: Page, theme: "light" | "dark") {
-  await page.evaluate((t) => localStorage.setItem("bb-theme", t), theme);
 }

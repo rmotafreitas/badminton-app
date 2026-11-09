@@ -94,22 +94,3 @@ export function playerStats(games: Game[], userId: string, months = 12): PlayerS
     monthly,
   };
 }
-
-/** Club leaderboard: most games, then win rate. */
-export function topPlayers(games: Game[], limit = 5) {
-  const table = new Map<string, { player: GamePlayer; games: number; wins: number }>();
-  for (const game of games) {
-    for (const [side, players] of [["team1", game.team1Players], ["team2", game.team2Players]] as const) {
-      for (const player of players) {
-        const row = table.get(player.id) ?? { player, games: 0, wins: 0 };
-        row.games++;
-        if (game.winner === side) row.wins++;
-        table.set(player.id, row);
-      }
-    }
-  }
-  return [...table.values()]
-    .map((r) => ({ ...r, winRate: Math.round((r.wins / r.games) * 100) }))
-    .sort((a, b) => b.games - a.games || b.winRate - a.winRate)
-    .slice(0, limit);
-}

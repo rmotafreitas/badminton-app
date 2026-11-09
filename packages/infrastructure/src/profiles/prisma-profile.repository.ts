@@ -1,4 +1,4 @@
-import type { ProfileChanges, ProfileImageKind, ProfileRepository } from "@bb/application";
+import type { ProcessedImage, ProfileChanges, ProfileImageKind, ProfileRepository } from "@bb/application";
 import { DEFAULT_RATING, isObjectId, type PlayerProfile, type Role } from "@bb/domain";
 import type { Database } from "@/shared/database";
 
@@ -52,7 +52,7 @@ export class PrismaProfileRepository implements ProfileRepository {
     await this.db.profile.update({ where: { userId }, data: changes });
   }
 
-  async setImage(userId: string, kind: ProfileImageKind, image: { dataUrl: string; version: string } | null): Promise<void> {
+  async setImage(userId: string, kind: ProfileImageKind, image: ProcessedImage | null): Promise<void> {
     const fields = IMAGE_FIELDS[kind];
     await this.db.profile.update({
       where: { userId },

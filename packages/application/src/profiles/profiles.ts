@@ -1,11 +1,6 @@
 import { type Actor, BusinessRuleViolation, canSeeContactDetails, isObjectId, NotFound, type PlayerProfile } from "@bb/domain";
-import type { ImageProcessor, ImageUpload } from "@/shared";
-import type { ProfileChanges, ProfileImageKind, ProfileRepository } from "./ports";
-
-const IMAGE_SIZES: Record<ProfileImageKind, { maxWidth: number; maxHeight: number; quality: number }> = {
-  photo: { maxWidth: 512, maxHeight: 512, quality: 70 },
-  banner: { maxWidth: 1600, maxHeight: 534, quality: 60 },
-};
+import { type ImageProcessor, type ImageUpload, processUpload } from "@/shared";
+import type { ProfileChanges, ProfileRepository } from "./ports";
 
 /** Email and phone are blanked unless the caller may see them (the person, admins, staff of their club). */
 const redact = (actor: Actor, profile: PlayerProfile): PlayerProfile =>
@@ -53,9 +48,7 @@ export class UpdateMyProfile {
     if (Object.keys(changes).length > 0) await this.deps.profiles.update(actor.userId, changes);
     for (const kind of ["photo", "banner"] as const) {
       const upload = input[kind];
-      if (!upload) continue;
-      const image = upload.kind === "remove" ? null : await this.deps.images.toWebp(upload.bytes, IMAGE_SIZES[kind]);
-      await this.deps.profiles.setImage(actor.userId, kind, image);
+      if (upload) await this.deps.profiles.setImage(actor.userId, kind, await processUpload(this.deps.images, upload, kind === "photo" ? "square" : "banner"));
     }
     const profile = await this.deps.profiles.findPlayer(actor.userId);
     if (!profile) throw new NotFound("Profile not found.");

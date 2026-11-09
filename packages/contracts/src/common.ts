@@ -27,3 +27,6 @@ export const OkSchema = z.object({ ok: z.literal(true) });
 
 /** A URL path to a cacheable image (`/api/media/...`), or null when there is none. */
 export const ImageUrlSchema = z.string().nullable();
+
+/** A multipart image upload. An empty file removes the image; a missing field leaves it alone. */
+export const ImageFileSchema = z.file().max(10 * 1024 * 1024).optional();

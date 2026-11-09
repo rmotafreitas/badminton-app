@@ -1,4 +1,4 @@
-import type { ClubImageKind, ClubRepository } from "@bb/application";
+import type { ClubImageKind, ClubRepository, ProcessedImage } from "@bb/application";
 import { type Club, type ClubWithMembers, DEFAULT_RATING, isObjectId, type Role } from "@bb/domain";
 import type { Prisma } from "@prisma/client";
 import type { Database } from "@/shared/database";
@@ -92,7 +92,7 @@ export class PrismaClubRepository implements ClubRepository {
     await this.db.club.delete({ where: { id } });
   }
 
-  async setImage(id: string, kind: ClubImageKind, image: { dataUrl: string; version: string } | null): Promise<void> {
+  async setImage(id: string, kind: ClubImageKind, image: ProcessedImage | null): Promise<void> {
     const fields = IMAGE_FIELDS[kind];
     await this.db.club.update({
       where: { id },

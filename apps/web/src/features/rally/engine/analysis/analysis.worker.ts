@@ -39,6 +39,14 @@ export type AnalysisResponse =
 
 const controllers = new Map<string, AbortController>();
 
+const fail = (jobId: string, e: unknown) =>
+  self.postMessage({
+    type: "error",
+    jobId,
+    message: e instanceof Error ? e.message : String(e),
+    cancelled: e instanceof AnalysisAborted,
+  } satisfies AnalysisResponse);
+
 self.onmessage = async (ev: MessageEvent<AnalysisRequest>) => {
   const msg = ev.data;
   if (msg.type === "cancel") {
@@ -53,12 +61,7 @@ self.onmessage = async (ev: MessageEvent<AnalysisRequest>) => {
       const check = await calibrateVideo(msg.file, { runtime: ortJsepRuntime, backend, signal: ctrl.signal });
       self.postMessage({ type: "calibrated", jobId: msg.jobId, check } satisfies AnalysisResponse);
     } catch (e) {
-      self.postMessage({
-        type: "error",
-        jobId: msg.jobId,
-        message: e instanceof Error ? e.message : String(e),
-        cancelled: e instanceof AnalysisAborted,
-      } satisfies AnalysisResponse);
+      fail(msg.jobId, e);
     } finally {
       controllers.delete(msg.jobId);
     }
@@ -86,12 +89,7 @@ self.onmessage = async (ev: MessageEvent<AnalysisRequest>) => {
     await idbDelete(STORES.checkpoints, msg.jobId).catch(() => undefined);
     self.postMessage({ type: "done", jobId: msg.jobId, result } satisfies AnalysisResponse);
   } catch (e) {
-    self.postMessage({
-      type: "error",
-      jobId: msg.jobId,
-      message: e instanceof Error ? e.message : String(e),
-      cancelled: e instanceof AnalysisAborted,
-    } satisfies AnalysisResponse);
+    fail(msg.jobId, e);
   } finally {
     controllers.delete(msg.jobId);
   }

@@ -14,13 +14,7 @@ export function mediaRoutes(auth: Authentication, deps: ApiDeps) {
   const serve = async (owner: "profile" | "club", id: string, kind: "photo" | "picture" | "banner", set: { headers: Record<string, unknown> }) => {
     const image = await deps.getImage.execute({ owner, id, kind });
     immutableImage(set);
-    return new Response(image.bytes, {
-      headers: {
-        "content-type": image.contentType,
-        "cache-control": "private, max-age=31536000, immutable",
-        "x-content-type-options": "nosniff",
-      },
-    });
+    return new Response(image.bytes, { headers: { "content-type": image.contentType } });
   };
   return new Elysia({ name: "module.media", prefix: "/media" })
     .use(auth)

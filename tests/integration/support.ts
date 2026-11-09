@@ -30,5 +30,3 @@ export function useIsolatedDatabase() {
   });
   return handle;
 }
-
-export const objectId = () => Array.from({ length: 24 }, () => "0123456789abcdef"[Math.floor(Math.random() * 16)]).join("");

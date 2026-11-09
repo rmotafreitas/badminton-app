@@ -35,10 +35,6 @@ export default async function globalSetup() {
   await person(PEOPLE.rui, ["PLAYER"], club.id);
   await db.$disconnect();
 
-  await fetch(`${E2E.mailpitUrl}/api/v1/messages`, { method: "DELETE" }).catch(() => {
-    throw new Error(`Mailpit is not reachable at ${E2E.mailpitUrl}: run \`make up\`.`);
-  });
-
   mkdirSync(".fixtures", { recursive: true });
   // Rally Analysis: an 8-second cut of the lab sample. Without a GPU the models run on WASM, so the full clip takes
   // ~40 minutes in CI; 8 s still holds a rally. RALLY_VIDEO picks another clip.

@@ -1,7 +1,6 @@
 import {
   AcquireAnalysisLock,
   AssignUserToClub,
-  type Cache,
   type ClubRepository,
   type Clock,
   CheckReadiness,
@@ -77,7 +76,6 @@ import {
   googleVerifier,
   MongoRateLimiter,
   mongoHealth,
-  noopCache,
   PrismaChallengeRepository,
   PrismaClubRepository,
   PrismaGameRepository,
@@ -97,7 +95,6 @@ import {
 export interface Infrastructure {
   readonly clock: Clock;
   readonly logger: Logger;
-  readonly cache: Cache;
   readonly health: HealthProbe;
   readonly limiter: RateLimiter;
   readonly secrets: Secrets;
@@ -132,7 +129,6 @@ export function createInfrastructure(config: Config, overrides: InfrastructureOv
   return {
     clock: systemClock,
     logger,
-    cache: noopCache,
     health: mongoHealth(db),
     limiter: new MongoRateLimiter(db),
     secrets: cryptoSecrets,

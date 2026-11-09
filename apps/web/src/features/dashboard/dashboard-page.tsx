@@ -13,7 +13,7 @@ import { Page, PageHeader } from "@/shared/components/page-header";
 import { PlayerAvatar } from "@/shared/components/player-avatar";
 import { useDictionary, useLanguage } from "@/shared/i18n";
 import { fmt } from "@/shared/i18n/ui";
-import { localDay } from "@/shared/lib/format";
+import { localDay, startOfWeek } from "@/shared/lib/format";
 import { cn } from "@/shared/lib/utils";
 import { Button } from "@/shared/ui/button";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/shared/ui/card";
@@ -153,22 +153,16 @@ function TrainingCard() {
   const { lang } = useLanguage();
   const { api } = useAppContext();
   const reviews = useQuery(trainingReviewsQuery(api));
-  const week = useMemo(() => {
-    const start = new Date();
-    start.setDate(start.getDate() - ((start.getDay() + 6) % 7));
-    const from = localDay(start);
-    return (reviews.data ?? []).filter((r) => r.date >= from);
-  }, [reviews.data]);
-  const days = useMemo(() => {
-    const start = new Date();
-    start.setDate(start.getDate() - ((start.getDay() + 6) % 7));
-    return Array.from({ length: 7 }, (_, i) => {
-      const d = new Date(start);
-      d.setDate(start.getDate() + i);
+  const { week, days } = useMemo(() => {
+    const start = startOfWeek();
+    const week = (reviews.data ?? []).filter((r) => r.date >= localDay(start));
+    const days = Array.from({ length: 7 }, (_, i) => {
+      const d = new Date(start.getFullYear(), start.getMonth(), start.getDate() + i);
       const key = localDay(d);
       return { key, label: d.toLocaleDateString(lang, { weekday: "narrow" }), effort: week.find((r) => r.date === key)?.effort ?? 0 };
     });
-  }, [week, lang]);
+    return { week, days };
+  }, [reviews.data, lang]);
   return (
     <Card className="gap-4">
       <CardHeader>

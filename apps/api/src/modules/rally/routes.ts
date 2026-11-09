@@ -40,17 +40,6 @@ export function rallyRoutes(auth: Authentication, deps: ApiDeps) {
   const full = (s: Parameters<typeof presentRallySession>[0]) => presentRallySession(s, "full", deps.clock.now());
   return (
     new Elysia({ name: "module.rally", prefix: "/rally-sessions" })
-      // Vercel Cron only (Authorization: Bearer $CRON_SECRET). Without a secret configured it always answers 401.
-      .get(
-        "/maintenance/purge-videos",
-        async ({ headers, status }) => {
-          if (!deps.cronSecret || headers.authorization !== `Bearer ${deps.cronSecret}`) {
-            return status(401, { code: "unauthenticated", message: "Cron only.", requestId: "cron" });
-          }
-          return { deleted: await deps.purgeExpiredVideos.execute() };
-        },
-        { response: { 200: z.object({ deleted: z.number() }), 401: ErrorResponseSchema } },
-      )
       .use(auth)
       .post("/", async ({ actor, body }) => full(await deps.createRallySession.execute({ actor, input: body })), {
         auth: true,
