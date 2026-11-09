@@ -1,7 +1,7 @@
 import type { ClubMember, GameType, SessionUser } from "@bb/contracts";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
-import { ArrowLeftRight, MoreVertical, RotateCcw, Trash2, Trophy, X } from "lucide-react";
+import { ArrowLeftRight, MoreVertical, RotateCcw, Trash2, Trophy, UserPlus, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useAppContext } from "@/app/context";
@@ -193,7 +193,11 @@ export function LiveScorePage({ user }: { user: SessionUser }) {
           onClick={() => setSlot({ team, index })}
           className={cn("tap-target flex min-h-14 w-full items-center gap-3 rounded-xl border bg-card px-3 text-left", !m && "border-dashed text-muted-foreground")}
         >
-          {m ? <PlayerAvatar id={m.id} name={m.name} photoUrl={m.photoUrl} className="size-9" /> : <span className="size-9 rounded-full bg-muted" />}
+          {m ? <PlayerAvatar id={m.id} name={m.name} photoUrl={m.photoUrl} className="size-9" /> : (
+            <span className="flex size-9 items-center justify-center rounded-full bg-muted">
+              <UserPlus className="size-4" />
+            </span>
+          )}
           <span className="truncate font-medium">{m ? m.name : dict.games.addPlayer}</span>
         </button>
       );

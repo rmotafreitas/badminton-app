@@ -256,11 +256,6 @@ function GameFormBody({
       </div>
 
       <div className="space-y-3">
-        <div className="grid grid-cols-[1fr_auto_1fr] gap-2 px-1 text-center text-xs font-medium tracking-wide text-muted-foreground uppercase">
-          <span>{t.team1}</span>
-          <span />
-          <span>{t.team2}</span>
-        </div>
         {state.sets.map((s, i) => {
           const err = showErrors ? setErrors[i] : null;
           const winner = s.a !== null && s.b !== null && !checkScore(s.a, s.b) ? (s.a > s.b ? "a" : "b") : null;
@@ -279,6 +274,16 @@ function GameFormBody({
                   </button>
                 )}
               </div>
+              {/* Which box is whose, under the first row's title and lined up with the boxes. */}
+              {i === 0 && (
+                <div className="flex gap-2 text-center text-xs font-medium tracking-wide text-muted-foreground uppercase">
+                  <span className="flex-1">{t.team1}</span>
+                  <span aria-hidden="true" className="invisible">
+                    –
+                  </span>
+                  <span className="flex-1">{t.team2}</span>
+                </div>
+              )}
               <div className="flex items-center gap-2">
                 <ScoreButton
                   value={s.a}

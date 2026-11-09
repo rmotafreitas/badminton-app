@@ -14,6 +14,25 @@
   transition-duration: 0.2s !important;
 }
 
+/* iOS Safari draws date/time inputs with its own min-width, height and centred text, so they overflow their grid
+   column and sit taller than every other field. Reset them to behave like a text input. */
+@layer base {
+  input[type="date"],
+  input[type="time"],
+  input[type="datetime-local"] {
+    -webkit-appearance: none;
+    appearance: none;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+  }
+  input::-webkit-date-and-time-value {
+    text-align: left;
+    margin: 0;
+    min-height: 1.5em;
+  }
+}
+
 /* Country flags (Twemoji, CC-BY 4.0), only for the regional-indicator letters: browsers fetch the file the first time a
    flag is drawn, and flags look the same everywhere, including Windows, which has none. */
 @font-face {

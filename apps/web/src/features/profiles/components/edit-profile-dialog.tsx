@@ -3,7 +3,8 @@ import { useMutation } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
 import { useAppContext } from "@/app/context";
-import { ImageField } from "@/shared/components/image-field";
+import { CoverAndPhotoField } from "@/shared/components/image-field";
+import { initials } from "@/shared/components/player-avatar";
 import { ResponsiveSheet } from "@/shared/components/responsive-sheet";
 import { useDictionary } from "@/shared/i18n";
 import { Button } from "@/shared/ui/button";
@@ -51,14 +52,16 @@ export function EditProfileDialog({ profile, open, onOpenChange }: { profile: Pr
           save.mutate();
         }}
       >
-        <ImageField label={t.banner} aspect="banner" current={profile.bannerUrl} value={banner} onChange={setBanner} removeLabel={dict.clubs.remove} />
-        <div className="flex items-end gap-4">
-          <ImageField label={t.photo} current={profile.photoUrl} value={photo} onChange={setPhoto} removeLabel={dict.clubs.remove} />
-          <Field className="min-w-0 flex-1">
-            <FieldLabel htmlFor="profile-name">{t.name}</FieldLabel>
-            <Input id="profile-name" value={name} onChange={(e) => setName(e.target.value)} maxLength={80} required className="h-11" />
-          </Field>
-        </div>
+        <CoverAndPhotoField
+          cover={{ label: t.banner, current: profile.bannerUrl, value: banner, onChange: setBanner }}
+          photo={{ label: t.photo, current: profile.photoUrl, value: photo, onChange: setPhoto }}
+          removeLabel={dict.clubs.remove}
+          fallback={initials(name || profile.name)}
+        />
+        <Field>
+          <FieldLabel htmlFor="profile-name">{t.name}</FieldLabel>
+          <Input id="profile-name" value={name} onChange={(e) => setName(e.target.value)} maxLength={80} required className="h-11" />
+        </Field>
         <div className="grid grid-cols-2 gap-3">
           <Field className="min-w-0">
             <FieldLabel htmlFor="profile-birthday">{t.birthday}</FieldLabel>

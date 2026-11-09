@@ -4,7 +4,8 @@ import { Building2, MapPin, Pencil, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { useAppContext } from "@/app/context";
-import { ImageField } from "@/shared/components/image-field";
+import { CoverAndPhotoField } from "@/shared/components/image-field";
+import { initials } from "@/shared/components/player-avatar";
 import { Page, PageHeader } from "@/shared/components/page-header";
 import { PlayerAvatar } from "@/shared/components/player-avatar";
 import { useDictionary } from "@/shared/i18n";
@@ -66,14 +67,17 @@ function ClubDialog({ club, open, onOpenChange }: { club?: Club; open: boolean; 
           save.mutate();
         }}
       >
-        <ImageField label={dict.clubs.banner} aspect="banner" current={club?.bannerUrl ?? null} value={banner} onChange={setBanner} removeLabel={dict.clubs.remove} />
-        <div className="flex items-end gap-4">
-          <ImageField label={dict.clubs.picture} current={club?.pictureUrl ?? null} value={picture} onChange={setPicture} removeLabel={dict.clubs.remove} />
-          <Field className="min-w-0 flex-1">
-            <FieldLabel htmlFor="club-name">{dict.clubs.name}</FieldLabel>
-            <Input id="club-name" value={name} onChange={(e) => setName(e.target.value)} minLength={2} maxLength={80} required className="h-11" />
-          </Field>
-        </div>
+        <CoverAndPhotoField
+          cover={{ label: dict.clubs.banner, current: club?.bannerUrl ?? null, value: banner, onChange: setBanner }}
+          photo={{ label: dict.clubs.picture, current: club?.pictureUrl ?? null, value: picture, onChange: setPicture }}
+          removeLabel={dict.clubs.remove}
+          photoShape="rounded"
+          fallback={name.trim() ? initials(name) : undefined}
+        />
+        <Field>
+          <FieldLabel htmlFor="club-name">{dict.clubs.name}</FieldLabel>
+          <Input id="club-name" value={name} onChange={(e) => setName(e.target.value)} minLength={2} maxLength={80} required className="h-11" />
+        </Field>
         <Field>
           <FieldLabel htmlFor="club-location">{dict.clubs.location}</FieldLabel>
           <Input id="club-location" value={location} onChange={(e) => setLocation(e.target.value)} maxLength={120} className="h-11" />
