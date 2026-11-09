@@ -19,7 +19,27 @@ export const requestContext = new Elysia({ name: "http.request-context" })
     set.headers["x-frame-options"] = "DENY";
     set.headers["referrer-policy"] = "strict-origin-when-cross-origin";
   })
-  .derive({ as: "global" }, ({ set }) => ({ requestId: currentRequestId(set) }));
+  .derive({ as: "global" }, ({ set }) => ({ requestId: currentRequestId(set) }))
+  // A 204/304 must have no body. Bun tolerates one; Node's Response (Vercel) throws, which turned every sign-out and
+  // delete into a 500 in production. So the empty answer is built here, for both runtimes, with every header kept.
+  .mapResponse({ as: "global" }, ({ responseValue, set }) => {
+    const code =
+      responseValue && typeof responseValue === "object" && "code" in responseValue && typeof responseValue.code === "number"
+        ? responseValue.code
+        : set.status;
+    if (code !== 204 && code !== 304) return;
+    return new Response(null, { status: code, headers: toHeaders(set.headers) });
+  });
+
+/** `set.headers` → Headers, with each Set-Cookie kept as its own header (a comma-joined one would break them). */
+function toHeaders(record: Record<string, unknown>): Headers {
+  const headers = new Headers();
+  for (const [name, value] of Object.entries(record)) {
+    if (Array.isArray(value)) for (const v of value) headers.append(name, String(v));
+    else if (value !== undefined && value !== null) headers.set(name, String(value));
+  }
+  return headers;
+}
 
 export function currentRequestId(set: { headers: Record<string, unknown> }): string {
   const id = set.headers["x-request-id"];

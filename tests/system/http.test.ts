@@ -11,6 +11,20 @@ describe("HTTP layer", () => {
     }
   });
 
+  it("204 answers carry no body (Node, which Vercel runs, throws on one) but keep their headers", async () => {
+    const api = testApi();
+    const res = await api.request("/api/auth/sign-out", {
+      method: "POST",
+      headers: { origin: APP_ORIGIN, "content-type": "application/json", cookie: "__Host-bb_session=dummy-token-1234567890" },
+      body: "{}",
+    });
+    expect(res.status).toBe(204);
+    expect(res.body).toBeNull();
+    expect(res.headers.getSetCookie().some((c) => c.startsWith("__Host-bb_session=;"))).toBe(true);
+    expect(res.headers.get("x-request-id")).toBeTruthy();
+    expect(res.headers.get("cache-control")).toBe("private, no-store");
+  });
+
   it("error bodies follow the contract and never leak internals", async () => {
     const api = testApi();
     const res = await api.request("/api/games/mine");
