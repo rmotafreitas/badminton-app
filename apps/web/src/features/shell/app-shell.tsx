@@ -92,7 +92,7 @@ function BottomTabs() {
   const tabs: NavItem[] = [
     { to: "/dashboard", label: nav.dashboard, icon: Home },
     { to: "/games", label: nav.games, icon: Trophy },
-    { to: "/analysis", label: nav.analysis, icon: Video },
+    { to: "/analysis", label: nav.analysisShort, icon: Video },
     { to: "/profile", label: nav.profile, icon: UserRound, exact: true },
   ];
   const [first, second, ...rest] = tabs;
@@ -101,7 +101,7 @@ function BottomTabs() {
       key={item.to}
       to={item.to}
       className={cn(
-        "tap-target flex min-h-14 flex-1 flex-col items-center justify-center gap-1 py-2 text-[11px] font-medium text-muted-foreground transition-colors short:min-h-11 short:py-1",
+        "tap-target flex min-h-14 min-w-0 flex-col items-center justify-center gap-1 py-2 text-[11px] font-medium text-muted-foreground transition-colors short:min-h-11 short:py-1",
         isActive(item.to, item.exact) && "text-primary",
       )}
     >
@@ -111,10 +111,11 @@ function BottomTabs() {
   );
   return (
     <nav className="fixed inset-x-0 bottom-0 z-40 border-t bg-background/90 px-safe pb-safe backdrop-blur-lg lg:hidden">
-      <div className="flex items-center">
+      {/* Five equal columns: the + is exactly centred whatever the labels' lengths. */}
+      <div className="grid grid-cols-5 items-center">
         {first && tab(first)}
         {second && tab(second)}
-        <div className="flex flex-1 justify-center">
+        <div className="flex justify-center">
           <QuickActionsSheet />
         </div>
         {rest.map(tab)}

@@ -8,6 +8,8 @@ export const uiEnUS = {
     play: "Play",
     games: "Games",
     analysis: "Rally analysis",
+    /** Phone tab bar: one short word. */
+    analysisShort: "Analysis",
     training: "Training",
     club: "Club",
     members: "Members",
@@ -329,6 +331,7 @@ export const uiPtPT: typeof uiEnUS = {
     play: "Jogar",
     games: "Jogos",
     analysis: "Análise de jogadas",
+    analysisShort: "Análise",
     training: "Treino",
     club: "Clube",
     members: "Membros",
