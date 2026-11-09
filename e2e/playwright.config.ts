@@ -22,6 +22,11 @@ export default defineConfig({
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
     locale: "en-US",
+    // The app defaults to Portuguese; the specs read the English copy (auth.spec checks the default).
+    storageState: {
+      cookies: [],
+      origins: [{ origin: E2E.webUrl, localStorage: [{ name: "badminton-lang", value: "en-US" }] }],
+    },
   },
   projects: [
     { name: "desktop", use: { ...devices["Desktop Chrome"], viewport: { width: 1440, height: 900 } }, testIgnore: /(rally|mobile)\.spec/ },

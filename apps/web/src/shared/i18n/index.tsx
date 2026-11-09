@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback } from "react";
+import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { ptPT } from "@/shared/i18n/pt-PT";
 import { enUS } from "@/shared/i18n/en-US";
 import { uiEnUS, uiPtPT } from "@/shared/i18n/ui";
@@ -13,7 +13,8 @@ function getInitialLang(): Language {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored === "pt-PT" || stored === "en-US") return stored;
   } catch {}
-  return navigator.language.startsWith("pt") ? "pt-PT" : "en-US";
+  // The clubs are in Portugal: Portuguese unless someone picks English in the account menu.
+  return "pt-PT";
 }
 
 interface LangContextValue {
@@ -26,6 +27,10 @@ const LangContext = createContext<LangContextValue | null>(null);
 
 export function LanguageProvider({ children }: { children: React.ReactNode }) {
   const [lang, setLang] = useState<Language>(getInitialLang);
+  // Screen readers, hyphenation and the browser's translate prompt read it.
+  useEffect(() => {
+    document.documentElement.lang = lang;
+  }, [lang]);
 
   const setLanguage = useCallback((l: Language) => {
     setLang(l);

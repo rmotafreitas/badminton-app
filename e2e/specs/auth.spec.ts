@@ -2,6 +2,17 @@ import { expect, test } from "@playwright/test";
 import { E2E, PEOPLE } from "../support/env";
 import { fillSignIn, shot, signIn } from "../support/helpers";
 
+test.describe("first visit", () => {
+  test.use({ storageState: { cookies: [], origins: [] } });
+
+  test("the app speaks Portuguese until you choose otherwise", async ({ page }) => {
+    await page.goto("/login");
+    await expect(page.getByRole("heading", { name: "Bem-vindo de volta" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Entrar", exact: true })).toBeVisible();
+    await expect(page.locator("html")).toHaveAttribute("lang", "pt-PT");
+  });
+});
+
 test.describe("authentication", () => {
   test("a guarded page sends you to sign in, then back where you were", async ({ page }) => {
     await page.goto("/training-review");
