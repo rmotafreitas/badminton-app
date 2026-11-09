@@ -35,7 +35,16 @@ test("phone: bottom tabs, the big + offers what to do next, the sidebar is a she
   await page.getByRole("button", { name: "Toggle Sidebar" }).click();
   await page.getByRole("link", { name: "Training" }).click();
   await expect(page).toHaveURL(/\/training-review/);
+  await expect(page.getByRole("dialog")).toBeHidden();
   await shot(page, "training");
+
+  // Navigating from the account menu inside the sheet closes the sheet too.
+  await page.getByRole("button", { name: "Toggle Sidebar" }).click();
+  await page.getByRole("dialog").getByRole("button", { name: /Ana Silva/ }).click();
+  await page.getByRole("menuitem", { name: "My profile" }).click();
+  await expect(page).toHaveURL(/\/profile$/);
+  await expect(page.getByRole("dialog")).toBeHidden();
+  await page.goto("/training-review");
   await tabs.getByRole("link", { name: "Profile" }).click();
   await shot(page, "profile");
 });

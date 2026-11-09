@@ -1,6 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { CalendarCheck, ChevronRight, ClipboardList, Plus, Timer, Video } from "lucide-react";
 import { useState } from "react";
+import { useCloseOnNavigate } from "@/shared/hooks/use-close-on-navigate";
 import { useDictionary } from "@/shared/i18n";
 import { tick } from "@/shared/lib/haptics";
 import { Button } from "@/shared/ui/button";
@@ -22,11 +23,12 @@ export function QuickActionsSheet() {
   const dict = useDictionary().ui;
   const [open, setOpen] = useState(false);
   const actions = useActions();
+  useCloseOnNavigate(() => setOpen(false));
   return (
     <Drawer open={open} onOpenChange={setOpen}>
       <DrawerTrigger asChild>
-        <Button size="icon" className="tap-target -mt-6 size-14 rounded-full shadow-lg shadow-primary/30 short:mt-0 short:size-11" aria-label={dict.nav.newGame} onClick={() => tick()}>
-          <Plus className="size-7" />
+        <Button size="icon" className="tap-target h-11 w-14 rounded-2xl short:h-9 short:w-12" aria-label={dict.nav.newGame} onClick={() => tick()}>
+          <Plus className="size-6" />
         </Button>
       </DrawerTrigger>
       <DrawerContent>

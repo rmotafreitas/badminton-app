@@ -6,6 +6,14 @@
 /* A phone on its side: every pixel of height counts, so the bars pinned to the edges shrink. */
 @custom-variant short (@media (max-height: 30rem));
 
+/* Bottom drawers (vaul) slide and fade in 0.5 s by default, set both in its injected CSS and inline: far too slow
+   for a tap-heavy phone app. Dragging still follows the finger (vaul sets `transition: none` while dragging). */
+[data-vaul-drawer],
+[data-vaul-overlay] {
+  animation-duration: 0.2s !important;
+  transition-duration: 0.2s !important;
+}
+
 /* Country flags (Twemoji, CC-BY 4.0), only for the regional-indicator letters: browsers fetch the file the first time a
    flag is drawn, and flags look the same everywhere, including Windows, which has none. */
 @font-face {

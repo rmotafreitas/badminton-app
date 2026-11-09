@@ -25,6 +25,7 @@ import {
   useSidebar,
 } from "@/shared/ui/sidebar";
 import { AccountMenu } from "./account-menu";
+import { useCloseOnNavigate } from "@/shared/hooks/use-close-on-navigate";
 import { QuickActionsMenu, QuickActionsSheet } from "./quick-actions";
 
 type NavItem = { to: string; label: string; icon: typeof Home; exact?: boolean };
@@ -110,7 +111,7 @@ function BottomTabs() {
   );
   return (
     <nav className="fixed inset-x-0 bottom-0 z-40 border-t bg-background/90 px-safe pb-safe backdrop-blur-lg lg:hidden">
-      <div className="flex items-end">
+      <div className="flex items-center">
         {first && tab(first)}
         {second && tab(second)}
         <div className="flex flex-1 justify-center">
@@ -134,10 +135,18 @@ function OfflineBanner() {
   );
 }
 
+/** The phone sidebar is a sheet: any navigation (a link, the account menu, back) closes it. */
+function CloseMobileSidebarOnNavigate() {
+  const { setOpenMobile } = useSidebar();
+  useCloseOnNavigate(() => setOpenMobile(false));
+  return null;
+}
+
 export function AppShell({ user, children }: { user: SessionUser; children: ReactNode }) {
   const dict = useDictionary().ui;
   return (
     <SidebarProvider>
+      <CloseMobileSidebarOnNavigate />
       <Sidebar collapsible="icon" variant="inset">
         <SidebarHeader>
           <SidebarMenu>
