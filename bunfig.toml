@@ -1,0 +1,4 @@
+# `bun test` at the root = small tests: unit, architecture and in-process system tests (fakes, no database).
+# The web app's tests run with Vitest from apps/web (`bun run test:web`).
+[test]
+pathIgnorePatterns = ["**/node_modules/**", "apps/web/**", "e2e/**", "**/*.integration.test.ts"]

@@ -2,7 +2,7 @@
 
 All models run **in the browser** (ONNX Runtime Web, WebGPU → WASM fallback).
 Weights are not committed; `fetch_models.sh` rebuilds them into
-`web/public/models/` (gitignored). In production they're served from
+`apps/web/public/models/` (gitignored). In production they're served from
 `VITE_MODEL_BASE_URL` (CDN / R2).
 
 | File | Task | Source | License |

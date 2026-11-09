@@ -1,5 +1,7 @@
-# OS
+# OS / editors
 .DS_Store
+.idea/
+.vscode/
 
 # Logs
 *.log
@@ -29,13 +31,12 @@ coverage/
 .env
 .env.local
 .env.*.local
+.env.production
+**/.env.production
 **/.env
 **/.env.local
 **/.env.*.local
 
-# Local TLS certificates
-certs/local/*.pem
-backend/certs/local/*.pem
 
 # Archives and traces
 *.trace
@@ -43,8 +44,13 @@ backend/certs/local/*.pem
 *.tar.gz
 *.tgz
 
-aefa-main
-
 # Rally Analysis: model weights and local test footage (never committed)
-web/public/models/
-web/public/lab/
+apps/web/public/models/
+apps/web/public/lab/
+
+# TypeScript project-reference output
+.tsbuild/
+.vercel
+
+# Playwright / test output
+**/test-results/

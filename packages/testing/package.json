@@ -1,0 +1,12 @@
+{
+  "name": "@bb/testing",
+  "private": true,
+  "type": "module",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "dependencies": {
+    "@bb/application": "workspace:*",
+    "@bb/bootstrap": "workspace:*",
+    "@bb/domain": "workspace:*"
+  }
+}

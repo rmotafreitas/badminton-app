@@ -3,35 +3,16 @@
 ## First-time setup
 
 ```bash
-# 1 — install mkcert (once per machine)
-brew install mkcert nss
-mkcert -install
-
-# 2 — copy env files and fill in values
-cp .env.example .env
-cp backend/.env.example backend/.env
-cp web/.env.example web/.env
-
-# 3 — install all deps
-make install
-
-# 4 — generate Prisma client
-make db-generate
+brew install mkcert nss && mkcert -install   # once per machine (Linux: your package manager)
+cp .env.example .env                         # one .env at the root, read by the API and the web app
+make dev                                     # install, services, schema, API + web
 ```
 
-### Host-run backend (alternative to the Docker backend)
+`make up` starts only Mongo (replica set, no auth) + SeaweedFS (local S3 stand-in for R2); then `bun run dev` runs the
+API on `127.0.0.1:3000` and the web app on `https://localhost:5173` (it proxies `/api`, so cookies are first-party).
 
-```bash
-# Infra only: Mongo (replica set, no auth) + SeaweedFS (local S3 stand-in for R2)
-docker compose -f docker-compose.dev.yml up -d mongo mongo-init seaweedfs seaweedfs-init
-
-# backend/.env → DATABASE_URL=mongodb://localhost:27017/app?directConnection=true
-cd backend && bun run db:push && bun dev     # https://localhost:3000
-cd web && bun dev --host                     # https://localhost:5173 (+ LAN for phones)
-```
-
-`prisma/seed.ts` has its `main()` call commented out on purpose (it wipes the DB).
-Seeded password login: `admin@email.local` / `password`.
+`scripts/seed.ts` has its `main()` call commented out on purpose (it wipes the DB).
+Seeded password login: `admin@email.local` / `password`. `make db-seed-demo` adds demo games (local DB only).
 
 ### Object storage (Rally Analysis videos)
 
@@ -40,112 +21,50 @@ Seeded password login: `admin@email.local` / `password`.
 | Dev              | SeaweedFS (`seaweedfs`)  | `http://localhost:8333`, bucket `rally-dev`  |
 | Prod             | Cloudflare R2            | `https://<account-id>.r2.cloudflarestorage.com` |
 
-Dev credentials live in `infra/seaweedfs/s3.json` (local only). Backend reads `S3_*` vars — see `backend/.env.example`.
-Videos never pass through the API: the backend presigns PUT/GET URLs and the browser talks to storage directly
-(R2 bucket needs a CORS rule for the app origin). A daily Vercel Cron purges expired videos (`CRON_SECRET`).
+Dev credentials live in `infra/seaweedfs/s3.json` (local only). The API reads `S3_*` from the root `.env`.
+Videos never pass through the API: it presigns PUT/GET URLs and the browser talks to storage directly
+(the R2 bucket needs a CORS rule for the app origin). A daily Vercel Cron purges expired videos (`CRON_SECRET`).
 
 ---
 
 ## Daily dev workflow
 
-| Goal                             | Command             |
-| -------------------------------- | ------------------- |
-| Start MongoDB + backend          | `make dev`          |
-| Start frontend (local, with HMR) | `cd web && bun dev` |
-| Stop MongoDB + backend           | `make dev-down`     |
-| Stream backend logs              | `make dev-logs`     |
-| Open Mongo shell                 | `make db-shell`     |
+| Goal                                   | Command                  |
+| -------------------------------------- | ------------------------ |
+| Everything (services, schema, API+web) | `make dev`               |
+| Only the services                      | `make up` / `make down`  |
+| API + web against running services     | `bun run dev`            |
+| Typecheck + all tests                  | `make check`             |
+| Mongo shell                            | `docker compose -f docker-compose.dev.yml exec mongo mongosh app` |
 
-Backend → `https://localhost:3000`
-Frontend → `https://localhost:5173`
-API proxy → Vite rewrites `/api/*` → `https://localhost:3000/*`
-
----
+API → `http://127.0.0.1:3000/api` · Web → `https://localhost:5173` (Vite proxies `/api` with the path kept).
 
 ## Database
 
-| Goal                           | Command            |
-| ------------------------------ | ------------------ |
-| Push schema changes to MongoDB | `make db-push`     |
-| Re-generate Prisma client      | `make db-generate` |
-| Open Prisma Studio (GUI)       | `make db-studio`   |
+| Goal                                   | Command                    |
+| -------------------------------------- | -------------------------- |
+| Push schema (collections, indexes)     | `make db-push`             |
+| Prisma Studio                          | `bun run db:studio`        |
+| Demo games (local DB only)             | `make db-seed-demo`        |
+| Content versions for stored images     | `make db-backfill-images`  |
+| Replay every club's ratings            | `make db-recompute-elo`    |
 
----
+## Production (self-hosted)
 
-## Production
+`make prod-up` builds and starts Mongo + API + nginx (web build, `/api` proxy). Vercel: see the README.
 
-| Goal                    | Command      |
-| ----------------------- | ------------ |
-| Build all Docker images | `make build` |
-| Start full stack        | `make up`    |
-| Stop full stack         | `make down`  |
-| Stream all logs         | `make logs`  |
+## Imports
 
----
-
-## Local HTTPS — how it works
-
-### Backend — `elysia-local-https`
-
-`elysia-local-https` wraps the Elysia `listen()` call. On first run it:
-
-1. runs `mkcert -install` (prompts sudo once)
-2. generates `certs/local/localhost.pem` + `certs/local/localhost-key.pem`
-3. auto-refreshes certs when < 14 days from expiry
-
-Controlled by env vars:
-
-```
-ENABLE_LOCAL_HTTPS=true   # default: true when NODE_ENV != production
-HTTPS_CERT_PATH=certs/local/localhost.pem
-HTTPS_KEY_PATH=certs/local/localhost-key.pem
-```
-
-Inside Docker, `ENABLE_LOCAL_HTTPS` is set to `false` — plain HTTP, with TLS terminated at the nginx reverse proxy in prod.
-
-### Frontend — `vite-plugin-mkcert`
-
-Added to `vite.config.ts` as `mkcert()` in the `plugins` array. The plugin:
-
-1. detects if mkcert is installed
-2. generates/reuses trusted certs for `localhost`
-3. injects them into Vite's dev-server HTTPS config automatically
-
-No `server.https: true` needed — the plugin covers it.
-
----
-
-## Path aliases
-
-Both projects support `@/` imports pointing to their respective `src/` directories.
-
-```ts
-// backend — instead of:
-import { PrismaUserRepo } from "../../infrastructure/db/PrismaUserRepo";
-// use:
-import { PrismaUserRepo } from "@/infrastructure/db/PrismaUserRepo";
-
-// web — instead of:
-import { AuthServiceImpl } from "../../core/services/auth-service";
-// use:
-import { AuthServiceImpl } from "@/core/services/auth-service";
-```
-
-Configured in:
-
-- `backend/tsconfig.json` → `paths: { "@/*": ["./src/*"] }`
-- `web/tsconfig.app.json` → `paths: { "@/*": ["./src/*"] }`
-- `web/vite.config.ts` → `resolve.alias: { "@": "./src" }`
-
----
+`@/x` is the current package's `src/x`; other packages are `@bb/<name>`; `../` is not allowed
+(`tests/architecture.test.ts`). The web app sees only `@bb/contracts` and the API's type.
 
 ## Troubleshooting
 
-| Problem                                               | Fix                                                                                                           |
-| ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- | ----------- |
-| `UNABLE_TO_VERIFY_LEAF_SIGNATURE` in Vite proxy       | Expected — browser trusts mkcert CA but Node doesn't. Set `secure: false` in the proxy config (already done). |
-| `mkcert: command not found`                           | `brew install mkcert nss && mkcert -install`                                                                  |
-| Prisma `Environment variable not found: DATABASE_URL` | Make sure `backend/.env` exists and has `DATABASE_URL` set.                                                   |
-| Backend starts on HTTP instead of HTTPS               | Check `ENABLE_LOCAL_HTTPS=true` in `backend/.env` and that certs exist in `backend/certs/local/`.             |
-| Port 3000 already in use                              | `lsof -ti:3000                                                                                                | xargs kill` |
-| Port 5173 already in use                              | `lsof -ti:5173                                                                                                | xargs kill` |
+| Problem                                   | Fix                                                                         |
+| ----------------------------------------- | --------------------------------------------------------------------------- |
+| `Invalid environment` on API start        | The message lists the missing/invalid variables (`packages/config`).        |
+| `mkcert: command not found`               | Install mkcert, then `mkcert -install`.                                     |
+| 403 "Cross-origin request refused"        | `APP_URL` must be the exact origin you open the web app on.                 |
+| Signed out after upgrading                | Expected once: sessions replaced the old JWT cookies.                       |
+| Photos missing after deploy               | Run `make db-backfill-images` against that database.                        |
+| Port 3000 / 5173 in use                   | `lsof -ti:3000 \| xargs kill`                                               |

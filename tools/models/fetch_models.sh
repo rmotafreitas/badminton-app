@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# Builds every Rally Analysis model into web/public/models (gitignored).
+# Builds every Rally Analysis model into apps/web/public/models (gitignored).
 # Requires: curl, unzip, git, python3.12 + uv (or a venv with the packages below).
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
-OUT="$ROOT/web/public/models"
+OUT="$ROOT/apps/web/public/models"
 WORK="${RALLY_MODELS_WORKDIR:-$HOME/.cache/rally-models}"
 mkdir -p "$OUT" "$WORK"
 cd "$WORK"

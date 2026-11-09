@@ -1,0 +1,12 @@
+**/node_modules
+**/dist
+**/.vercel
+.tsbuild
+.git
+.env
+**/.env
+apps/web/public/models
+apps/web/public/lab
+apps/web/test-results
+tools
+docs

@@ -1,0 +1,50 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "installCommand": "cd ../.. && bun install",
+  "buildCommand": "bun run build",
+  "outputDirectory": "dist",
+  "routes": [
+    {
+      "src": "/api/(.*)",
+      "dest": "${API_URL}/api/$1",
+      "env": [
+        "API_URL"
+      ]
+    },
+    {
+      "src": "/(.*)",
+      "headers": {
+        "x-content-type-options": "nosniff",
+        "referrer-policy": "strict-origin-when-cross-origin",
+        "permissions-policy": "camera=(self), microphone=(self), geolocation=(), payment=()",
+        "strict-transport-security": "max-age=63072000; includeSubDomains",
+        "x-frame-options": "DENY"
+      },
+      "continue": true
+    },
+    {
+      "src": "/assets/(.*)",
+      "headers": {
+        "cache-control": "public, max-age=31536000, immutable"
+      },
+      "continue": true
+    },
+    {
+      "src": "/sw.js",
+      "headers": {
+        "cache-control": "no-cache"
+      },
+      "continue": true
+    },
+    {
+      "handle": "filesystem"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/index.html",
+      "headers": {
+        "cache-control": "no-cache"
+      }
+    }
+  ]
+}

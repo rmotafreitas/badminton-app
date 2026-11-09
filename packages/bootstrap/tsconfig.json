@@ -1,0 +1,12 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "../../.tsbuild/bootstrap",
+    "rootDir": "src",
+    "types": ["bun"],
+    "tsBuildInfoFile": "../../.tsbuild/bootstrap.tsbuildinfo",
+    "paths": { "@/*": ["./src/*"] }
+  },
+  "include": ["src"],
+  "references": [{ "path": "../application" }, { "path": "../config" }, { "path": "../infrastructure" }]
+}

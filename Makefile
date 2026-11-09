@@ -1,78 +1,54 @@
-.PHONY: dev dev-down dev-logs build up down logs \
-        db-shell db-generate db-push db-seed install install-backend install-web clean dev-full
+# Front door only: every target runs a `bun run` script, so CI and machines without make use bun directly.
+.PHONY: help dev up down reset install check test typecheck db-push db-seed-demo db-backfill-images db-recompute-elo build-web build-api prod-up prod-down
 
-# ─────────────────────────────────────────────────────────────────────────────
-#  DEV  — MongoDB + backend in Docker, frontend runs locally (best HMR)
-# ─────────────────────────────────────────────────────────────────────────────
-dev:
-	docker compose -f docker-compose.dev.yml up -d --build
-	@echo ""
-	@echo "  → Backend:  https://localhost:3000"
-	@echo "  → Start frontend locally:  cd web && bun dev"
-	@echo ""
+help: ## List targets
+	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[32m%-20s\033[0m %s\n", $$1, $$2}'
 
-dev-full:
-	docker compose -f docker-compose.dev.yml down
-	docker compose -f docker-compose.dev.yml up -d --build
-	cd backend && bunx --bun prisma generate && bunx --bun prisma db push && bun run db:seed
-	@echo ""
-	@echo "  → Backend:  https://localhost:3000"
-	@echo "  → Start frontend locally:  cd web && bun dev"
-	@echo ""
+dev: install up ## Install, start Mongo + SeaweedFS, push the schema, run API + web
+	bun run db:push
+	bun run dev
 
-dev-down:
+up: ## Start local services (Mongo replica set, SeaweedFS)
+	docker compose -f docker-compose.dev.yml up -d --wait
+
+down: ## Stop local services
 	docker compose -f docker-compose.dev.yml down
 
-dev-logs:
-	docker compose -f docker-compose.dev.yml logs -f
-
-# ─────────────────────────────────────────────────────────────────────────────
-#  PRODUCTION
-# ─────────────────────────────────────────────────────────────────────────────
-build:
-	docker compose build
-
-up:
-	docker compose up -d
-
-down:
-	docker compose down
-
-logs:
-	docker compose logs -f
-
-# ─────────────────────────────────────────────────────────────────────────────
-#  DATABASE
-# ─────────────────────────────────────────────────────────────────────────────
-db-shell:
-	docker compose -f docker-compose.dev.yml exec mongo mongosh
-
-db-generate:
-	cd backend && bunx --bun prisma generate
-
-db-push:
-	cd backend && bunx --bun prisma db push
-
-db-studio:
-	cd backend && bunx --bun prisma studio
-
-db-seed:
-	cd backend && bun run db:seed
-
-# ─────────────────────────────────────────────────────────────────────────────
-#  INSTALL
-# ─────────────────────────────────────────────────────────────────────────────
-install: install-backend install-web
-
-install-backend:
-	cd backend && bun install
-
-install-web:
-	cd web && bun install
-
-# ─────────────────────────────────────────────────────────────────────────────
-#  CLEAN
-# ─────────────────────────────────────────────────────────────────────────────
-clean:
-	docker compose down -v
+reset: ## Stop local services and DELETE their data
 	docker compose -f docker-compose.dev.yml down -v
+
+install: ## Install dependencies (generates the Prisma client)
+	bun install
+
+check: ## Typecheck + every small test (backend, architecture, web)
+	bun run check
+
+test: ## Small tests only
+	bun run test
+
+typecheck: ## TypeScript project references
+	bun run typecheck
+
+db-push: ## Sync the Prisma schema (indexes, new collections) to DATABASE_URL
+	bun run db:push
+
+db-seed-demo: ## DEV ONLY: 90 demo games per club, then ratings replayed
+	bun run db:seed:demo
+
+db-backfill-images: ## One-off after deploy: content versions for stored images
+	bun run db:backfill-images
+
+db-recompute-elo: ## Replay every club's games and rewrite ratings
+	bun run db:recompute-elo
+
+build-web: ## Production build of the web app
+	bun run build:web
+
+build-api: ## Vercel build output of the API
+	bun run build:api
+
+prod-up: ## Self-hosted production (Mongo + API + nginx web)
+	docker compose up -d --build
+
+prod-down:
+	docker compose down

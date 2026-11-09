@@ -16,44 +16,35 @@ services:
       timeout: 5s
       retries: 5
 
-  # ── Backend (Bun + Elysia, Onion arch) ────────────────────────────────────
-  backend:
+  # ── API (Bun + Elysia) ─────────────────────────────────────────────────
+  api:
     build:
-      context: ./backend
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: apps/api/Dockerfile
     restart: unless-stopped
     depends_on:
       mongo:
         condition: service_healthy
+    env_file: .env
     environment:
+      NODE_ENV: production
+      API_HOST: 0.0.0.0
+      API_PORT: 3000
       DATABASE_URL: mongodb://${MONGO_USER:-admin}:${MONGO_PASSWORD}@mongo:27017/app?authSource=admin
-      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
-      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
-      SMTP_HOST: ${SMTP_HOST}
-      SMTP_PORT: ${SMTP_PORT:-587}
-      SMTP_SECURE: ${SMTP_SECURE:-false}
-      SMTP_USERNAME: ${SMTP_USERNAME}
-      SMTP_PASSWORD: ${SMTP_PASSWORD}
-      SMTP_FROM: ${SMTP_FROM}
-      APP_URL: ${APP_URL}
-      TWILIO_ACCOUNT_SID: ${TWILIO_ACCOUNT_SID}
-      TWILIO_AUTH_TOKEN: ${TWILIO_AUTH_TOKEN}
-      TWILIO_FROM_NUMBER: ${TWILIO_FROM_NUMBER}
-      FRONTEND_URL: ${FRONTEND_URL}
-      ENABLE_LOCAL_HTTPS: "false"
-    ports:
-      - "3000:3000"
+    expose:
+      - "3000"
 
-  # ── Frontend (nginx serving Vite build) ────────────────────────────────────
-  frontend:
+  # ── Web (nginx: static build + /api proxy) ───────────────────────────────
+  web:
     build:
-      context: ./web
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        VITE_GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+        VITE_MODEL_BASE_URL: ${VITE_MODEL_BASE_URL:-}
     restart: unless-stopped
     depends_on:
-      - backend
-    environment:
-      VITE_GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+      - api
     ports:
       - "80:80"
 

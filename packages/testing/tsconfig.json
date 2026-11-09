@@ -1,0 +1,12 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "../../.tsbuild/testing",
+    "rootDir": "src",
+    "types": ["bun"],
+    "tsBuildInfoFile": "../../.tsbuild/testing.tsbuildinfo",
+    "paths": { "@/*": ["./src/*"] }
+  },
+  "include": ["src"],
+  "references": [{ "path": "../domain" }, { "path": "../application" }, { "path": "../bootstrap" }]
+}

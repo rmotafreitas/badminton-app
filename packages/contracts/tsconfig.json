@@ -1,0 +1,11 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "../../.tsbuild/contracts",
+    "rootDir": "src",
+    "types": [],
+    "tsBuildInfoFile": "../../.tsbuild/contracts.tsbuildinfo",
+    "paths": { "@/*": ["./src/*"] }
+  },
+  "include": ["src"]
+}

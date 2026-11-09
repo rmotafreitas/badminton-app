@@ -1,0 +1,17 @@
+{
+  "name": "@bb/e2e",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "playwright test --project=desktop --project=mobile",
+    "test:rally": "playwright test --project=rally",
+    "report": "playwright show-report"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.64.0",
+    "@prisma/client": "6.19.3",
+    "bcryptjs": "3.0.3",
+    "sharp": "0.35.2",
+    "@types/node": "24.13.2"
+  }
+}

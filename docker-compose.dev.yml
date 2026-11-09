@@ -1,3 +1,4 @@
+# Local services only. The API and web app run on the host: `bun run dev` (or `make dev`).
 services:
   mongo:
     image: mongo:7
@@ -34,6 +35,14 @@ services:
             }
           '
         sleep 3
+
+  # Captures every email in development and E2E (UI: http://localhost:8025, SMTP: localhost:1025).
+  mailpit:
+    image: axllent/mailpit:v1.27
+    restart: unless-stopped
+    ports:
+      - "1025:1025"
+      - "8025:8025"
 
   # Local S3-compatible object storage (stand-in for Cloudflare R2 in dev).
   # S3 API on http://localhost:8333 — dev-only credentials in infra/seaweedfs/s3.json
@@ -72,22 +81,6 @@ services:
         done
         echo "bucket creation failed"; exit 1
 
-  backend:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile.dev
-    restart: unless-stopped
-    depends_on:
-      mongo-init:
-        condition: service_completed_successfully
-    volumes:
-      - ./backend/src:/app/src          # hot-reload source
-      - ./backend/certs:/app/certs      # local HTTPS certs (mkcert)
-      - ./.env:/app/.env                # mounted so entrypoint can watch for changes
-    env_file:
-      - .env
-    ports:
-      - "3000:3000"
 
 volumes:
   mongo_data_dev:

@@ -1,0 +1,18 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "../../.tsbuild/api",
+    "rootDir": "src",
+    "types": ["bun"],
+    "tsBuildInfoFile": "../../.tsbuild/api.tsbuildinfo",
+    "paths": { "@/*": ["./src/*"] }
+  },
+  "include": ["src"],
+  "references": [
+    { "path": "../../packages/domain" },
+    { "path": "../../packages/application" },
+    { "path": "../../packages/contracts" },
+    { "path": "../../packages/config" },
+    { "path": "../../packages/bootstrap" }
+  ]
+}

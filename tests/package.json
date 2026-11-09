@@ -1,0 +1,18 @@
+{
+  "name": "@bb/tests",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@bb/api": "workspace:*",
+    "@bb/application": "workspace:*",
+    "@bb/bootstrap": "workspace:*",
+    "@bb/contracts": "workspace:*",
+    "@bb/domain": "workspace:*",
+    "@bb/testing": "workspace:*",
+    "@elysiajs/eden": "1.4.9",
+    "@bb/config": "workspace:*",
+    "@bb/infrastructure": "workspace:*",
+    "@prisma/client": "6.19.3",
+    "sharp": "0.35.2"
+  }
+}

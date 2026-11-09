@@ -1,7 +1,0 @@
-.is-hero-bar {
-  @apply bg-card border-b border-border p-4 sm:p-6;
-}
-
-.is-hero-bar h1 {
-  @apply text-2xl sm:text-3xl font-semibold leading-tight;
-}

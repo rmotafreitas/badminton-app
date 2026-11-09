@@ -1,0 +1,32 @@
+{
+  "files": [],
+  "references": [
+    {
+      "path": "packages/domain"
+    },
+    {
+      "path": "packages/application"
+    },
+    {
+      "path": "packages/contracts"
+    },
+    {
+      "path": "packages/config"
+    },
+    {
+      "path": "packages/infrastructure"
+    },
+    {
+      "path": "packages/bootstrap"
+    },
+    {
+      "path": "packages/testing"
+    },
+    {
+      "path": "apps/api"
+    },
+    {
+      "path": "apps/web"
+    }
+  ]
+}

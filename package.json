@@ -1,0 +1,42 @@
+{
+  "name": "badminton-buddy",
+  "private": true,
+  "type": "module",
+  "packageManager": "bun@1.4.3",
+  "workspaces": [
+    "apps/*",
+    "packages/*",
+    "tests",
+    "scripts",
+    "e2e"
+  ],
+  "scripts": {
+    "postinstall": "bun run db:generate",
+    "dev": "bun run --parallel dev:api dev:web",
+    "dev:api": "bun run --cwd apps/api dev",
+    "dev:web": "bun run --cwd apps/web dev",
+    "build:web": "bun run --cwd apps/web build",
+    "build:api": "bun run --cwd apps/api build",
+    "db:generate": "prisma generate --schema packages/infrastructure/prisma/schema.prisma",
+    "db:push": "prisma db push --schema packages/infrastructure/prisma/schema.prisma",
+    "db:studio": "prisma studio --schema packages/infrastructure/prisma/schema.prisma",
+    "db:seed": "bun --env-file=.env scripts/seed.ts",
+    "db:recompute-elo": "bun --env-file=.env scripts/recompute-elo.ts",
+    "db:backfill-images": "bun --env-file=.env scripts/backfill-image-versions.ts",
+    "typecheck": "tsc -b && tsc -p tests && tsc -p scripts && tsc -p e2e",
+    "test": "bun run test:unit && bun run test:web",
+    "test:unit": "bun test",
+    "test:web": "bun run --cwd apps/web test",
+    "check": "bun run typecheck && bun run test",
+    "db:seed:demo": "bun --env-file=.env scripts/seed-demo.ts",
+    "test:integration": "bun --env-file=.env test --path-ignore-patterns='**/node_modules/**' --path-ignore-patterns='apps/web/**' --path-ignore-patterns='e2e/**' --timeout 30000 .integration.test",
+    "test:all": "bun run test && bun run test:integration && bun run test:e2e",
+    "test:e2e": "bun run --cwd e2e test",
+    "test:e2e:rally": "bun run --cwd e2e test:rally"
+  },
+  "devDependencies": {
+    "@types/bun": "1.4.4",
+    "prisma": "6.19.3",
+    "typescript": "5.9.3"
+  }
+}

@@ -1,0 +1,61 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: Typecheck, unit, system and web tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.3
+      - run: bun install --frozen-lockfile
+      - run: bun run check
+
+  integration:
+    name: Integration (MongoDB + SeaweedFS)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.3
+      - run: docker compose -f docker-compose.dev.yml up -d --wait mongo mongo-init seaweedfs seaweedfs-init
+      - run: bun install --frozen-lockfile
+      - run: cp .env.example .env
+      - run: bun run test:integration
+
+  e2e:
+    name: End-to-end (Playwright)
+    runs-on: ubuntu-latest
+    needs: check
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.3
+      - run: docker compose -f docker-compose.dev.yml up -d --wait mongo mongo-init seaweedfs seaweedfs-init mailpit
+      - run: bun install --frozen-lockfile
+      - run: cp .env.example .env
+      - run: sudo apt-get install -y libnss3-tools && curl -sL "https://dl.filippo.io/mkcert/latest?for=linux/amd64" -o /usr/local/bin/mkcert && chmod +x /usr/local/bin/mkcert && mkcert -install
+      - run: bunx --cwd e2e playwright install --with-deps chromium
+      - run: bun run test:e2e
+        env:
+          CI: "1"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: e2e
+          path: |
+            e2e/.report
+            e2e/screenshots
+          retention-days: 14

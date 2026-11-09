@@ -1,0 +1,15 @@
+{
+  "name": "@bb/scripts",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@bb/application": "workspace:*",
+    "@bb/bootstrap": "workspace:*",
+    "@bb/config": "workspace:*",
+    "@bb/domain": "workspace:*",
+    "@bb/infrastructure": "workspace:*",
+    "@prisma/client": "6.19.3",
+    "bcryptjs": "3.0.3",
+    "sharp": "0.35.2"
+  }
+}

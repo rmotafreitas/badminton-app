@@ -12,7 +12,7 @@ object storage.
 ## Architecture
 
 ```
-web/src/rally/
+apps/web/src/features/rally/
   engine/                 pure analysis code (runs in workers)
     runtime/              InferenceRuntime port + ONNX Runtime Web adapter (WebGPU → WASM)
     models/               model registry/cache, YOLOX (people), TrackNetV3 (shuttle)
@@ -29,7 +29,7 @@ web/src/rally/
   storage/idb.ts          IndexedDB wrapper
   ui/                     pages + components (/analysis, /analysis/record, /analysis/:key)
   lab/                    /lab device benchmark + engine harness (internal)
-backend/src/…/RallySession*   sessions API, S3/R2 presigning, analysis lock, retention
+packages/application/src/rally + apps/api/src/modules/rally   sessions API, S3/R2 presigning, analysis lock, retention
 tools/models/                 reproducible model export (weights are not in git)
 ```
 
@@ -93,7 +93,7 @@ Nobody else. Linked players can remove themselves.
    ]
    ```
 
-4. Backend env (Vercel project of `backend/`):
+4. API env (Vercel project rooted at `apps/api/`):
 
    | Var | Value |
    | --- | --- |
@@ -106,10 +106,10 @@ Nobody else. Linked players can remove themselves.
    Without `S3_*` the feature still works: sessions, stats and reviews sync,
    videos stay on the recording device ("Cloud storage not set up").
 
-5. Push the Prisma schema: `cd backend && bun run db:push` (adds `RallySession`).
+5. Push the Prisma schema: `bun run db:push` (adds `RallySession`).
 
-The backend build declares a daily Vercel Cron
-(`/rally-sessions/maintenance/purge-videos`) that deletes review videos older
+The API build declares a daily Vercel Cron
+(`/api/rally-sessions/maintenance/purge-videos`) that deletes review videos older
 than 60 days unless pinned. Stats are kept forever.
 
 ### 2. Model files (~43 MB used by the app)
@@ -117,8 +117,8 @@ than 60 days unless pinned. Stats are kept forever.
 The app needs `yolox_tiny_humanart.onnx` and `tracknetv3_fp16.onnx` (the other
 files are only used by `/lab`). Build them with `tools/models/fetch_models.sh`,
 then host them on any CDN with CORS — e.g. a **public R2 bucket** (r2.dev or a
-custom domain) with `GET` allowed from your app origin — and set in the `web/`
-Vercel project:
+custom domain) with `GET` allowed from your app origin — and set in the web
+(`apps/web/`) Vercel project:
 
 ```
 VITE_MODEL_BASE_URL=https://models.YOUR-DOMAIN/   # trailing slash
@@ -156,24 +156,21 @@ analysis starts) are part of the normal Vite build.
 ## Developing
 
 ```bash
-docker compose -f docker-compose.dev.yml up -d mongo mongo-init seaweedfs seaweedfs-init
-tools/models/fetch_models.sh            # models → web/public/models
-cd backend && bun run db:push && bun dev
-cd web && bun dev --host                # https://localhost:5173/analysis, /lab
-cd web && bunx vitest run src/rally     # engine tests (geometry, physics, tracking, events)
+make up                                  # Mongo (replica set) + SeaweedFS
+tools/models/fetch_models.sh            # models → apps/web/public/models
+bun run db:push && bun run dev          # API + web: https://localhost:5173/analysis, /lab
+cd apps/web && bunx vitest run src/features/rally   # engine tests (geometry, physics, tracking, events)
 ```
 
 ### End-to-end check
 
 ```bash
-cd web && RALLY_VIDEO=/path/clip.mp4 CHROME=/path/to/chrome bun ../tools/e2e/rally-e2e.mjs
+make up && bun run test:e2e:rally        # RALLY_VIDEO=/path/clip.mp4 to use your own footage
 ```
 
-`BROWSER=webkit` runs it in Safari's engine instead (two dev-only artefacts:
-headless Linux WebKit draws every video frame black, so the court can't be
-detected, and it blocks the `http://localhost:8333` SeaweedFS upload from the
-HTTPS app as mixed content — production storage must be HTTPS anyway). Drives a real headless browser through import → court check → analysis →
-upload → review → export → download, saving screenshots and the export.
+Playwright drives the real stack through import → court check → on-device analysis → shot review → correction →
+export → the cloud copy (`e2e/specs/rally.spec.ts`). Headless Linux WebKit draws every video frame black, so the
+court can't be detected there: the rally project runs in Chromium.
 
 ### Measuring accuracy
 
