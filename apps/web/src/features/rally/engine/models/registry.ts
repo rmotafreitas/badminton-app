@@ -1,7 +1,8 @@
 /**
- * Model catalogue. Weights are NOT committed to git; they are produced by
- * tools/models/ (export scripts) and served from MODEL_BASE_URL — `/models/`
- * in dev (web/public/models, gitignored), a CDN/R2 bucket in prod.
+ * Model catalogue. Weights are produced by tools/models/ (export scripts) and
+ * served from MODEL_BASE_URL (default `/models/`, i.e. web/public/models). Only
+ * the models the app itself runs are committed (tracknetv3_fp16, yolox_tiny);
+ * the lab-only ones stay local.
  */
 
 export type ModelId =
@@ -76,6 +77,8 @@ export const MODELS: Record<ModelId, ModelSpec> = {
   },
 };
 
+const MODEL_CACHE = "rally-models-v2";
+
 export function modelUrl(id: ModelId): string {
   return MODEL_BASE_URL + MODELS[id].file;
 }
@@ -89,10 +92,11 @@ export async function fetchModel(
   onProgress?: (loaded: number, total: number) => void,
 ): Promise<ArrayBuffer> {
   const url = modelUrl(id);
-  const cacheName = "rally-models-v1";
   let cached: Response | undefined;
   try {
-    const cache = await caches.open(cacheName);
+    // v1 could hold the SPA's index.html saved as a model; drop it.
+    void caches.delete("rally-models-v1").catch(() => undefined);
+    const cache = await caches.open(MODEL_CACHE);
     cached = await cache.match(url);
     if (cached) return await cached.arrayBuffer();
   } catch {
@@ -101,6 +105,7 @@ export async function fetchModel(
 
   const res = await fetch(url);
   if (!res.ok || !res.body) throw new Error(`Model ${id}: HTTP ${res.status}`);
+  if (res.headers.get("content-type")?.includes("text/html")) throw new Error(`Model ${id}: not found at ${url}`);
   const total = Number(res.headers.get("content-length") ?? 0);
   const reader = res.body.getReader();
   const chunks: Uint8Array[] = [];
@@ -119,7 +124,7 @@ export async function fetchModel(
     offset += c.byteLength;
   }
   try {
-    const cache = await caches.open(cacheName);
+    const cache = await caches.open(MODEL_CACHE);
     await cache.put(url, new Response(bytes, { headers: { "content-type": "application/octet-stream" } }));
   } catch {
     // Best effort.

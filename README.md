@@ -40,7 +40,7 @@ Two projects from this repository:
   uptime monitor (UptimeRobot, cron-job.org) at `/api/health/ready` every 5 minutes; the app is built to stay usable
   through a cold start anyway (see "A sleeping API never blocks the UI" in docs/architecture.md).
 - **Web**: root directory `apps/web`. Env: `API_URL` (the API deployment's origin), `VITE_GOOGLE_CLIENT_ID`,
-  `VITE_MODEL_BASE_URL`. The browser calls `/api` on the web origin; Vercel rewrites it to `${API_URL}/api/…`.
+  optionally `VITE_MODEL_BASE_URL` (the ONNX models are otherwise served from the app's own `/models/`). The browser calls `/api` on the web origin; Vercel rewrites it to `${API_URL}/api/…`.
 
 After the first deploy of this version: `bun run db:push` (new collections and indexes) and
 `bun run db:backfill-images`. Everyone signs in once more (sessions replaced the JWT cookies).

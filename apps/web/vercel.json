@@ -30,6 +30,13 @@
       "continue": true
     },
     {
+      "src": "/models/(.*)",
+      "headers": {
+        "cache-control": "public, max-age=604800"
+      },
+      "continue": true
+    },
+    {
       "src": "/sw.js",
       "headers": {
         "cache-control": "no-cache"
@@ -38,6 +45,10 @@
     },
     {
       "handle": "filesystem"
+    },
+    {
+      "src": "/models/(.*)",
+      "status": 404
     },
     {
       "src": "/(.*)",

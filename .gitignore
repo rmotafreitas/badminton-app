@@ -45,7 +45,9 @@ coverage/
 *.tgz
 
 # Rally Analysis: model weights and local test footage (never committed)
-apps/web/public/models/
+apps/web/public/models/*
+!apps/web/public/models/tracknetv3_fp16.onnx
+!apps/web/public/models/yolox_tiny_humanart.onnx
 apps/web/public/lab/
 
 # TypeScript project-reference output

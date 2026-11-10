@@ -5,7 +5,9 @@
 .git
 .env
 **/.env
-apps/web/public/models
+apps/web/public/models/*
+!apps/web/public/models/tracknetv3_fp16.onnx
+!apps/web/public/models/yolox_tiny_humanart.onnx
 apps/web/public/lab
 apps/web/test-results
 tools
