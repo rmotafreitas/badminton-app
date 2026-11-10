@@ -19,6 +19,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card";
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/shared/ui/empty";
 import { Progress } from "@/shared/ui/progress";
 import { GpuNotice } from "./GpuNotice";
+import { ModelStatus } from "./ModelStatus";
 import { formatBytes, formatDuration, useLocalSessions, useOnline, useSessionManager } from "./hooks";
 import { AnalysisBadge, Pill, UploadBadge } from "./StatusBadges";
 
@@ -125,6 +126,8 @@ export default function SessionsPage() {
           <AlertDescription>{t.offline}</AlertDescription>
         </Alert>
       )}
+
+      <ModelStatus refreshKey={running?.clientId} />
 
       {running && (
         <Card className="border-sky-500/30 bg-sky-500/5">

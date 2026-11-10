@@ -23,6 +23,13 @@ export const ptPT = {
     cancel: "Cancelar",
     noGpu: "Este browser não consegue usar a GPU, por isso a análise vai ser muito mais lenta aqui (pode demorar 10× a duração do vídeo ou mais). Chrome/Edge recente num portátil, ou Safari no iOS 26+, é mais rápido — qualquer dispositivo com a tua sessão iniciada pode analisar.",
     keepOpen: "Mantém a app aberta durante a análise — o ecrã fica ligado. Num portátil é muito mais rápido.",
+    model: {
+      ready: "Modelo de análise neste dispositivo — pronto a usar",
+      missing: "O modelo de análise ainda não está neste dispositivo ({size}). Descarrega uma vez e depois a análise funciona offline.",
+      download: "Descarregar agora",
+      downloading: "A descarregar o modelo de análise…",
+      failed: "A transferência falhou. Verifica a ligação e tenta de novo.",
+    },
     upload: {
       pending: "À espera de envio",
       transcoding: "A comprimir",

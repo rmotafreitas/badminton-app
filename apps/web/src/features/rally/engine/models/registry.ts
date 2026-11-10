@@ -79,6 +79,36 @@ export const MODELS: Record<ModelId, ModelSpec> = {
 
 const MODEL_CACHE = "rally-models-v2";
 
+/** The models the app runs (analysis and the live preview); the others are lab-only. */
+export const APP_MODELS: readonly ModelId[] = ["tracknetv3-fp16", "yolox-tiny-person"];
+/** Their combined download size, shown before the first download. */
+export const APP_MODELS_BYTES = 22_687_473 + 20_283_006;
+
+/** True when every app model is already stored on this device. */
+export async function appModelsCached(): Promise<boolean> {
+  try {
+    const cache = await caches.open(MODEL_CACHE);
+    const hits = await Promise.all(APP_MODELS.map((id) => cache.match(modelUrl(id))));
+    return hits.every(Boolean);
+  } catch {
+    return false;
+  }
+}
+
+/** Stores the app models on this device ahead of the first analysis; `onProgress` gets 0–1. */
+export async function downloadAppModels(onProgress: (fraction: number) => void): Promise<void> {
+  const loaded = new Map<ModelId, number>();
+  const report = () => onProgress(Math.min(1, [...loaded.values()].reduce((a, b) => a + b, 0) / APP_MODELS_BYTES));
+  await Promise.all(
+    APP_MODELS.map((id) =>
+      fetchModel(id, (n) => {
+        loaded.set(id, n);
+        report();
+      }),
+    ),
+  );
+}
+
 export function modelUrl(id: ModelId): string {
   return MODEL_BASE_URL + MODELS[id].file;
 }

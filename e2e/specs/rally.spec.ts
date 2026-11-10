@@ -22,6 +22,7 @@ test("import a rally video, check the court, analyse it on-device, review and ex
 
   await page.getByRole("link", { name: "Rally analysis" }).first().click();
   await expect(page.getByText("No sessions yet")).toBeVisible();
+  await expect(page.getByText("The analysis model isn't on this device yet")).toBeVisible();
   await shot(page, "rally-empty");
 
   const chooser = page.waitForEvent("filechooser");
@@ -79,6 +80,7 @@ test("import a rally video, check the court, analyse it on-device, review and ex
   // The session is on the server too (synced summary), and the list shows it as analysed.
   await page.getByRole("link", { name: "Rally analysis" }).first().click();
   await expect(page.getByText("Analysed").first()).toBeVisible();
+  await expect(page.getByText("Analysis model on this device — ready to use")).toBeVisible();
   await shot(page, "rally-list");
 
   // The coach's profile shows the rally card once the coach is linked as a player.

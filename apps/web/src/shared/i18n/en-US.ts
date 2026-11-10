@@ -23,6 +23,13 @@ export const enUS = {
     cancel: "Cancel",
     noGpu: "This browser can't use the GPU, so analysis will be much slower here (it may take 10× the video length or more). Recent Chrome/Edge on a laptop, or Safari on iOS 26+, is faster — any device you're logged in on can analyse it.",
     keepOpen: "Keep the app open while analysing — your screen stays on. A laptop is much faster.",
+    model: {
+      ready: "Analysis model on this device — ready to use",
+      missing: "The analysis model isn't on this device yet ({size}). It downloads once, then analysis works offline.",
+      download: "Download now",
+      downloading: "Downloading the analysis model…",
+      failed: "Download failed. Check your connection and try again.",
+    },
     upload: {
       pending: "Waiting to upload",
       transcoding: "Compressing",
