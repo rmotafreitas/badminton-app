@@ -43,7 +43,7 @@ export const enUS = {
     storageNote: "Videos are kept 60 days (pin to keep longer). Stats are kept forever.",
     onThisDevice: "On this device",
     otherDevice: "Recorded on another device",
-    phases: { prepare: "Finding the court", scan: "Tracking players & shuttle", finish: "Computing stats" },
+    phases: { compress: "Compressing the video", prepare: "Finding the court", scan: "Tracking players & shuttle", finish: "Computing stats" },
     formats: { singles: "Singles", doubles: "Doubles", practice: "Practice" },
     shotTypes: {
       serve: "Serve",

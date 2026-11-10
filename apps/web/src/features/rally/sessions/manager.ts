@@ -154,6 +154,7 @@ export class SessionManager {
   private sessions = new Map<string, LocalSession>();
   private listeners = new Set<Listener>();
   private worker: Worker | null = null;
+  private compacting = new Map<string, { done: Promise<Blob | undefined>; listeners: Set<(p: number) => void>; ctrl: AbortController }>();
   private running: string | null = null;
   private syncing = false;
   private wakeLock: { release(): Promise<void> } | null = null;
@@ -417,6 +418,7 @@ export class SessionManager {
   }
 
   cancel(clientId: string) {
+    this.compacting.get(clientId)?.ctrl.abort();
     if (this.running === clientId) {
       this.worker?.postMessage({
         type: "cancel",
@@ -446,8 +448,7 @@ export class SessionManager {
 
   private async run(clientId: string) {
     const s = this.sessions.get(clientId);
-    const video = await this.getVideo(clientId);
-    if (!s || !video) {
+    if (!s || !(await this.getVideo(clientId))) {
       await this.patch(clientId, {
         analysis: { state: "failed", error: "Video not on this device" },
       });
@@ -482,9 +483,21 @@ export class SessionManager {
       }
       await this.acquireWakeLock();
       await this.patch(clientId, {
+        analysis: { state: "running", progress: 0, phase: "compress" },
+      });
+      let lastEmit = 0;
+      const video = await this.compact(clientId, (p) => {
+        const now = performance.now();
+        if (now - lastEmit < 500) return;
+        lastEmit = now;
+        void this.patch(clientId, { analysis: { state: "running", progress: p, phase: "compress" } });
+      });
+      if (!video) throw new Error("Video not on this device");
+      const current = this.sessions.get(clientId) ?? s; // compacting rescales the corners
+      await this.patch(clientId, {
         analysis: { state: "running", progress: 0, phase: "prepare" },
       });
-      let corners = s.corners;
+      let corners = current.corners;
       if (!corners) {
         // Quick court check: a wrong court ruins everything downstream, and
         // confirming it is one tap. Only very confident detections skip it.
@@ -507,7 +520,7 @@ export class SessionManager {
         corners = cal.corners;
         await this.patch(clientId, { corners });
       }
-      const result = await this.analyse(clientId, video, { ...s, corners });
+      const result = await this.analyse(clientId, video, { ...current, corners });
       await idbPut(STORES.results, clientId, result);
       const summary = summarise(result, s.corrections);
       await this.patch(clientId, {
@@ -529,6 +542,62 @@ export class SessionManager {
       await this.releaseWakeLock();
       void this.pump();
     }
+  }
+
+  /**
+   * The video to analyse and upload: a 720p review copy (REVIEW_COPY), made once and stored in place of the
+   * original. Phone recordings are 4K and hundreds of MB, and iOS runs out of memory decoding them next to the
+   * models. Concurrent callers (analysis, upload) share one conversion; a device that can't convert keeps the
+   * original.
+   */
+  private compact(clientId: string, onProgress?: (p: number) => void): Promise<Blob | undefined> {
+    let job = this.compacting.get(clientId);
+    if (!job) {
+      const listeners = new Set<(p: number) => void>();
+      const ctrl = new AbortController();
+      const done = this.makeCompact(clientId, (p) => listeners.forEach((l) => l(p)), ctrl.signal).finally(() =>
+        this.compacting.delete(clientId),
+      );
+      job = { done, listeners, ctrl };
+      this.compacting.set(clientId, job);
+    }
+    if (onProgress) job.listeners.add(onProgress);
+    return job.done;
+  }
+
+  private async makeCompact(clientId: string, onProgress: (p: number) => void, signal: AbortSignal) {
+    const video = await this.getVideo(clientId);
+    if (!video) return undefined;
+    const info = await this.transcoder.probe(video);
+    if (fitsReviewCopy(info) || !(await this.transcoder.supported())) return video;
+    let small: Blob;
+    try {
+      small = await this.transcoder.transcode(video, { ...REVIEW_COPY, onProgress, signal });
+    } catch (e) {
+      if (signal.aborted) throw Object.assign(new Error("Cancelled"), { cancelled: true });
+      console.warn("Could not compress the video; using the original", e);
+      return video;
+    }
+    const out = await this.transcoder.probe(small);
+    try {
+      await idbPutBlob(STORES.videos, clientId, small);
+    } catch {
+      return video; // no room for the copy: keep the original (the corners stay in its pixels)
+    }
+    // A partial analysis of the original is in its pixels and timeline: start over.
+    await idbDelete(STORES.checkpoints, clientId).catch(() => undefined);
+    const kx = out.width / info.width;
+    const ky = out.height / info.height;
+    const corners = this.sessions.get(clientId)?.corners;
+    await this.patch(clientId, {
+      mime: small.type,
+      bytes: small.size,
+      width: out.width,
+      height: out.height,
+      fps: Math.round(out.fps * 100) / 100,
+      corners: corners?.map((c) => ({ x: c.x * kx, y: c.y * ky })) as Calibration["corners"] | undefined,
+    });
+    return small;
   }
 
   private getWorker(): Worker {
@@ -660,23 +729,11 @@ export class SessionManager {
 
   private async uploadVideo(clientId: string) {
     const s = this.sessions.get(clientId)!;
-    const original = await this.getVideo(clientId);
-    if (!original || !s.serverId) return;
+    if (!s.hasLocalVideo || !s.serverId) return;
     try {
-      let body = original;
-      const info = await this.transcoder.probe(original);
-      if (!fitsReviewCopy(info) && (await this.transcoder.supported())) {
-        await this.patch(clientId, {
-          upload: { state: "transcoding", progress: 0 },
-        });
-        body = await this.transcoder.transcode(original, {
-          ...REVIEW_COPY,
-          onProgress: (p) =>
-            void this.patch(clientId, {
-              upload: { state: "transcoding", progress: p },
-            }),
-        });
-      }
+      await this.patch(clientId, { upload: { state: "transcoding", progress: 0 } });
+      const body = await this.compact(clientId, (p) => void this.patch(clientId, { upload: { state: "transcoding", progress: p } }));
+      if (!body) return;
       const type = body.type.includes("webm")
         ? "video/webm"
         : body.type.includes("quicktime")

@@ -43,7 +43,7 @@ export const ptPT = {
     storageNote: "Os vídeos ficam 60 dias (fixa para guardar mais tempo). As estatísticas ficam para sempre.",
     onThisDevice: "Neste dispositivo",
     otherDevice: "Gravado noutro dispositivo",
-    phases: { prepare: "A encontrar o campo", scan: "A seguir jogadores e volante", finish: "A calcular estatísticas" },
+    phases: { compress: "A comprimir o vídeo", prepare: "A encontrar o campo", scan: "A seguir jogadores e volante", finish: "A calcular estatísticas" },
     formats: { singles: "Singulares", doubles: "Pares", practice: "Treino" },
     shotTypes: {
       serve: "Serviço",

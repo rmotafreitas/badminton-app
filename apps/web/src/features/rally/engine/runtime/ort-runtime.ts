@@ -40,9 +40,42 @@ const loaders: Record<Flavour, () => Promise<Ort>> = {
 
 const cache = new Map<Flavour, Promise<Ort>>();
 
+/** 64 KiB wasm pages: ORT asks for a 4 GB ceiling; never go below 256 MB. */
+const MIN_MAX_PAGES = 4096;
+
+/**
+ * ORT's wasm creates `new WebAssembly.Memory({ maximum: 65536 pages, shared: true })`: a 4 GB reservation that
+ * iOS Safari often refuses ("RangeError: Out of memory" → "no available backend found"). Wrap the constructor so a
+ * refused ceiling is halved until it fits; the models need a few hundred MB. A smaller maximum is still a valid
+ * import for the module.
+ */
+export function withMemoryFallback(Native: typeof WebAssembly.Memory): typeof WebAssembly.Memory {
+  function Memory(desc: WebAssembly.MemoryDescriptor) {
+    let maximum = desc.maximum;
+    for (;;) {
+      try {
+        return new Native({ ...desc, maximum });
+      } catch (e) {
+        if (!(e instanceof RangeError) || maximum === undefined || maximum <= Math.max(MIN_MAX_PAGES, desc.initial)) throw e;
+        maximum = Math.max(MIN_MAX_PAGES, desc.initial, maximum >> 1);
+      }
+    }
+  }
+  Memory.prototype = Native.prototype;
+  return Memory as unknown as typeof WebAssembly.Memory;
+}
+
+let memoryPatched = false;
+function patchWasmMemory() {
+  if (memoryPatched || typeof WebAssembly === "undefined") return;
+  memoryPatched = true;
+  WebAssembly.Memory = withMemoryFallback(WebAssembly.Memory);
+}
+
 function loadOrt(flavour: Flavour): Promise<Ort> {
   let p = cache.get(flavour);
   if (!p) {
+    patchWasmMemory();
     p = loaders[flavour]().then((ort) => {
       // Threads need cross-origin isolation (SharedArrayBuffer). Without it
       // ORT silently runs single-threaded, so be explicit.
@@ -126,7 +159,8 @@ class OrtRuntime implements InferenceRuntime {
   async createSession(model: ArrayBuffer, options: SessionOptions): Promise<InferenceSession> {
     const ort = await loadOrt(this.flavour);
     const session = await ort.InferenceSession.create(new Uint8Array(model), {
-      executionProviders: [options.backend],
+      // The GPU can still fail to start (lost adapter, no memory): fall back to the CPU rather than fail.
+      executionProviders: options.backend === "wasm" ? ["wasm"] : [options.backend, "wasm"],
       graphOptimizationLevel: "all",
     });
     return new OrtSession(ort, session, options.backend);
