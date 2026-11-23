@@ -33,6 +33,11 @@ async function managedClub(deps: Deps, actor: Actor, clubId: string) {
   return club;
 }
 
+/** SYSTEM_ADMIN is never a club role: asking for it is a client error, not something to drop quietly. */
+function checkClubRoles(roles: readonly Role[] | undefined) {
+  if (roles?.includes("SYSTEM_ADMIN")) throw new BadRequest("System admin isn't a club role.", "system_admin_not_member");
+}
+
 function memberOf(members: readonly ClubMember[], userId: string) {
   const member = members.find((m) => m.id === userId);
   if (!member) throw new NotFound("This person isn't a member of the club.");
@@ -52,6 +57,7 @@ export class AddClubMember {
   constructor(private readonly deps: Deps) {}
   async execute({ actor, clubId, input }: { actor: Actor; clubId: string; input: AddMemberInput }): Promise<User> {
     await managedClub(this.deps, actor, clubId);
+    if (!("userId" in input)) checkClubRoles(input.roles);
     const { users } = this.deps;
     let user: User | null;
     if ("userId" in input) {
@@ -80,8 +86,9 @@ export class AddClubMember {
       throw new Conflict("This person belongs to another club. Ask a system admin to move them.", "in_other_club");
     }
     await users.setClub(user.id, clubId);
-    // Club roles from a previous club don't carry over.
-    await users.setRoles(user.id, rolesAfterLeavingClub(user.roles));
+    // Club roles from a previous club don't carry over; the ones asked for here apply, as they do for an invite.
+    const requested = "userId" in input ? [] : (input.roles ?? []);
+    await users.setRoles(user.id, clubMemberRoles([...rolesAfterLeavingClub(user.roles), ...requested]));
     return (await users.findById(user.id)) ?? user;
   }
 }
@@ -105,6 +112,7 @@ export class SetMemberRoles {
   async execute({ actor, clubId, userId, roles }: { actor: Actor; clubId: string; userId: string; roles: readonly Role[] }): Promise<Role[]> {
     const club = await managedClub(this.deps, actor, clubId);
     const member = memberOf(club.members, userId);
+    checkClubRoles(roles);
     const next = clubMemberRoles(roles);
     const problem = lastAdminProblem(actor, club.members, userId, next);
     if (problem) throw new BusinessRuleViolation(problem, "last_club_admin");

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import { decodeStoredImage, normalizePhone } from "@bb/application";
-import { gameOutcome, lineupProblem, rateGame, replayRatings } from "@bb/domain";
+import { gameOutcome, isCalendarDay, lineupProblem, rateGame, replayRatings } from "@bb/domain";
 
 describe("ratings", () => {
   it("equal players: winner +16, loser -16", () => {
@@ -82,5 +82,16 @@ describe("stored images", () => {
 
   it("refuses garbage", () => {
     expect(decodeStoredImage("not base64 at all!")).toBeNull();
+  });
+});
+
+describe("calendar days", () => {
+  it("accepts real days only (Date.parse would roll 2026-02-31 over to March)", () => {
+    expect(isCalendarDay("2026-02-28")).toBe(true);
+    expect(isCalendarDay("2028-02-29")).toBe(true);
+    expect(isCalendarDay("2026-02-29")).toBe(false);
+    expect(isCalendarDay("2026-02-31")).toBe(false);
+    expect(isCalendarDay("2026-13-01")).toBe(false);
+    expect(isCalendarDay("2026-1-01")).toBe(false);
   });
 });

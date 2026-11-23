@@ -1,4 +1,4 @@
-import { type Actor, BusinessRuleViolation, isCalendarDay, isObjectId, NotFound, type TrainingReview } from "@bb/domain";
+import { type Actor, BusinessRuleViolation, Forbidden, isCalendarDay, isObjectId, isSystemAdmin, NotFound, type TrainingReview } from "@bb/domain";
 import type { TrainingReviewRepository } from "./ports";
 
 type Deps = { readonly reviews: TrainingReviewRepository };
@@ -41,6 +41,17 @@ export class DeleteTrainingReview {
   async execute({ actor, reviewId }: { actor: Actor; reviewId: string }): Promise<void> {
     const review = isObjectId(reviewId) ? await this.deps.reviews.findById(reviewId) : null;
     if (!review || review.userId !== actor.userId) throw new NotFound("Review not found.");
+    await this.deps.reviews.delete(reviewId);
+  }
+}
+
+/** A system admin removes anyone's review (the Data screens). */
+export class RemoveTrainingReview {
+  constructor(private readonly deps: Deps) {}
+  async execute({ actor, reviewId }: { actor: Actor; reviewId: string }): Promise<void> {
+    if (!isSystemAdmin(actor)) throw new Forbidden();
+    const review = isObjectId(reviewId) ? await this.deps.reviews.findById(reviewId) : null;
+    if (!review) throw new NotFound("Review not found.");
     await this.deps.reviews.delete(reviewId);
   }
 }

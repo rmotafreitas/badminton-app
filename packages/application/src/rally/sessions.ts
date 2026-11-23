@@ -5,6 +5,7 @@ import {
   Forbidden,
   isCalendarDay,
   isObjectId,
+  isSystemAdmin,
   NotFound,
   RALLY_LIMITS,
   RALLY_VIDEO_TYPES,
@@ -153,10 +154,7 @@ export class UpdateRallySession extends RallyUseCase {
     }
     if (input.participants !== undefined) patch.participants = await this.checkParticipants(input.participants);
     if (input.pinned !== undefined && input.pinned !== session.pinned) {
-      if (input.pinned) {
-        const pins = (await this.deps.sessions.findForUser(actor.userId)).filter((s) => s.ownerId === actor.userId && s.pinned);
-        if (pins.length >= RALLY_LIMITS.maxPins) throw new Conflict(`You can pin up to ${RALLY_LIMITS.maxPins} videos.`, "pin_limit");
-      }
+      if (input.pinned) await checkPinLimit(this.deps.sessions, session.ownerId);
       patch.pinned = input.pinned;
     }
     if (input.corrections !== undefined) {
@@ -193,13 +191,46 @@ export class LeaveRallySession extends RallyUseCase {
   }
 }
 
+/** The owner's pins are limited, whoever pins (the owner, or a system admin on their behalf). */
+async function checkPinLimit(sessions: RallySessionRepository, ownerId: string) {
+  const pins = (await sessions.findForUser(ownerId)).filter((s) => s.ownerId === ownerId && s.pinned);
+  if (pins.length >= RALLY_LIMITS.maxPins) throw new Conflict(`You can pin up to ${RALLY_LIMITS.maxPins} videos.`, "pin_limit");
+}
+
+async function removeSession(deps: RallyDeps, session: RallySession) {
+  await Promise.all([session.videoKey, session.resultKey].filter((k): k is string => !!k).map((k) => deps.storage.delete(k)));
+  await deps.sessions.delete(session.id);
+}
+
 export class DeleteRallySession extends RallyUseCase {
   async execute({ actor, id }: { actor: Actor; id: string }): Promise<void> {
-    const session = await this.policy.owned(id, actor);
-    await Promise.all(
-      [session.videoKey, session.resultKey].filter((k): k is string => !!k).map((k) => this.deps.storage.delete(k)),
-    );
-    await this.deps.sessions.delete(id);
+    await removeSession(this.deps, await this.policy.owned(id, actor));
+  }
+}
+
+/**
+ * A system admin's housekeeping on anyone's recording (the Data screens): rename, keep or unkeep it (within the
+ * owner's pin limit), delete it with its files. Nobody else.
+ */
+export class ModerateRallySession extends RallyUseCase {
+  private async load(actor: Actor, id: string) {
+    if (!isSystemAdmin(actor)) throw new Forbidden();
+    return this.policy.load(id);
+  }
+
+  async update({ actor, id, input }: { actor: Actor; id: string; input: { title?: string | null; pinned?: boolean } }): Promise<RallySession> {
+    const session = await this.load(actor, id);
+    const patch: RallySessionPatch = {};
+    if (input.title !== undefined) patch.title = input.title?.slice(0, 120) ?? null;
+    if (input.pinned !== undefined && input.pinned !== session.pinned) {
+      if (input.pinned) await checkPinLimit(this.deps.sessions, session.ownerId);
+      patch.pinned = input.pinned;
+    }
+    return this.deps.sessions.update(id, patch);
+  }
+
+  async delete({ actor, id }: { actor: Actor; id: string }): Promise<void> {
+    await removeSession(this.deps, await this.load(actor, id));
   }
 }
 
