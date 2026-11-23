@@ -146,8 +146,18 @@ export class UpdateGame {
     };
     const problem = lineupProblem(next);
     if (problem) throw new BusinessRuleViolation(problem, "invalid_lineup");
+    const players = [...next.team1PlayerIds, ...next.team2PlayerIds];
+    if (changes.team1PlayerIds || changes.team2PlayerIds) {
+      // New players: the same checks as registering the game.
+      const permission = registerGameProblem(actor, game.clubId, players);
+      if (permission) throw new Forbidden(permission);
+      if (!players.every(isObjectId) || (await this.deps.users.findByIds(players)).length !== new Set(players).size) {
+        throw new BusinessRuleViolation("Some players don't exist.", "unknown_player");
+      }
+    }
     const updated = await this.deps.games.update(gameId, changes);
-    await this.deps.ratings.replayClub(game.clubId, [...game.team1PlayerIds, ...game.team2PlayerIds]);
+    // Old and new players: someone taken out of their only game goes back to the default rating.
+    await this.deps.ratings.replayClub(game.clubId, [...new Set([...game.team1PlayerIds, ...game.team2PlayerIds, ...players])]);
     return withPlayersOne(this.deps.players, updated);
   }
 }

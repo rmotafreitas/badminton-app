@@ -101,6 +101,53 @@ export function RefPicker({
   );
 }
 
+/** Several rows of another table (a team's players): chips you remove with ×, and a picker to add one (up to `max`). */
+function RefsInput({ field, value, refs, onChange }: { field: DataField; value: string[]; refs: Refs; onChange: (ids: string[]) => void }) {
+  const dict = useDictionary().ui;
+  const label = useLabel();
+  // Names of rows picked here, until the server's refs know them.
+  const [picked, setPicked] = useState<Record<string, string>>({});
+  const name = (id: string) => picked[id] ?? (field.ref ? refs[field.ref]?.[id] : undefined) ?? `#${id.slice(-6)}`;
+  const full = field.max !== undefined && value.length >= field.max;
+  return (
+    <div className="space-y-2">
+      {value.length > 0 && (
+        <ul className="flex flex-wrap gap-2">
+          {value.map((id) => (
+            <li key={id} className="flex h-10 items-center gap-1 rounded-full border bg-muted/50 pr-1 pl-3 text-sm">
+              <span className="max-w-48 truncate">{name(id)}</span>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="size-8 rounded-full"
+                aria-label={`${dict.data.remove} ${name(id)}`}
+                onClick={() => onChange(value.filter((v) => v !== id))}
+              >
+                <X />
+              </Button>
+            </li>
+          ))}
+        </ul>
+      )}
+      {!full && (
+        <RefPicker
+          table={field.ref as string}
+          value={null}
+          label={label(field.label)}
+          allowNone={false}
+          placeholder={dict.data.add}
+          onChange={(id, text) => {
+            if (!id || value.includes(id)) return;
+            if (text) setPicked((p) => ({ ...p, [id]: text }));
+            onChange([...value, id]);
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
 // ── Sets ─────────────────────────────────────────────────────────────────────
 
 type Set = { team1Score: number; team2Score: number };
@@ -223,6 +270,8 @@ function FieldInput({ field, value, onChange, refs }: { field: DataField; value:
           onChange={(next) => onChange(next)}
         />
       );
+    case "refs":
+      return <RefsInput field={field} value={(value as string[] | null) ?? []} refs={refs} onChange={onChange} />;
     case "sets":
       return <SetsInput value={(value as Set[] | null) ?? []} onChange={onChange} />;
     default:

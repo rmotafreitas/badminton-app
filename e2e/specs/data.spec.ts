@@ -123,6 +123,22 @@ test("a club admin edits the club and manages members", async ({ page }) => {
   await expect(page.getByText("Your club").first()).toBeVisible();
   await expect(page.getByRole("row", { name: new RegExp(PEOPLE.admin.name) })).toHaveCount(0);
 
+  // Club admins edit what they can set adding someone: name, email, phone, roles, active.
+  await page.getByRole("row", { name: new RegExp(PEOPLE.ana.name) }).click();
+  let sheet = page.getByRole("dialog", { name: PEOPLE.ana.name });
+  await sheet.getByRole("button", { name: "Edit" }).click();
+  for (const label of ["Name", "Email", "Phone", "Roles", "Active"]) await expect(sheet.getByText(label, { exact: true }).first()).toBeVisible();
+  await sheet.getByLabel("Name").fill(`${PEOPLE.ana.name} E2E`);
+  await shot(page, "data-member-edit");
+  await sheet.getByRole("button", { name: "Save" }).click();
+  await expect(page.getByText("Saved.")).toBeVisible();
+  sheet = page.getByRole("dialog", { name: `${PEOPLE.ana.name} E2E` });
+  await sheet.getByRole("button", { name: "Edit" }).click();
+  await sheet.getByLabel("Name").fill(PEOPLE.ana.name);
+  await sheet.getByRole("button", { name: "Save" }).click();
+  await expect(page.getByRole("dialog", { name: PEOPLE.ana.name }).getByRole("button", { name: "Edit" })).toBeVisible();
+  await page.keyboard.press("Escape");
+
   // From a member's Data sheet straight to their registration.
   await page.getByRole("row", { name: new RegExp(PEOPLE.ana.name) }).click();
   await page.getByRole("dialog", { name: PEOPLE.ana.name }).getByRole("link", { name: "Registrations" }).click();

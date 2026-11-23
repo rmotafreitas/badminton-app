@@ -25,6 +25,7 @@ import {
   RemoveClubMember,
   type RecordStore,
   SetMemberRoles,
+  UpdateClubMember,
   UpdateAccount,
   AssignUserToClub,
   type ClubRepository,
@@ -227,7 +228,7 @@ export function createIdentityModule(infra: Infrastructure, settings: AppSetting
 }
 
 export function createClubsModule(infra: Infrastructure) {
-  const deps = { clubs: infra.clubs, users: infra.users, images: infra.images };
+  const deps = { clubs: infra.clubs, users: infra.users, images: infra.images, profiles: infra.profiles };
   return {
     getClub: new GetClub(deps),
     listClubs: new ListClubs(deps),
@@ -238,6 +239,7 @@ export function createClubsModule(infra: Infrastructure) {
     addClubMember: new AddClubMember(deps),
     removeClubMember: new RemoveClubMember(deps),
     setMemberRoles: new SetMemberRoles(deps),
+    updateClubMember: new UpdateClubMember(deps),
   };
 }
 
@@ -246,7 +248,15 @@ export function createDataModule(
   infra: Infrastructure,
   modules: Pick<
     ReturnType<typeof createClubsModule> & ReturnType<typeof createGamesModule>,
-    "createClub" | "updateClub" | "deleteClub" | "addClubMember" | "removeClubMember" | "setMemberRoles" | "updateGame" | "deleteGame"
+    | "createClub"
+    | "updateClub"
+    | "deleteClub"
+    | "addClubMember"
+    | "removeClubMember"
+    | "setMemberRoles"
+    | "updateClubMember"
+    | "updateGame"
+    | "deleteGame"
   >,
 ) {
   const accountDeps = {
