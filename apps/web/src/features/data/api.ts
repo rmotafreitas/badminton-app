@@ -1,6 +1,6 @@
-import type { DataOption, DataPage, DataRecord, DataTable } from "@bb/contracts";
+import type { DataOption, DataPage, DataRecord, DataRelated, DataTable } from "@bb/contracts";
 import { keepPreviousData, type QueryClient, queryOptions } from "@tanstack/react-query";
-import { type Api, ApiError, NetworkError, sendForm, setImageField, unwrap } from "@/app/api";
+import { type Api, sendForm, setImageField, unwrap } from "@/app/api";
 import { staleTime } from "@/app/query-client";
 
 export type Filters = Record<string, string | boolean | null>;
@@ -12,6 +12,9 @@ export interface ListParams {
   page?: number;
   pageSize?: number;
   filters?: Filters;
+  view?: string;
+  /** `table:id`: only the rows related to that row. */
+  of?: string;
 }
 
 export const dataKeys = {
@@ -20,6 +23,7 @@ export const dataKeys = {
   table: (table: string) => ["data", "table", table] as const,
   page: (table: string, params: ListParams) => ["data", "table", table, "page", params] as const,
   record: (table: string, id: string) => ["data", "table", table, "record", id] as const,
+  related: (table: string, id: string) => ["data", "table", table, "record", id, "related"] as const,
   options: (table: string, q: string) => ["data", "options", table, q] as const,
 };
 
@@ -30,6 +34,8 @@ const query = (params: ListParams) => ({
   page: params.page,
   pageSize: params.pageSize,
   filters: params.filters && Object.keys(params.filters).length ? JSON.stringify(params.filters) : undefined,
+  view: params.view,
+  of: params.of,
 });
 
 /** The tables this user may open (empty for players). Persisted, so the Data menu paints at once. */
@@ -53,6 +59,13 @@ export const dataRecordQuery = (api: Api, table: string, id: string) =>
   queryOptions({
     queryKey: dataKeys.record(table, id),
     queryFn: async () => unwrap(await api.data({ table })({ id }).get()) as DataRecord,
+  });
+
+/** How many rows of each related table point at this row. */
+export const dataRelatedQuery = (api: Api, table: string, id: string) =>
+  queryOptions({
+    queryKey: dataKeys.related(table, id),
+    queryFn: async () => unwrap(await api.data({ table })({ id }).related.get()) as DataRelated[],
   });
 
 export const dataOptionsQuery = (api: Api, table: string, q: string) =>
@@ -83,29 +96,9 @@ export const updateRecord = (table: string, id: string, write: RecordWrite) =>
 
 export const deleteRecord = async (api: Api, table: string, id: string) => unwrap(await api.data({ table })({ id }).delete());
 
-/** Downloads the whole filtered table as CSV (headers in the user's language). */
-export async function downloadCsv(table: string, params: ListParams, lang: "en" | "pt") {
-  const search = new URLSearchParams();
-  for (const [key, value] of Object.entries({ ...query(params), page: undefined, pageSize: undefined, lang })) {
-    if (value !== undefined) search.set(key, String(value));
-  }
-  let response: Response;
-  try {
-    response = await fetch(`/api/data/${encodeURIComponent(table)}/export?${search}`, { credentials: "same-origin" });
-  } catch (cause) {
-    throw new NetworkError({ cause });
-  }
-  if (!response.ok) {
-    const body = (await response.json().catch(() => null)) as { message?: string; code?: string } | null;
-    throw new ApiError(response.status, body?.code ?? "export_failed", body?.message ?? "Export failed.");
-  }
-  const name = /filename="([^"]+)"/.exec(response.headers.get("content-disposition") ?? "")?.[1] ?? `${table}.csv`;
-  const url = URL.createObjectURL(await response.blob());
-  const link = Object.assign(document.createElement("a"), { href: url, download: name });
-  document.body.append(link);
-  link.click();
-  link.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 10_000);
+/** One big page of an export (same filters, view and scope as the list). */
+export async function fetchExportPage(api: Api, table: string, params: ListParams, page: number, pageSize: number, signal: AbortSignal) {
+  return unwrap(await api.data({ table }).export.get({ query: { ...query(params), page, pageSize }, fetch: { signal } })) as DataPage;
 }
 
 /**

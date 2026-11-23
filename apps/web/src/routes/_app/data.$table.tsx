@@ -18,6 +18,8 @@ function validateSearch(search: Record<string, unknown>): DataSearch {
     dir: search.dir === "asc" || search.dir === "desc" ? search.dir : undefined,
     page: Number.isInteger(page) && page > 1 ? page : undefined,
     filters: okFilters && Object.keys(okFilters).length ? okFilters : undefined,
+    view: str(search.view, 40),
+    of: typeof search.of === "string" && /^[A-Za-z]{1,40}:[a-f0-9]{24}$/.test(search.of) ? search.of : undefined,
   };
 }
 

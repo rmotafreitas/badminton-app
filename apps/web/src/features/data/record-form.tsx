@@ -204,8 +204,8 @@ function FieldInput({ field, value, onChange, refs }: { field: DataField; value:
           </SelectTrigger>
           <SelectContent>
             {field.options?.map((o) => (
-              <SelectItem key={o} value={o}>
-                {o}
+              <SelectItem key={o.value} value={o.value}>
+                {o.label[label.lang]}
               </SelectItem>
             ))}
           </SelectContent>

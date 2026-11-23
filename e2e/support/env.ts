@@ -5,7 +5,8 @@ const dbUrl = (() => {
   return url.toString();
 })();
 
-const apiPort = 3100;
+// Overridable when another local project already listens on 3100.
+const apiPort = Number(process.env.E2E_API_PORT ?? 3100);
 const webPort = 5180;
 
 export const E2E = {

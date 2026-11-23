@@ -1,9 +1,11 @@
 import type { DataRecord, DataRow, DataTable } from "@bb/contracts";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Pencil, Trash2 } from "lucide-react";
+import { Link } from "@tanstack/react-router";
+import { ChevronRight, Pencil, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { useAppContext } from "@/app/context";
+import { useSessionUser } from "@/features/auth";
 import { ResponsiveSheet } from "@/shared/components/responsive-sheet";
 import { useDictionary } from "@/shared/i18n";
 import { fmt } from "@/shared/i18n/ui";
@@ -18,8 +20,9 @@ import {
   AlertDialogTitle,
 } from "@/shared/ui/alert-dialog";
 import { Button } from "@/shared/ui/button";
+import { Skeleton } from "@/shared/ui/skeleton";
 import { Spinner } from "@/shared/ui/spinner";
-import { createRecord, dataKeys, dataRecordQuery, deleteRecord, invalidateAfterDataWrite, updateRecord } from "./api";
+import { createRecord, dataKeys, dataRecordQuery, dataRelatedQuery, deleteRecord, invalidateAfterDataWrite, updateRecord } from "./api";
 import { FieldValue, type Refs, useLabel, useRowTitle } from "./fields";
 import { blankValues, type FormImages, type FormValues, RecordFields, rowValues } from "./record-form";
 
@@ -29,6 +32,45 @@ function changedValues(before: FormValues, after: FormValues): FormValues {
 }
 
 const imagesToSend = (images: FormImages) => Object.fromEntries(Object.entries(images).filter(([, v]) => v !== undefined));
+
+const linkRow = "tap-target flex items-center justify-between gap-3 px-3 py-3 text-sm hover:bg-muted/60";
+
+/** Where a row is pointed at from: a count per related table, each a link to that table filtered to this row. */
+function RelatedLinks({ table, rowId, clubId, onNavigate }: { table: DataTable; rowId: string; clubId: string | null; onNavigate: () => void }) {
+  const dict = useDictionary().ui;
+  const label = useLabel();
+  const { api } = useAppContext();
+  const viewer = useSessionUser();
+  const counts = useQuery({ ...dataRelatedQuery(api, table.key, rowId), enabled: table.related.length > 0 });
+  // A member's registration lives on the club's Registrations page, for the admins of that club.
+  const registration = table.key === "users" && viewer.roles.includes("CLUB_ADMIN") && !!clubId && clubId === viewer.clubId;
+  if (!table.related.length && !registration) return null;
+  return (
+    <section className="mt-4">
+      <h3 className="mb-2 text-sm font-medium text-muted-foreground">{dict.data.related}</h3>
+      <div className="divide-y rounded-lg border">
+        {table.related.map((r) => {
+          const count = counts.data?.find((c) => c.table === r.table)?.count;
+          return (
+            <Link key={r.table} to="/data/$table" params={{ table: r.table }} search={{ of: `${table.key}:${rowId}` }} className={linkRow} onClick={onNavigate}>
+              <span>{label(r.label)}</span>
+              <span className="flex items-center gap-1 text-muted-foreground">
+                {count === undefined ? <Skeleton className="h-4 w-6" /> : <span className="tabular">{count.toLocaleString(label.locale)}</span>}
+                <ChevronRight className="size-4" />
+              </span>
+            </Link>
+          );
+        })}
+        {registration && (
+          <Link to="/club-registrations" search={{ member: rowId }} className={linkRow} onClick={onNavigate}>
+            <span>{dict.registration.clubTitle}</span>
+            <ChevronRight className="size-4 text-muted-foreground" />
+          </Link>
+        )}
+      </div>
+    </section>
+  );
+}
 
 /**
  * One row: its details, and editing in place. Opens from the list with the list's copy of the row (instant), then
@@ -159,16 +201,24 @@ export function RecordSheet({
             {save.error && <p className="text-sm text-destructive">{save.error.message}</p>}
           </div>
         ) : row ? (
-          <dl className="divide-y">
-            {current.fields.map((f) => (
-              <div key={f.key} className="flex items-start justify-between gap-4 py-3">
-                <dt className="shrink-0 text-sm text-muted-foreground">{label(f.label)}</dt>
-                <dd className="min-w-0 text-right text-sm break-words">
-                  <FieldValue field={f} row={row} refs={refs} title={title} className={f.type === "image" ? "size-12" : undefined} />
-                </dd>
-              </div>
-            ))}
-          </dl>
+          <>
+            <dl className="divide-y">
+              {current.fields.map((f) => (
+                <div key={f.key} className="flex items-start justify-between gap-4 py-3">
+                  <dt className="shrink-0 text-sm text-muted-foreground">{label(f.label)}</dt>
+                  <dd className="min-w-0 text-right text-sm break-words">
+                    <FieldValue field={f} row={row} refs={refs} title={title} className={f.type === "image" ? "size-12" : undefined} />
+                  </dd>
+                </div>
+              ))}
+            </dl>
+            <RelatedLinks
+              table={current}
+              rowId={row.id}
+              clubId={table.key === "users" ? ((row.values.clubId as string | null) ?? null) : null}
+              onNavigate={() => onOpenChange(false)}
+            />
+          </>
         ) : null}
       </ResponsiveSheet>
       <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>

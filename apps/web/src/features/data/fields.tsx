@@ -44,6 +44,9 @@ export function useLabel() {
 export const fieldOf = (table: DataTable, key: string) => table.fields.find((f) => f.key === key);
 export const listedFields = (table: DataTable) => table.fields.filter((f) => f.list);
 
+/** An enum value as it reads (the raw value when the registry gives no label). */
+export const optionLabel = (field: DataField, value: string, lang: "en" | "pt") => field.options?.find((o) => o.value === value)?.label[lang] ?? value;
+
 type Sets = { team1Score: number; team2Score: number }[];
 
 const bytes = (n: number) => (n >= 1e9 ? `${(n / 1e9).toFixed(1)} GB` : n >= 1e6 ? `${(n / 1e6).toFixed(1)} MB` : `${Math.round(n / 1e3)} kB`);
@@ -72,6 +75,8 @@ export function useFormatValue() {
         return seconds(value as number);
       case "roles":
         return (value as Role[]).map((r) => dict.roles[r] ?? r).join(", ");
+      case "enum":
+        return optionLabel(field, value as string, label.lang);
       case "ref":
         return (field.ref && refs[field.ref]?.[value as string]) || (value as string);
       case "refs":
@@ -105,6 +110,7 @@ export function useRowTitle() {
 export function FieldValue({ field, row, refs, title, className }: { field: DataField; row: DataRow; refs: Refs; title?: string; className?: string }) {
   const dict = useDictionary().ui;
   const format = useFormatValue();
+  const label = useLabel();
   const value = row.values[field.key];
   if (field.type === "image") {
     const rounded = field.key === "picture" ? "rounded-lg" : undefined;
@@ -131,7 +137,7 @@ export function FieldValue({ field, row, refs, title, className }: { field: Data
   if (field.type === "enum") {
     return (
       <Badge variant="outline" className={className}>
-        {value as string}
+        {optionLabel(field, value as string, label.lang)}
       </Badge>
     );
   }
