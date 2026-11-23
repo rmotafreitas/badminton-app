@@ -37,12 +37,22 @@ export class ExportChanged extends Error {
 
 const sleep = (ms: number, signal: AbortSignal) =>
   new Promise<void>((resolve, reject) => {
-    const timer = setTimeout(resolve, ms);
-    signal.addEventListener("abort", () => {
+    const onAbort = () => {
       clearTimeout(timer);
       reject(new ExportAborted());
-    });
+    };
+    const timer = setTimeout(() => {
+      signal.removeEventListener("abort", onAbort);
+      resolve();
+    }, ms);
+    signal.addEventListener("abort", onAbort, { once: true });
   });
+
+/** Worth another go: a network error, a timeout, rate limiting or a server error. A 4xx answer won't change. */
+const retryable = (error: unknown) => {
+  const status = (error as { status?: unknown } | null)?.status;
+  return typeof status !== "number" || status === 408 || status === 429 || status >= 500;
+};
 
 async function withRetries<T>(run: () => Promise<T>, signal: AbortSignal, retries: number): Promise<T> {
   for (let attempt = 0; ; attempt++) {
@@ -50,7 +60,7 @@ async function withRetries<T>(run: () => Promise<T>, signal: AbortSignal, retrie
       return await run();
     } catch (error) {
       if (signal.aborted) throw new ExportAborted();
-      if (attempt >= retries) throw error;
+      if (attempt >= retries || !retryable(error)) throw error;
       await sleep(400 * 2 ** attempt, signal);
     }
   }
@@ -58,7 +68,9 @@ async function withRetries<T>(run: () => Promise<T>, signal: AbortSignal, retrie
 
 /**
  * Every row of an export, in order: the first page says how many there are, then the rest come `concurrency` at a
- * time. Each page is retried `retries` times; a page that still fails rejects, leaving what arrived in `received`.
+ * time. Each page is retried `retries` times; a page that still fails stops the whole run (the other requests are
+ * cancelled) and rejects, leaving what arrived in `received` for "Try again". The caller must abort a run before
+ * starting another on the same `received`.
  * Pages are offsets, so a page reporting a different total means rows moved between pages: `received` is cleared and
  * it rejects with `ExportChanged` (trying again starts from scratch) rather than writing a file with gaps or doubles.
  */
@@ -66,7 +78,7 @@ export async function collectRows({
   fetchPage,
   pageSize,
   maxRows,
-  signal,
+  signal: outer,
   received = noPages(),
   onProgress,
   concurrency = 4,
@@ -81,42 +93,68 @@ export async function collectRows({
   concurrency?: number;
   retries?: number;
 }): Promise<{ rows: (readonly ExportCell[])[]; total: number; capped: boolean }> {
-  let total = 0;
+  // This run's own signal: aborted by the caller, or by the first page that fails for good.
+  const run = new AbortController();
+  const stop = () => run.abort();
+  if (outer.aborted) throw new ExportAborted();
+  outer.addEventListener("abort", stop, { once: true });
+  const signal = run.signal;
   const { pages: got } = received;
+  let total = 0;
   const count = () => [...got.values()].reduce((n, rows) => n + rows.length, 0);
   const report = () => onProgress?.({ done: Math.min(count(), total), total });
-
   const changed = () => {
     got.clear();
     received.total = null;
     return new ExportChanged();
   };
-  const first = await withRetries(() => fetchPage(1, signal), signal, retries);
-  // Resuming: pages kept from before only line up if the total is still the same.
-  if (received.total !== null && received.total !== first.total) got.clear();
-  received.total = first.total;
-  got.set(1, first.rows);
-  total = Math.min(first.total, maxRows);
-  report();
-
-  const pages = Math.ceil(total / pageSize);
-  const missing = Array.from({ length: Math.max(pages - 1, 0) }, (_, i) => i + 2).filter((p) => !got.has(p));
-  let next = 0;
-  const worker = async () => {
-    while (next < missing.length) {
-      if (signal.aborted) throw new ExportAborted();
-      const page = missing[next++] as number;
-      const result = await withRetries(() => fetchPage(page, signal), signal, retries);
-      if (result.total !== first.total) throw changed();
-      got.set(page, result.rows);
-      report();
-    }
+  /** A page, unless this run was stopped meanwhile: a stopped run never writes into `received`. */
+  const fetchOne = async (page: number) => {
+    const result = await withRetries(() => fetchPage(page, signal), signal, retries);
+    if (signal.aborted) throw new ExportAborted();
+    return result;
   };
-  await Promise.all(Array.from({ length: Math.min(concurrency, missing.length) }, worker));
 
-  const rows: (readonly ExportCell[])[] = [];
-  for (let p = 1; p <= Math.max(pages, 1); p++) rows.push(...(got.get(p) ?? []));
-  return { rows: rows.slice(0, total), total: first.total, capped: first.total > maxRows };
+  try {
+    const first = await fetchOne(1);
+    // Resuming: pages kept from before only line up if the total is still the same.
+    if (received.total !== null && received.total !== first.total) got.clear();
+    received.total = first.total;
+    got.set(1, first.rows);
+    total = Math.min(first.total, maxRows);
+    report();
+
+    const pages = Math.max(Math.ceil(total / pageSize), 1);
+    const missing = Array.from({ length: pages - 1 }, (_, i) => i + 2).filter((p) => !got.has(p));
+    let next = 0;
+    const worker = async () => {
+      while (next < missing.length) {
+        if (signal.aborted) throw new ExportAborted();
+        const page = missing[next++] as number;
+        const result = await fetchOne(page);
+        if (result.total !== first.total) throw changed();
+        got.set(page, result.rows);
+        report();
+      }
+    };
+    try {
+      await Promise.all(Array.from({ length: Math.min(concurrency, missing.length) }, worker));
+    } catch (error) {
+      stop(); // the other workers stop at their next step and write nothing more
+      throw outer.aborted ? new ExportAborted() : error;
+    }
+
+    const rows: (readonly ExportCell[])[] = [];
+    for (let p = 1; p <= pages; p++) {
+      const page = got.get(p);
+      // Never a file with a hole in it.
+      if (!page) throw changed();
+      rows.push(...page);
+    }
+    return { rows: rows.slice(0, total), total: first.total, capped: first.total > maxRows };
+  } finally {
+    outer.removeEventListener("abort", stop);
+  }
 }
 
 /** Hands a file to the browser as a download. */

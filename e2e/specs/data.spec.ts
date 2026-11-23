@@ -122,6 +122,12 @@ test("a club admin edits the club and manages members", async ({ page }) => {
   await openDataTable(page, "Members");
   await expect(page.getByText("Your club").first()).toBeVisible();
   await expect(page.getByRole("row", { name: new RegExp(PEOPLE.admin.name) })).toHaveCount(0);
+
+  // From a member's Data sheet straight to their registration.
+  await page.getByRole("row", { name: new RegExp(PEOPLE.ana.name) }).click();
+  await page.getByRole("dialog", { name: PEOPLE.ana.name }).getByRole("link", { name: "Registrations" }).click();
+  await expect(page).toHaveURL(/\/club-registrations\?member=[a-f0-9]{24}/);
+  await expect(page.getByRole("dialog", { name: PEOPLE.ana.name })).toBeVisible();
 });
 
 test("game scores are edited with the score grid; players don't get the Data area", async ({ page, browser }) => {

@@ -254,9 +254,14 @@ function filterValue(field: FieldDef, value: unknown): string | boolean | null {
     case "roles":
       if (typeof value !== "string" || !(ROLES as readonly string[]).includes(value)) throw bad();
       return value;
-    default:
+    case "text":
+    case "email":
+    case "phone":
       if (typeof value !== "string" || value.length > 100) throw bad();
       return value;
+    default:
+      // Dates, numbers, images…: not filterable by equality. Declaring one `filter` needs a case here first.
+      throw bad();
   }
 }
 
@@ -283,13 +288,16 @@ export class DataTables {
     const sortField = def.fields.find((f) => f.key === input.sort && f.sort) ? (input.sort as string) : def.defaultSort.field;
     const dir = input.sort === sortField && input.dir ? input.dir : input.sort === sortField ? "asc" : def.defaultSort.dir;
     const where: Record<string, string | boolean | null> = {};
+    const conditions: RecordCondition[] = [];
     for (const [key, value] of Object.entries(input.filters ?? {})) {
       const field = def.fields.find((f) => f.key === key && f.filter);
       if (!field) throw new BadRequest(`You can't filter by "${key}".`, "bad_filter");
-      where[key] = filterValue(field, value);
+      const checked = filterValue(field, value);
+      // "No value" also matches a field never set (MongoDB's null alone doesn't).
+      if (checked === null) conditions.push({ op: "empty", field: key });
+      else where[key] = checked;
     }
     Object.assign(where, scopeWhere(def, access, input.actor));
-    const conditions: RecordCondition[] = [];
     if (input.view !== undefined) {
       const named = def.views?.find((v) => v.key === input.view);
       if (!named) throw new BadRequest(`No view "${input.view}".`, "bad_view");
@@ -334,21 +342,28 @@ export class DataTables {
   }
 
   async get({ actor, table, id }: { actor: Actor; table: string; id: string }) {
+    const { def, access, row } = await this.visibleRow(actor, table, id);
+    return { table: view(actor, def, access, this.handlers[def.key]), row, refs: await this.refLabels(actor, def, [row]) };
+  }
+
+  /** The row, if the caller may see it (else NotFound): its table, the caller's access and the row. */
+  private async visibleRow(actor: Actor, table: string, id: string) {
     const { def, access } = resolve(actor, table);
     if (!isObjectId(id)) throw new NotFound();
     const row = await this.deps.store.get(def.key, id);
     const scope = scopeWhere(def, access, actor);
     if (!row || Object.entries(scope).some(([k, v]) => (k === "id" ? row.id : row.values[k]) !== v)) throw new NotFound();
-    return { table: view(actor, def, access, this.handlers[def.key]), row, refs: await this.refLabels(actor, def, [row]) };
+    return { def, access, row };
   }
 
   /** How many rows of each related table point at this row (only tables the caller may open, in their scope). */
   async related({ actor, table, id }: { actor: Actor; table: string; id: string }) {
-    const { table: parent } = await this.get({ actor, table, id });
+    const { def, access } = await this.visibleRow(actor, table, id);
+    const parent = view(actor, def, access, this.handlers[def.key]);
     return Promise.all(
       parent.related.map(async ({ table: key, label }) => {
         const child = resolve(actor, key);
-        const entry = parent.def.related?.find((r) => r.table === key) as NonNullable<TableDef["related"]>[number];
+        const entry = def.related?.find((r) => r.table === key) as NonNullable<TableDef["related"]>[number];
         const { total } = await this.deps.store.list(key, {
           where: scopeWhere(child.def, child.access, actor),
           conditions: [{ op: "any", fields: entry.fields, value: id }],
@@ -365,11 +380,11 @@ export class DataTables {
   private async relatedTo(actor: Actor, table: string, id: string, child: TableKey) {
     const entry = tableDef(table)?.related?.find((r) => r.table === child);
     if (!entry) throw new BadRequest(`"${table}" rows have no "${child}".`, "bad_related");
-    const parent = await this.get({ actor, table, id });
-    const label = (await this.labels(actor, parent.table.def.key, [id])).get(id) ?? id;
+    const { def } = await this.visibleRow(actor, table, id);
+    const label = (await this.labels(actor, def.key, [id])).get(id) ?? id;
     return {
       condition: { op: "any", fields: entry.fields, value: id } satisfies RecordCondition,
-      of: { table: parent.table.def.key, id, label },
+      of: { table: def.key, id, label },
     };
   }
 
@@ -380,14 +395,15 @@ export class DataTables {
   private async labels(actor: Actor, table: TableKey, ids: readonly string[]): Promise<Map<string, string>> {
     const labels = await this.deps.store.labels(table, ids);
     if (table !== "users") return labels;
-    await Promise.all(
-      [...labels].map(async ([id, label]) => {
-        if (label) return;
-        const user = await this.deps.store.get("users", id);
-        const visible = user && canSeeContactDetails(actor, { userId: id, clubId: (user.values.clubId as string | null) ?? null });
-        labels.set(id, (visible && ((user.values.email as string | null) || (user.values.phone as string | null))) || `#${id.slice(-6)}`);
-      }),
-    );
+    const nameless = [...labels].filter(([, label]) => !label).map(([id]) => id);
+    if (!nameless.length) return labels;
+    // One query for all of them.
+    const users = new Map((await this.deps.store.getMany("users", nameless)).map((u) => [u.id, u.values]));
+    for (const id of nameless) {
+      const user = users.get(id);
+      const visible = user && canSeeContactDetails(actor, { userId: id, clubId: (user.clubId as string | null) ?? null });
+      labels.set(id, (visible && ((user.email as string | null) || (user.phone as string | null))) || `#${id.slice(-6)}`);
+    }
     return labels;
   }
 

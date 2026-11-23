@@ -1,5 +1,5 @@
 import { Download, FileSpreadsheet, FileText } from "lucide-react";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { ResponsiveSheet } from "@/shared/components/responsive-sheet";
 import { useDictionary } from "@/shared/i18n";
@@ -98,9 +98,14 @@ export function ExportButton({
   const retry = () => {
     const current = run.current;
     if (!current) return;
+    // The failed run has stopped; make sure, before a new one writes into the same pages.
+    current.controller.abort();
     current.controller = new AbortController();
     void go(current);
   };
+
+  // Leaving the page stops the export: no download turning up later from somewhere else.
+  useEffect(() => () => run.current?.controller.abort(), []);
 
   const cancel = () => {
     run.current?.controller.abort();

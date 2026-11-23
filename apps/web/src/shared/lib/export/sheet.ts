@@ -53,11 +53,26 @@ export function toCsv(table: ExportTable, lang: "en" | "pt"): string {
 
 const MAX_CELL_TEXT = 32_767;
 
-/** XML-safe text: escaped, without the control characters XML 1.0 forbids, within Excel's cell limit. */
+/** Drops what XML 1.0 forbids: control characters, U+FFFE/U+FFFF and unpaired surrogates (no lookbehind: old Safari). */
+function xmlChars(text: string): string {
+  let out = "";
+  for (let i = 0; i < text.length; i++) {
+    const c = text.charCodeAt(i);
+    if (c >= 0xd800 && c <= 0xdbff) {
+      const low = text.charCodeAt(i + 1);
+      if (low >= 0xdc00 && low <= 0xdfff) out += text[i] + text[++i];
+      continue;
+    }
+    if ((c >= 0xdc00 && c <= 0xdfff) || c === 0xfffe || c === 0xffff) continue;
+    if (c < 0x20 && c !== 0x09 && c !== 0x0a && c !== 0x0d) continue;
+    out += text[i];
+  }
+  return out;
+}
+
+/** XML-safe text: escaped, without the characters XML 1.0 forbids, within Excel's cell limit. */
 const xml = (text: string) =>
-  text
-    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F￾￿]|[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g, "")
-    .slice(0, MAX_CELL_TEXT)
+  xmlChars(text.slice(0, MAX_CELL_TEXT))
     .replaceAll("&", "&amp;")
     .replaceAll("<", "&lt;")
     .replaceAll(">", "&gt;")
@@ -143,7 +158,7 @@ export function toXlsx(table: ExportTable): Uint8Array {
       `${HEAD}<Relationships xmlns="${PKG_REL_NS}"><Relationship Id="rId1" Type="${REL_NS}/officeDocument" Target="xl/workbook.xml"/></Relationships>`,
     ),
     "xl/workbook.xml": strToU8(
-      `${HEAD}<workbook xmlns="${NS}" xmlns:r="${REL_NS}"><sheets><sheet name="${xml(name)}" sheetId="1" r:id="rId1"/></sheets>${
+      `${HEAD}<workbook xmlns="${NS}" xmlns:r="${REL_NS}"><bookViews><workbookView/></bookViews><sheets><sheet name="${xml(name)}" sheetId="1" r:id="rId1"/></sheets>${
         columns ? `<definedNames><definedName name="_xlnm._FilterDatabase" localSheetId="0" hidden="1">${xml(filterRange)}</definedName></definedNames>` : ""
       }</workbook>`,
     ),

@@ -61,6 +61,13 @@ describe("Excel", () => {
     expect(sheet).toContain('<autoFilter ref="A1:E4"/>');
   });
 
+  it("drops unpaired surrogates but keeps real emoji", () => {
+    const files = unzipSync(toXlsx({ name: "x", headers: ["a"], rows: [["ok 🏸 \uD800 bad \uDC00 end"]] }));
+    const xml = strFromU8(files["xl/worksheets/sheet1.xml"] as Uint8Array);
+    expect(xml).toContain("ok 🏸  bad  end");
+    expect(strFromU8(files["xl/workbook.xml"] as Uint8Array)).toContain("<bookViews><workbookView/></bookViews>");
+  });
+
   it("names columns past Z", () => {
     expect([0, 25, 26, 27, 51, 52, 701, 702].map(columnName)).toEqual(["A", "Z", "AA", "AB", "AZ", "BA", "ZZ", "AAA"]);
   });
@@ -147,6 +154,46 @@ describe("collecting pages", () => {
     const result = await collectRows({ fetchPage, pageSize: 100, maxRows: 1000, signal, received, retries: 0 });
     expect(result.rows).toHaveLength(250);
     expect(fetched.sort()).toEqual([1, 2, 3]);
+  });
+
+  it("a page that fails for good stops the others, which write nothing afterwards; trying again fills every page", async () => {
+    let broken = true;
+    const signals: AbortSignal[] = [];
+    let fetchedAfterFailure = 0;
+    let failedAt = 0;
+    const fetchPage = async (page: number, signal: AbortSignal): Promise<ExportPage> => {
+      signals.push(signal);
+      if (failedAt) fetchedAfterFailure++;
+      await new Promise((r) => setTimeout(r, page === 3 ? 1 : 10));
+      if (broken && page === 3) {
+        failedAt = Date.now();
+        throw new Error("page 3 down");
+      }
+      return { total: 1000, rows: Array.from({ length: 100 }, (_, i) => [(page - 1) * 100 + i]) };
+    };
+    const received = noPages();
+    await expect(collectRows({ fetchPage, pageSize: 100, maxRows: 1000, signal: new AbortController().signal, received, retries: 0 })).rejects.toThrow("page 3 down");
+    const kept = received.pages.size;
+    await new Promise((r) => setTimeout(r, 30)); // the in-flight pages land now: they must not be written
+    expect(received.pages.size).toBe(kept);
+    expect(signals.at(-1)?.aborted).toBe(true);
+    expect(fetchedAfterFailure).toBe(0);
+    broken = false;
+    const result = await collectRows({ fetchPage, pageSize: 100, maxRows: 1000, signal: new AbortController().signal, received, retries: 0 });
+    expect(result.rows.map((r) => r[0])).toEqual(Array.from({ length: 1000 }, (_, i) => i));
+  });
+
+  it("doesn't retry answers that won't change (4xx), does retry server errors", async () => {
+    const attempts = new Map<number, number>();
+    const failing = (status: number) => async (): Promise<ExportPage> => {
+      attempts.set(status, (attempts.get(status) ?? 0) + 1);
+      throw Object.assign(new Error(`HTTP ${status}`), { status });
+    };
+    const signal = new AbortController().signal;
+    await expect(collectRows({ fetchPage: failing(403), pageSize: 10, maxRows: 10, signal, retries: 2 })).rejects.toThrow("HTTP 403");
+    expect(attempts.get(403)).toBe(1);
+    await expect(collectRows({ fetchPage: failing(503), pageSize: 10, maxRows: 10, signal, retries: 1 })).rejects.toThrow("HTTP 503");
+    expect(attempts.get(503)).toBe(2);
   });
 
   it("cancelling stops it", async () => {

@@ -129,6 +129,9 @@ export function DataTablePage({ tableKey, search, onSearch }: { tableKey: string
   const tables = useQuery(dataTablesQuery(api));
   const [text, setText] = useState(search.q ?? "");
   const q = useDebounced(text.trim(), 300);
+  const known = tables.data?.find((t) => t.key === tableKey);
+  // A view the table no longer has (an old link) is dropped, not an error page.
+  const view = known && !known.views.some((v) => v.key === search.view) ? undefined : search.view;
   const params: ListParams = {
     q: search.q,
     sort: search.sort,
@@ -136,7 +139,7 @@ export function DataTablePage({ tableKey, search, onSearch }: { tableKey: string
     page: search.page ?? 1,
     pageSize: PAGE_SIZE,
     filters: search.filters,
-    view: search.view,
+    view,
     of: search.of,
   };
   const page = useQuery(dataPageQuery(api, tableKey, params));
@@ -226,8 +229,8 @@ export function DataTablePage({ tableKey, search, onSearch }: { tableKey: string
             <Button
               key={v.key ?? "__all"}
               size="sm"
-              variant={search.view === v.key ? "default" : "outline"}
-              aria-pressed={search.view === v.key}
+              variant={view === v.key ? "default" : "outline"}
+              aria-pressed={view === v.key}
               className="h-9 shrink-0 rounded-full"
               onClick={() => onSearch({ ...search, view: v.key, page: undefined })}
             >
