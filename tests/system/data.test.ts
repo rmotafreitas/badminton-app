@@ -358,6 +358,7 @@ describe("data: writes go through the rules", () => {
     const admin = w.api.as(w.admin);
     const outsider = await admin.games.post({ clubId: w.club.id, type: "SINGLES", team1PlayerIds: [w.player.id], team2PlayerIds: [w.outsider.id], team1Points: 21, team2Points: 9 });
     expect(outsider.status).toBe(422);
+    expect((outsider.error?.value as { code?: string } | undefined)?.code).toBe("player_not_in_club");
     const game = await admin.games.post({ clubId: w.club.id, type: "SINGLES", team1PlayerIds: [w.player.id], team2PlayerIds: [w.coach.id], team1Points: 21, team2Points: 9 });
     const id = (game.data as any).id;
     const root = w.cookie(w.admin);

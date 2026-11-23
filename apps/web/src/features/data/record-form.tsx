@@ -64,6 +64,7 @@ export function RefPicker({
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
   const options = useQuery({ ...dataOptionsQuery(api, table, q.trim()), enabled: open });
+  const offered = options.data?.filter((o) => !exclude?.includes(o.id));
   const pick = (id: string | null, name?: string) => {
     onChange(id, name);
     setOpen(false);
@@ -95,9 +96,7 @@ export function RefPicker({
                 {dict.data.none}
               </button>
             )}
-            {options.data
-              ?.filter((o) => !exclude?.includes(o.id))
-              .map((o) => (
+            {offered?.map((o) => (
               <button
                 key={o.id}
                 type="button"
@@ -106,8 +105,8 @@ export function RefPicker({
               >
                 {o.label}
               </button>
-              ))}
-            {options.data?.length === 0 && <p className="px-3 py-6 text-center text-sm text-muted-foreground">{dict.data.noMatch}</p>}
+            ))}
+            {offered?.length === 0 && <p className="px-3 py-6 text-center text-sm text-muted-foreground">{dict.data.noMatch}</p>}
           </div>
         </div>
       </ResponsiveSheet>
