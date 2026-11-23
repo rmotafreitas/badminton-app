@@ -4,7 +4,7 @@ import { toast } from "sonner";
 import { ResponsiveSheet } from "@/shared/components/responsive-sheet";
 import { useDictionary } from "@/shared/i18n";
 import { fmt } from "@/shared/i18n/ui";
-import { type CollectProgress, collectRows, ExportAborted, type FetchExportPage, type ReceivedPages, saveFile } from "@/shared/lib/export/collect";
+import { type CollectProgress, collectRows, ExportAborted, ExportChanged, type FetchExportPage, noPages, type ReceivedPages, saveFile } from "@/shared/lib/export/collect";
 import { Button } from "@/shared/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/shared/ui/dropdown-menu";
 import { Progress } from "@/shared/ui/progress";
@@ -54,11 +54,11 @@ export function ExportButton({
   const [busy, setBusy] = useState(false);
   const [sheet, setSheet] = useState(false);
   const [progress, setProgress] = useState<CollectProgress>({ done: 0, total: 0 });
-  const [failed, setFailed] = useState(false);
+  const [failed, setFailed] = useState<"failed" | "changed" | null>(null);
 
   const go = async (current: Run) => {
     setBusy(true);
-    setFailed(false);
+    setFailed(null);
     try {
       const result = await collectRows({
         fetchPage,
@@ -80,7 +80,7 @@ export function ExportButton({
       setSheet(false);
     } catch (error) {
       if (error instanceof ExportAborted || current.controller.signal.aborted) return;
-      setFailed(true);
+      setFailed(error instanceof ExportChanged ? "changed" : "failed");
       setSheet(true);
     } finally {
       setBusy(false);
@@ -89,7 +89,7 @@ export function ExportButton({
 
   const start = (format: Format) => {
     run.current?.controller.abort();
-    const current: Run = { format, received: new Map(), controller: new AbortController() };
+    const current: Run = { format, received: noPages(), controller: new AbortController() };
     run.current = current;
     setProgress({ done: 0, total: 0 });
     void go(current);
@@ -106,7 +106,7 @@ export function ExportButton({
     run.current?.controller.abort();
     run.current = null;
     setBusy(false);
-    setFailed(false);
+    setFailed(null);
     setSheet(false);
   };
 
@@ -147,11 +147,16 @@ export function ExportButton({
         }
       >
         <div className="space-y-3 py-2" role="status" aria-live="polite">
-          <Progress value={percent} aria-label={dict.data.exporting} />
-          <p className="tabular text-sm text-muted-foreground">
-            {fmt(dict.data.exportProgress, { done: progress.done.toLocaleString(lang), total: progress.total.toLocaleString(lang) })}
-          </p>
-          {failed && <p className="text-sm text-destructive">{dict.data.exportFailed}</p>}
+          {/* Before the first page there is nothing to count: only the error, if any. */}
+          {progress.total > 0 && (
+            <>
+              <Progress value={percent} aria-label={dict.data.exporting} />
+              <p className="tabular text-sm text-muted-foreground">
+                {fmt(dict.data.exportProgress, { done: progress.done.toLocaleString(lang), total: progress.total.toLocaleString(lang) })}
+              </p>
+            </>
+          )}
+          {failed && <p className="text-sm text-destructive">{failed === "changed" ? dict.data.exportChanged : dict.data.exportFailed}</p>}
         </div>
       </ResponsiveSheet>
     </>

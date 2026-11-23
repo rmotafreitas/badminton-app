@@ -1,5 +1,6 @@
 import { describe, expect, it } from "bun:test";
-import { type FieldDef, parseValue, parseValues } from "@bb/application";
+import { type FieldDef, parseValue, parseValues, type TableDef, TABLES, tableDef } from "@bb/application";
+import { ROLES } from "@bb/domain";
 
 const field = (f: Partial<FieldDef> & Pick<FieldDef, "type">): FieldDef => ({ key: "x", label: { en: "X", pt: "X" }, ...f });
 
@@ -37,5 +38,37 @@ describe("data: submitted values", () => {
     expect(() => parseValues([name], {}, "create")).toThrow();
     expect(parseValues([name], {}, "edit")).toEqual({});
     expect(() => parseValues([name], { name: " " }, "edit")).toThrow();
+  });
+});
+
+describe("data: the registry is consistent", () => {
+  it("every view and related link names real fields of the right kind", () => {
+    for (const table of TABLES) {
+      const field = (t: TableDef, key: string) => t.fields.find((f) => f.key === key);
+      for (const view of table.views ?? []) {
+        expect(view.where.length).toBeGreaterThan(0);
+        for (const c of view.where) {
+          const f = field(table, c.field);
+          expect(f, `${table.key}.${view.key}: no field "${c.field}"`).toBeDefined();
+          if ("is" in c) {
+            if (f!.type === "boolean") expect(typeof c.is).toBe("boolean");
+            if (f!.type === "enum") expect(f!.options).toContain(c.is as string);
+            if (f!.type === "roles") expect(ROLES).toContain(c.is as never);
+          } else if (!("empty" in c)) {
+            expect(["datetime"], `${table.key}.${view.key}: dates only`).toContain(f!.type);
+          }
+        }
+      }
+      for (const r of table.related ?? []) {
+        const child = tableDef(r.table)!;
+        for (const key of r.fields) {
+          const f = field(child, key);
+          expect(f, `${table.key} → ${r.table}.${key}`).toBeDefined();
+          expect(["ref", "refs"]).toContain(f!.type);
+          expect(f!.ref).toBe(table.key);
+        }
+      }
+      for (const f of table.fields) if (f.optionLabels) expect(Object.keys(f.optionLabels).sort()).toEqual([...(f.options ?? [])].sort());
+    }
   });
 });

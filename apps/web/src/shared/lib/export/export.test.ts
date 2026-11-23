@@ -1,6 +1,6 @@
 import { strFromU8, unzipSync } from "fflate";
 import { describe, expect, it } from "vitest";
-import { collectRows, ExportAborted, type ExportPage } from "./collect";
+import { collectRows, ExportAborted, ExportChanged, type ExportPage, noPages } from "./collect";
 import { columnName, type ExportTable, toCsv, toXlsx } from "./sheet";
 
 const table: ExportTable = {
@@ -22,6 +22,8 @@ describe("CSV", () => {
     expect(lines[1]).toBe(`a1;"'=HYPERLINK(""x"")";1234,5;2026-02-03 14:05;2004-12-04`);
     expect(lines[2]).toBe('a2;"Ana ""Nê""; Silva\nLisboa";;;');
     expect(csv).toContain("'+351 912 345 678");
+    // Leading spaces don't hide a formula.
+    expect(toCsv({ name: "x", headers: ["a"], rows: [["  =1+1"], ["\u00A0@SUM(A1)"], ["a = b"]] }, "en")).toBe("\uFEFFa\r\n'  =1+1\r\n'\u00A0@SUM(A1)\r\na = b\r\n");
     // Numbers aren't text, so a negative one isn't "defused".
     expect(csv).toContain(";-3;");
   });
@@ -106,7 +108,7 @@ describe("collecting pages", () => {
   it("a page that keeps failing rejects; trying again fetches only what's missing", async () => {
     let broken = true;
     const s = source(300, 100, (page) => broken && page === 2);
-    const received = new Map();
+    const received = noPages();
     const signal = new AbortController().signal;
     await expect(collectRows({ fetchPage: s.fetchPage, pageSize: 100, maxRows: 1000, signal, received, retries: 1 })).rejects.toThrow("page 2 failed");
     broken = false;
@@ -114,6 +116,37 @@ describe("collecting pages", () => {
     const result = await collectRows({ fetchPage: s.fetchPage, pageSize: 100, maxRows: 1000, signal, received, retries: 1 });
     expect(result.rows).toHaveLength(300);
     expect(s.attempts.get(3)).toBe(before);
+  });
+
+  it("rows moving between pages mean starting over, never a file with gaps", async () => {
+    let total = 300;
+    const received = noPages();
+    const fetchPage = async (page: number): Promise<ExportPage> => {
+      if (page === 2) total = 299; // someone deleted a row meanwhile
+      return { total, rows: [[page]] };
+    };
+    await expect(collectRows({ fetchPage, pageSize: 100, maxRows: 1000, signal: new AbortController().signal, received })).rejects.toBeInstanceOf(ExportChanged);
+    expect(received.pages.size).toBe(0);
+  });
+
+  it("resuming after the total changed refetches everything", async () => {
+    let total = 300;
+    let fail = true;
+    const fetched: number[] = [];
+    const fetchPage = async (page: number): Promise<ExportPage> => {
+      fetched.push(page);
+      if (fail && page === 3) throw new Error("down");
+      return { total, rows: Array.from({ length: Math.min(100, total - (page - 1) * 100) }, () => [page]) };
+    };
+    const received = noPages();
+    const signal = new AbortController().signal;
+    await expect(collectRows({ fetchPage, pageSize: 100, maxRows: 1000, signal, received, retries: 0 })).rejects.toThrow("down");
+    total = 250;
+    fail = false;
+    fetched.length = 0;
+    const result = await collectRows({ fetchPage, pageSize: 100, maxRows: 1000, signal, received, retries: 0 });
+    expect(result.rows).toHaveLength(250);
+    expect(fetched.sort()).toEqual([1, 2, 3]);
   });
 
   it("cancelling stops it", async () => {

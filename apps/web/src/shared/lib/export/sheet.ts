@@ -23,9 +23,12 @@ const localMoment = (d: Date) => `${localDay(d)} ${pad(d.getHours())}:${pad(d.ge
 
 // ── CSV ──────────────────────────────────────────────────────────────────────
 
-/** Spreadsheet formula injection: text starting with = + - @ (or a tab / CR) would run as a formula. */
+/**
+ * Spreadsheet formula injection: text starting with = + - @ (or a tab / CR), even after leading spaces that a
+ * spreadsheet may skip, would run as a formula.
+ */
 const csvText = (text: string, separator: string) => {
-  const safe = /^[=+\-@\t\r]/.test(text) ? `'${text}` : text;
+  const safe = /^[\s\u00A0]*[=+\-@]|^[\t\r]/.test(text) ? `'${text}` : text;
   return safe.includes(separator) || /["\n\r]/.test(safe) ? `"${safe.replaceAll('"', '""')}"` : safe;
 };
 
