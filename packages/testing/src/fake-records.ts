@@ -1,4 +1,4 @@
-import { type RecordRow, type RecordStore, type RecordValue, type TableKey, tableDef } from "@bb/application";
+import { type RecordCondition, type RecordRow, type RecordStore, type RecordValue, type TableKey, tableDef } from "@bb/application";
 import type { FakeStore } from "./fakes";
 
 type Values = Record<string, RecordValue>;
@@ -43,7 +43,7 @@ function rowsOf(store: FakeStore, table: TableKey): RecordRow[] {
         values: { ...g, team1PlayerIds: [...g.team1PlayerIds], team2PlayerIds: [...g.team2PlayerIds], sets: [...g.sets] },
       }));
     case "trainingReviews":
-      return [...store.reviews.values()].map((r) => ({ id: r.id, values: { userId: r.userId, date: r.date, effort: r.effort, note: r.note, createdAt: r.createdAt } }));
+      return [...store.reviews.values()].map((r) => ({ id: r.id, values: { userId: r.userId, date: r.date, effort: r.effort, createdAt: r.createdAt } }));
     case "rallySessions":
       return [...store.rally.values()].map((s) => ({
         id: s.id,
@@ -74,10 +74,32 @@ function rowsOf(store: FakeStore, table: TableKey): RecordRow[] {
 
 const comparable = (v: RecordValue | undefined) => (v instanceof Date ? v.getTime() : v);
 
+function holds(table: TableKey, row: RecordRow, c: RecordCondition): boolean {
+  const type = (key: string) => tableDef(table)?.fields.find((f) => f.key === key)?.type;
+  const matches = (key: string, want: string | boolean) => {
+    const value = row.values[key];
+    return type(key) === "roles" || type(key) === "refs" ? Array.isArray(value) && (value as unknown[]).includes(want) : (value ?? null) === want;
+  };
+  switch (c.op) {
+    case "any":
+      return c.fields.some((key) => matches(key, c.value));
+    case "empty": {
+      const value = row.values[c.field];
+      return value === null || value === undefined || (Array.isArray(value) && value.length === 0);
+    }
+    case "after":
+    case "before": {
+      const value = row.values[c.field];
+      if (!(value instanceof Date)) return false;
+      return c.op === "after" ? value.getTime() > c.value.getTime() : value.getTime() < c.value.getTime();
+    }
+  }
+}
+
 /** The Prisma store's behaviour over the fake store: equality/contains filters, search, sort, paging. */
 export function fakeRecords(store: FakeStore): RecordStore {
   const label = (table: TableKey, row: RecordRow) => {
-    if (table === "users") return String(row.values.name || row.values.email || row.values.phone || row.id);
+    if (table === "users") return String(row.values.name ?? "");
     const def = tableDef(table);
     const value = def ? row.values[def.titleField] : null;
     return value instanceof Date ? value.toISOString().slice(0, 10) : String(value ?? row.id);
@@ -93,6 +115,7 @@ export function fakeRecords(store: FakeStore): RecordStore {
           return type === "roles" || type === "refs" ? Array.isArray(value) && (value as unknown[]).includes(want) : (value ?? null) === want;
         }),
       );
+      rows = rows.filter((row) => (query.conditions ?? []).every((c) => holds(table, row, c)));
       if (query.search) {
         const term = query.search.term.toLowerCase();
         rows = rows.filter((row) => query.search?.fields.some((f) => String(row.values[f] ?? "").toLowerCase().includes(term)));

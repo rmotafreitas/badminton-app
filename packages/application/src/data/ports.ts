@@ -13,9 +13,20 @@ export interface RecordRow {
   readonly values: Readonly<Record<string, RecordValue>>;
 }
 
+/**
+ * A condition beyond equality. `empty`: no value (null, unset, or an empty list). `after` / `before`: a date strictly
+ * later / earlier than `value`. `any`: at least one of `fields` equals `value` (on `roles` / `refs`: contains it).
+ */
+export type RecordCondition =
+  | { readonly op: "empty"; readonly field: string }
+  | { readonly op: "after" | "before"; readonly field: string; readonly value: Date }
+  | { readonly op: "any"; readonly fields: readonly string[]; readonly value: string | boolean };
+
 export interface RecordQuery {
   /** Equality per field. On `roles` / `refs` fields: "contains this value". */
   readonly where: Readonly<Record<string, string | boolean | null>>;
+  /** All of these hold too (views, related rows). */
+  readonly conditions?: readonly RecordCondition[];
   /** Case-insensitive "contains" over these fields, any of them. */
   readonly search?: { readonly term: string; readonly fields: readonly string[] };
   readonly sort: { readonly field: string; readonly dir: "asc" | "desc" };

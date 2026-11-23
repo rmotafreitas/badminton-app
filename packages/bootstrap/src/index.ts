@@ -19,6 +19,8 @@ import {
   AddClubMember,
   CreateAccount,
   DataTables,
+  ModerateRallySession,
+  RemoveTrainingReview,
   DeleteAccount,
   RemoveClubMember,
   type RecordStore,
@@ -265,10 +267,10 @@ export function createDataModule(
     ...modules,
     ...accounts,
     store: infra.records,
-    storage: infra.storage,
+    clock: infra.clock,
     sessions: infra.sessions,
-    reviews: infra.reviews,
-    rally: infra.rally,
+    removeTrainingReview: new RemoveTrainingReview({ reviews: infra.reviews }),
+    moderateRallySession: new ModerateRallySession({ sessions: infra.rally, users: infra.users, storage: infra.storage, clock: infra.clock }),
   });
   return { ...accounts, dataTables };
 }

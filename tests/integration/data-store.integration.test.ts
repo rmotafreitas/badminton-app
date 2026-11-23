@@ -72,6 +72,53 @@ describe("PrismaRecordStore", () => {
     expect(JSON.stringify(await store.list("authSessions", query()))).not.toContain("very-secret");
   });
 
+  it("conditions: either team, never set, dates around now; take 0 just counts", async () => {
+    const club = await db.club.create({ data: { name: "Cond" } });
+    const [a, b, c] = await Promise.all(["a", "b", "c"].map((n) => db.user.create({ data: { email: `${n}@cond.pt` } })));
+    const games = new PrismaGameRepository(db);
+    const game = (t1: string, t2: string, playedAt: string) =>
+      games.create({ type: "SINGLES", clubId: club.id, team1PlayerIds: [t1], team2PlayerIds: [t2], sets: [{ team1Score: 21, team2Score: 3 }], registeredById: t1, playedAt: new Date(playedAt) });
+    await game(a!.id, b!.id, "2026-10-01T10:00:00Z");
+    await game(b!.id, a!.id, "2026-11-01T10:00:00Z");
+    await game(b!.id, c!.id, "2026-11-02T10:00:00Z");
+
+    const either = await store.list("games", query({ conditions: [{ op: "any", fields: ["team1PlayerIds", "team2PlayerIds"], value: a!.id }] }));
+    expect(either.total).toBe(2);
+    // The file's database is shared by its tests: stay within this club.
+    const mine = { clubId: club.id };
+    const recent = await store.list("games", query({ where: mine, conditions: [{ op: "after", field: "playedAt", value: new Date("2026-10-15T00:00:00Z") }] }));
+    expect(recent.total).toBe(2);
+    const between = await store.list("games", query({
+      where: mine,
+      conditions: [
+        { op: "after", field: "playedAt", value: new Date("2026-10-15T00:00:00Z") },
+        { op: "before", field: "playedAt", value: new Date("2026-11-01T12:00:00Z") },
+      ],
+    }));
+    expect(between.total).toBe(1);
+    const counted = await store.list("games", query({ where: mine, take: 0 }));
+    expect(counted).toEqual({ rows: [], total: 3 });
+
+    // `lastAccess` was never set on these documents: "empty" still finds them (MongoDB's null alone wouldn't).
+    await db.user.update({ where: { id: c!.id }, data: { lastAccess: new Date() } });
+    const never = await store.list("users", query({ where: {}, conditions: [{ op: "empty", field: "lastAccess" }, { op: "any", fields: ["id"], value: a!.id }] }));
+    expect(never.total).toBe(1);
+    const seen = await store.list("users", query({ conditions: [{ op: "empty", field: "lastAccess" }] }));
+    expect(seen.rows.map((r) => r.id)).not.toContain(c!.id);
+    // `any` on a list field means "contains" (only the earlier test's coach has COACH).
+    const coaches = await store.list("users", query({ conditions: [{ op: "any", fields: ["roles"], value: "COACH" }] }));
+    expect(coaches.rows.length).toBeGreaterThan(0);
+    expect(coaches.rows.every((r) => (r.values.roles as string[]).includes("COACH"))).toBe(true);
+    expect(coaches.rows.map((r) => r.id)).not.toContain(a!.id);
+  });
+
+  it("a nameless user's label is empty (the use case decides what to show), and training notes aren't read", async () => {
+    const user = await db.user.create({ data: { email: "nameless@test.pt" } });
+    expect((await store.labels("users", [user.id])).get(user.id)).toBe("");
+    await db.trainingSessionReview.create({ data: { userId: user.id, date: "2026-11-01", effort: 5, note: "secret note" } });
+    expect(JSON.stringify(await store.list("trainingReviews", query()))).not.toContain("secret note");
+  });
+
   it("removes sign-in codes and rate-limit windows (missing ids are fine)", async () => {
     const code = await db.magicToken.create({ data: { token: "h", target: "x@t.pt", type: "email-code", expiresAt: new Date() } });
     await store.remove("signInCodes", code.id);
