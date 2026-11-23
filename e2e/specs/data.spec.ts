@@ -171,6 +171,20 @@ test("game scores are edited with the score grid; players don't get the Data are
   await expect(page.getByText("Saved.")).toBeVisible();
   await expect(sheet.getByText(/–17/)).toBeVisible();
 
+  // Change a player: take team 1's player out, put the same person back with the picker, save.
+  await sheet.getByRole("button", { name: "Edit" }).click();
+  const chip = sheet.getByRole("button", { name: /^Remove / }).first();
+  const removed = ((await chip.getAttribute("aria-label")) ?? "").replace(/^Remove /, "");
+  await chip.click();
+  await expect(sheet.getByRole("button", { name: `Remove ${removed}` })).toHaveCount(0);
+  await sheet.getByRole("button", { name: "Team 1", exact: true }).click();
+  await page.getByRole("dialog", { name: "Team 1" }).getByRole("button", { name: removed, exact: true }).click();
+  await expect(sheet.getByRole("button", { name: `Remove ${removed}` })).toBeVisible();
+  // Singles: one a side, so the picker is gone once the team is full.
+  await expect(sheet.getByRole("button", { name: "Team 1", exact: true })).toHaveCount(0);
+  await sheet.getByRole("button", { name: "Save" }).click();
+  await expect(page.getByText("Saved.").first()).toBeVisible();
+
   const other = await browser.newContext({ ignoreHTTPSErrors: true, baseURL: test.info().project.use.baseURL });
   const asAna = await other.newPage();
   await signIn(asAna, PEOPLE.ana.email);

@@ -40,6 +40,9 @@ function checkClubRoles(roles: readonly Role[] | undefined) {
 }
 
 /**
+ * Check-then-write, like `lastAdminProblem`: two admins demoting each other at the same instant could both pass. Rare,
+ * and a system admin can repair it, so no transaction.
+ *
  * After `userId` stops being an active club admin (demoted, deactivated or removed), the club must still have one who
  * can sign in. System admins may leave a club without one: they can fix it.
  */
@@ -163,6 +166,8 @@ export class UpdateClubMember {
     if (!user) throw new NotFound("This person isn't a member of the club.");
 
     checkClubRoles(changes.roles);
+    // Everything is checked before anything is written.
+    const name = changes.name === undefined ? undefined : cleanPersonName(changes.name ?? "");
     const nextRoles = changes.roles ? clubMemberRoles(changes.roles) : null;
     if (nextRoles) {
       const problem = lastAdminProblem(actor, club.members, userId, nextRoles);
@@ -184,7 +189,7 @@ export class UpdateClubMember {
       await users.updateAccount(userId, { ...contact, ...(changes.isActive !== undefined && { isActive: changes.isActive }) });
     }
     if (nextRoles) await users.setRoles(userId, nextRoles);
-    if (changes.name !== undefined) await this.deps.profiles.update(userId, { name: cleanPersonName(changes.name ?? "") });
+    if (name !== undefined) await this.deps.profiles.update(userId, { name });
     const updated = await users.findById(userId);
     if (!updated) throw new NotFound("This person isn't a member of the club.");
     return updated;

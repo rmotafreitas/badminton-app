@@ -1,5 +1,5 @@
 import { type Actor, BadRequest, canSeeContactDetails, Forbidden, isObjectId, NotFound, ROLES, type Role } from "@bb/domain";
-import type { AddClubMember, CreateClub, DeleteClub, RemoveClubMember, SetMemberRoles, UpdateClub, UpdateClubMember } from "@/clubs";
+import type { AddClubMember, CreateClub, DeleteClub, RemoveClubMember, UpdateClub, UpdateClubMember } from "@/clubs";
 import type { DeleteGame, UpdateGame } from "@/games";
 import type { CreateAccount, DeleteAccount, SessionRepository, UpdateAccount } from "@/identity";
 import type { ModerateRallySession } from "@/rally";
@@ -49,7 +49,6 @@ export interface DataDeps {
   readonly deleteAccount: DeleteAccount;
   readonly addClubMember: AddClubMember;
   readonly removeClubMember: RemoveClubMember;
-  readonly setMemberRoles: SetMemberRoles;
   readonly updateClubMember: UpdateClubMember;
   readonly updateGame: UpdateGame;
   readonly deleteGame: DeleteGame;

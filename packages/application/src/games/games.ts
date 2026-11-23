@@ -15,6 +15,7 @@ import {
   lineupProblem,
   NotFound,
   type Ratings,
+  playersProblem,
   registerGameProblem,
   ratingTimeline,
   replayRatings,
@@ -102,7 +103,7 @@ export class RegisterGame {
     const playerIds = [...input.team1PlayerIds, ...input.team2PlayerIds];
     const permission = registerGameProblem(actor, input.clubId, playerIds);
     if (permission) throw new Forbidden(permission);
-    await this.assertPlayersExist(playerIds);
+    await assertPlayers(this.deps, input.clubId, playerIds);
     const game = await this.deps.games.create({
       ...lineup,
       clubId: input.clubId,
@@ -113,11 +114,14 @@ export class RegisterGame {
     return withPlayersOne(this.deps.players, game);
   }
 
-  private async assertPlayersExist(ids: readonly string[]) {
-    if (!ids.every(isObjectId) || (await this.deps.users.findByIds(ids)).length !== new Set(ids).size) {
-      throw new BusinessRuleViolation("Some players don't exist.", "unknown_player");
-    }
-  }
+}
+
+/** The players exist, are members of the game's club and aren't system admins. */
+async function assertPlayers(deps: Pick<Deps, "users">, clubId: string, ids: readonly string[]) {
+  const users = ids.every(isObjectId) ? await deps.users.findByIds(ids) : [];
+  if (users.length !== new Set(ids).size) throw new BusinessRuleViolation("Some players don't exist.", "unknown_player");
+  const problem = playersProblem(clubId, users);
+  if (problem) throw new BusinessRuleViolation(problem, "player_not_in_club");
 }
 
 async function loadVisible(deps: Pick<Deps, "games">, actor: Actor, gameId: string): Promise<Game> {
@@ -151,9 +155,9 @@ export class UpdateGame {
       // New players: the same checks as registering the game.
       const permission = registerGameProblem(actor, game.clubId, players);
       if (permission) throw new Forbidden(permission);
-      if (!players.every(isObjectId) || (await this.deps.users.findByIds(players)).length !== new Set(players).size) {
-        throw new BusinessRuleViolation("Some players don't exist.", "unknown_player");
-      }
+      // Only those added: someone who has since left the club can stay on their old games.
+      const before = new Set([...game.team1PlayerIds, ...game.team2PlayerIds]);
+      await assertPlayers(this.deps, game.clubId, [...new Set(players.filter((id) => !before.has(id)))]);
     }
     const updated = await this.deps.games.update(gameId, changes);
     // Old and new players: someone taken out of their only game goes back to the default rating.

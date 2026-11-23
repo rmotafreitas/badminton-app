@@ -166,9 +166,11 @@ describe("data: listing", () => {
 
   it("a nameless account reads as its email only to those who may see it", async () => {
     const w = world();
-    const nameless = w.api.store.addUser({ email: "ghost@test.pt", clubId: w.other.id });
+    // A nameless member plays, then moves to another club: their old games still show them.
+    const nameless = w.api.store.addUser({ email: "ghost@test.pt", clubId: w.club.id });
     const game = await w.api.as(w.admin).games.post({ clubId: w.club.id, type: "SINGLES", team1PlayerIds: [w.player.id], team2PlayerIds: [nameless.id], team1Points: 21, team2Points: 9 });
     const id = (game.data as any).id;
+    expect((await write(w.api, w.cookie(w.admin), "PATCH", `/api/data/users/${nameless.id}`, { clubId: w.other.id })).status).toBe(200);
     const forCoach = await json(await get(w.api, w.cookie(w.coach), `/api/data/games/${id}`));
     expect(forCoach.refs.users[nameless.id]).toBe(`#${nameless.id.slice(-6)}`);
     expect(JSON.stringify(forCoach)).not.toContain("ghost@test.pt");
@@ -243,6 +245,9 @@ describe("data: writes go through the rules", () => {
     // Contacts stay unique, and an account keeps one to sign in with.
     expect((await write(w.api, cookie, "PATCH", `/api/data/users/${w.coach.id}`, { email: "ana@test.pt" })).status).toBe(409);
     expect((await write(w.api, cookie, "PATCH", `/api/data/users/${w.coach.id}`, { email: null, phone: null })).status).toBe(400);
+    // Changing only the email keeps the phone.
+    const emailOnly = await json(await write(w.api, cookie, "PATCH", `/api/data/users/${w.player.id}`, { email: "bea2@new.pt" }));
+    expect(emailOnly.row.values.phone).toMatch(/912345678$/);
     // Another club's member: not found.
     expect((await write(w.api, cookie, "PATCH", `/api/data/users/${w.outsider.id}`, { name: "X" })).status).toBe(404);
   });
@@ -264,6 +269,20 @@ describe("data: writes go through the rules", () => {
     expect(removeSelf.status).toBe(422);
     // A system admin may still change anything.
     expect((await write(w.api, w.cookie(w.admin), "PATCH", `/api/data/users/${w.coach.id}`, { roles: ["PLAYER"] })).status).toBe(200);
+  });
+
+  it("the Members screen's own routes keep an active club admin too", async () => {
+    const w = world();
+    const ana = w.api.as(w.clubAdmin);
+    // Rui becomes a second admin, then is deactivated: Ana is the only active one.
+    await ana.clubs({ id: w.club.id }).members({ userId: w.coach.id }).roles.put({ roles: ["CLUB_ADMIN"] });
+    expect((await write(w.api, w.cookie(w.clubAdmin), "PATCH", `/api/data/users/${w.coach.id}`, { isActive: false })).status).toBe(200);
+    // Reactivated by a system admin, Rui tries to demote and remove Ana's only active counterpart... himself last:
+    expect((await write(w.api, w.cookie(w.admin), "PATCH", `/api/data/users/${w.coach.id}`, { isActive: true })).status).toBe(200);
+    expect((await write(w.api, w.cookie(w.coach), "PATCH", `/api/data/users/${w.clubAdmin.id}`, { isActive: false })).status).toBe(200);
+    const rui = w.api.as(w.coach);
+    expect((await rui.clubs({ id: w.club.id }).members({ userId: w.coach.id }).roles.put({ roles: ["PLAYER"] })).status).toBe(422);
+    expect((await rui.clubs({ id: w.club.id }).members({ userId: w.coach.id }).delete()).status).toBe(422);
   });
 
   it("coaches see members but can't edit them", async () => {
@@ -327,7 +346,37 @@ describe("data: writes go through the rules", () => {
       team2PlayerIds: [w.clubAdmin.id, fourth.id],
     });
     expect(doubles.status).toBe(200);
+    // Doubles now: the singles ratings are back to the start for everyone, the four have doubles ratings.
+    for (const u of [w.coach, w.player, w.clubAdmin]) expect(w.api.store.users.get(u.id)!.eloSingles).toBe(200);
+    for (const u of [w.coach, w.player, w.clubAdmin, fourth]) expect(w.api.store.users.get(u.id)!.eloDoubles).not.toBe(200);
     expect((await write(w.api, cookie, "PATCH", `/api/data/games/${id}`, { team2PlayerIds: [w.clubAdmin.id, "64b000000000000000000000"] })).status).toBe(422);
+    expect((await write(w.api, cookie, "PATCH", `/api/data/games/${id}`, { team2PlayerIds: [w.clubAdmin.id, ""] })).status).toBe(400);
+  });
+
+  it("a game's players are members of its club, never system admins; someone who left stays on old games", async () => {
+    const w = world();
+    const admin = w.api.as(w.admin);
+    const outsider = await admin.games.post({ clubId: w.club.id, type: "SINGLES", team1PlayerIds: [w.player.id], team2PlayerIds: [w.outsider.id], team1Points: 21, team2Points: 9 });
+    expect(outsider.status).toBe(422);
+    const game = await admin.games.post({ clubId: w.club.id, type: "SINGLES", team1PlayerIds: [w.player.id], team2PlayerIds: [w.coach.id], team1Points: 21, team2Points: 9 });
+    const id = (game.data as any).id;
+    const root = w.cookie(w.admin);
+    for (const intruder of [w.outsider.id, w.admin.id]) {
+      const res = await write(w.api, root, "PATCH", `/api/data/games/${id}`, { team2PlayerIds: [intruder] });
+      expect(res.status).toBe(422);
+      expect((await json(res)).code).toBe("player_not_in_club");
+    }
+    // Rui moves to another club: the game still has him, and editing it (even its players) keeps working.
+    expect((await write(w.api, root, "PATCH", `/api/data/users/${w.coach.id}`, { clubId: w.other.id })).status).toBe(200);
+    expect((await write(w.api, root, "PATCH", `/api/data/games/${id}`, { team1PlayerIds: [w.clubAdmin.id] })).status).toBe(200);
+  });
+
+  it("a player can't swap themselves out of their own game", async () => {
+    const w = world();
+    const game = await w.api.as(w.admin).games.post({ clubId: w.club.id, type: "SINGLES", team1PlayerIds: [w.player.id], team2PlayerIds: [w.coach.id], team1Points: 21, team2Points: 9 });
+    const id = (game.data as any).id;
+    const res = await w.api.as(w.player).games({ id }).patch({ team1PlayerIds: [w.clubAdmin.id] });
+    expect(res.status).toBe(403);
   });
 
   it("recordings: a system admin keeps them within the owner's pin limit, and deleting removes the files", async () => {

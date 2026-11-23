@@ -236,6 +236,7 @@ export const TABLES: readonly TableDef[] = [
         list: true,
         filter: true,
         edit: true,
+        required: true,
       },
       { key: "clubId", label: L("Club", "Clube"), type: "ref", ref: "clubs", list: true, filter: true },
       { key: "team1PlayerIds", label: L("Team 1", "Equipa 1"), type: "refs", ref: "users", list: true, edit: true, required: true, max: 2 },

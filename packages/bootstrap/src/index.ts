@@ -253,7 +253,6 @@ export function createDataModule(
     | "deleteClub"
     | "addClubMember"
     | "removeClubMember"
-    | "setMemberRoles"
     | "updateClubMember"
     | "updateGame"
     | "deleteGame"
