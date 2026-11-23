@@ -1,5 +1,5 @@
 import { type Actor, BadRequest, canSeeContactDetails, Forbidden, isObjectId, NotFound, ROLES, type Role } from "@bb/domain";
-import type { AddClubMember, CreateClub, DeleteClub, RemoveClubMember, SetMemberRoles, UpdateClub } from "@/clubs";
+import type { AddClubMember, CreateClub, DeleteClub, RemoveClubMember, UpdateClub, UpdateClubMember } from "@/clubs";
 import type { DeleteGame, UpdateGame } from "@/games";
 import type { CreateAccount, DeleteAccount, SessionRepository, UpdateAccount } from "@/identity";
 import type { ModerateRallySession } from "@/rally";
@@ -49,7 +49,7 @@ export interface DataDeps {
   readonly deleteAccount: DeleteAccount;
   readonly addClubMember: AddClubMember;
   readonly removeClubMember: RemoveClubMember;
-  readonly setMemberRoles: SetMemberRoles;
+  readonly updateClubMember: UpdateClubMember;
   readonly updateGame: UpdateGame;
   readonly deleteGame: DeleteGame;
 }
@@ -95,8 +95,9 @@ function handlers(deps: DataDeps): Partial<Record<TableKey, TableHandler>> {
       update: async ({ actor, access }, id, values) => {
         if (access.scope === "all") {
           await deps.updateAccount.execute({ actor, userId: id, input: accountInput(values) });
-        } else if (values.roles) {
-          await deps.setMemberRoles.execute({ actor, clubId: actor.clubId as string, userId: id, roles: values.roles as Role[] });
+        } else {
+          const { clubId: _club, ...changes } = accountInput(values);
+          await deps.updateClubMember.execute({ actor, clubId: actor.clubId as string, userId: id, changes });
         }
       },
       delete: ({ actor, access }, id) =>
@@ -112,6 +113,9 @@ function handlers(deps: DataDeps): Partial<Record<TableKey, TableHandler>> {
           changes: {
             ...(values.sets !== undefined && { sets: values.sets as GameSetValue[] }),
             ...(values.playedAt instanceof Date && { playedAt: values.playedAt }),
+            ...(values.type !== undefined && { type: values.type as "SINGLES" | "DOUBLES" }),
+            ...(values.team1PlayerIds !== undefined && { team1PlayerIds: values.team1PlayerIds as string[] }),
+            ...(values.team2PlayerIds !== undefined && { team2PlayerIds: values.team2PlayerIds as string[] }),
           },
         });
       },

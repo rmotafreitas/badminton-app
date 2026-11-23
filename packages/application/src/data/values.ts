@@ -76,7 +76,11 @@ export function parseValue(field: FieldDef, raw: unknown): RecordValue {
       return id(field, raw);
     case "refs":
       if (!Array.isArray(raw)) throw bad(field, "expected a list of ids.");
-      return raw.map((r) => id(field, r)).filter((r): r is string => r !== null);
+      return raw.map((r) => {
+        const value = id(field, r);
+        if (value === null) throw bad(field, "expected a list of ids.");
+        return value;
+      });
     case "sets":
       return sets(field, raw);
     case "image":

@@ -101,8 +101,9 @@ plus create / update / delete and which fields that role may set. Players see no
   see contacts (`canSeeContactDetails`); anyone else sees a short id.
 - **Writes go through use cases.** Each table's handler (`handlers()` in `data/data.ts`) calls the use case that owns
   the rules: clubs → `CreateClub`/`UpdateClub`/`DeleteClub`; users → `CreateAccount`/`UpdateAccount`/`DeleteAccount`
-  (system admins) or `AddClubMember`/`SetMemberRoles`/`RemoveClubMember` (club admins; SYSTEM_ADMIN is a 400);
-  games → `UpdateGame`/`DeleteGame` (ratings replay); recordings → `ModerateRallySession` (the owner's pin limit holds);
+  (system admins) or `AddClubMember`/`UpdateClubMember`/`RemoveClubMember` (club admins edit what they can set
+  adding someone, plus active, never the club; SYSTEM_ADMIN is a 400; the club keeps an active club admin);
+  games → `UpdateGame`/`DeleteGame` (date, score, type and players, with the registering checks; ratings replay); recordings → `ModerateRallySession` (the owner's pin limit holds);
   training reviews → `RemoveTrainingReview`. Fields a role may not set are a 400, not silently dropped.
   **Exception:** housekeeping tables with no rules of their own (sessions, sign-in methods, sign-in codes, rate-limit
   windows) are deleted directly through the session repository / `RecordStore.remove`.

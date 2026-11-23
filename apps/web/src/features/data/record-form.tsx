@@ -43,6 +43,7 @@ export function RefPicker({
   onChange,
   allowNone = true,
   placeholder,
+  exclude,
   className,
 }: {
   table: string;
@@ -54,6 +55,8 @@ export function RefPicker({
   allowNone?: boolean;
   /** Shown when nothing is picked (default "Choose…"). */
   placeholder?: string;
+  /** Rows not offered (already picked elsewhere). */
+  exclude?: readonly string[];
   className?: string;
 }) {
   const dict = useDictionary().ui;
@@ -61,13 +64,23 @@ export function RefPicker({
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
   const options = useQuery({ ...dataOptionsQuery(api, table, q.trim()), enabled: open });
+  const offered = options.data?.filter((o) => !exclude?.includes(o.id));
   const pick = (id: string | null, name?: string) => {
     onChange(id, name);
     setOpen(false);
   };
   return (
     <>
-      <Button type="button" variant="outline" className={cn("h-11 w-full justify-between font-normal", className)} onClick={() => setOpen(true)} aria-label={label}>
+      <Button
+        type="button"
+        variant="outline"
+        className={cn("h-11 w-full justify-between font-normal", className)}
+        onClick={() => {
+          setQ(""); // a fresh search each time
+          setOpen(true);
+        }}
+        aria-label={label}
+      >
         <span className={cn("truncate", !value && "text-muted-foreground")}>{value ? (current ?? value) : (placeholder ?? dict.data.pick)}</span>
         <ChevronsUpDown className="size-4 opacity-50" />
       </Button>
@@ -83,7 +96,7 @@ export function RefPicker({
                 {dict.data.none}
               </button>
             )}
-            {options.data?.map((o) => (
+            {offered?.map((o) => (
               <button
                 key={o.id}
                 type="button"
@@ -93,11 +106,74 @@ export function RefPicker({
                 {o.label}
               </button>
             ))}
-            {options.data?.length === 0 && <p className="px-3 py-6 text-center text-sm text-muted-foreground">{dict.data.noMatch}</p>}
+            {offered?.length === 0 && <p className="px-3 py-6 text-center text-sm text-muted-foreground">{dict.data.noMatch}</p>}
           </div>
         </div>
       </ResponsiveSheet>
     </>
+  );
+}
+
+/** Several rows of another table (a team's players): chips you remove with ×, and a picker to add one (up to `max`). */
+function RefsInput({
+  field,
+  value,
+  refs,
+  max,
+  taken,
+  onChange,
+}: {
+  field: DataField;
+  value: string[];
+  refs: Refs;
+  max?: number;
+  /** Rows already picked in a sibling field (the other team): not offered. */
+  taken: readonly string[];
+  onChange: (ids: string[]) => void;
+}) {
+  const dict = useDictionary().ui;
+  const label = useLabel();
+  // Names of rows picked here, until the server's refs know them.
+  const [picked, setPicked] = useState<Record<string, string>>({});
+  const name = (id: string) => picked[id] ?? (field.ref ? refs[field.ref]?.[id] : undefined) ?? `#${id.slice(-6)}`;
+  const full = max !== undefined && value.length >= max;
+  return (
+    <div className="space-y-2">
+      {value.length > 0 && (
+        <ul className="flex flex-wrap gap-2">
+          {value.map((id) => (
+            <li key={id} className="flex h-11 items-center gap-1 rounded-full border bg-muted/50 pl-3 text-sm">
+              <span className="max-w-48 truncate">{name(id)}</span>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="size-11 rounded-full"
+                aria-label={`${dict.data.remove} ${name(id)}`}
+                onClick={() => onChange(value.filter((v) => v !== id))}
+              >
+                <X />
+              </Button>
+            </li>
+          ))}
+        </ul>
+      )}
+      {!full && (
+        <RefPicker
+          table={field.ref as string}
+          value={null}
+          label={label(field.label)}
+          allowNone={false}
+          placeholder={dict.data.add}
+          exclude={[...value, ...taken]}
+          onChange={(id, text) => {
+            if (!id || value.includes(id)) return;
+            if (text) setPicked((p) => ({ ...p, [id]: text }));
+            onChange([...value, id]);
+          }}
+        />
+      )}
+    </div>
   );
 }
 
@@ -161,7 +237,20 @@ function SetsInput({ value, onChange }: { value: Set[]; onChange: (sets: Set[]) 
 
 // ── One field ────────────────────────────────────────────────────────────────
 
-function FieldInput({ field, value, onChange, refs }: { field: DataField; value: DataValue; onChange: (v: DataValue) => void; refs: Refs }) {
+function FieldInput({
+  field,
+  value,
+  onChange,
+  refs,
+  form,
+}: {
+  field: DataField;
+  value: DataValue;
+  onChange: (v: DataValue) => void;
+  refs: Refs;
+  /** The whole form, for fields that depend on others (a team's size on the game's type). */
+  form: FormValues;
+}) {
   const dict = useDictionary().ui;
   const viewer = useSessionUser();
   const label = useLabel();
@@ -223,6 +312,13 @@ function FieldInput({ field, value, onChange, refs }: { field: DataField; value:
           onChange={(next) => onChange(next)}
         />
       );
+    case "refs": {
+      // A game's teams: one player a side in singles, two in doubles, and nobody on both teams.
+      const team = /^team[12]PlayerIds$/.test(field.key);
+      const max = team ? (form.type === "DOUBLES" ? 2 : 1) : field.max;
+      const other = team ? (form[field.key === "team1PlayerIds" ? "team2PlayerIds" : "team1PlayerIds"] as string[] | null) : null;
+      return <RefsInput field={field} value={(value as string[] | null) ?? []} refs={refs} max={max} taken={other ?? []} onChange={onChange} />;
+    }
     case "sets":
       return <SetsInput value={(value as Set[] | null) ?? []} onChange={onChange} />;
     default:
@@ -322,7 +418,7 @@ export function RecordFields({
               {label(f.label)}
               {f.required && <span className="text-destructive"> *</span>}
             </FieldLabel>
-            <FieldInput field={f} value={values[f.key] ?? null} refs={refs} onChange={(v) => onValues({ ...values, [f.key]: v })} />
+            <FieldInput field={f} value={values[f.key] ?? null} refs={refs} form={values} onChange={(v) => onValues({ ...values, [f.key]: v })} />
           </Field>
         ))}
     </form>

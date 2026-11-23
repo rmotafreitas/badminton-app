@@ -1,3 +1,4 @@
+import type { Role } from "@/identity/user";
 import { type Actor, isClubStaff, isSameClub, isSystemAdmin } from "@/shared/actor";
 import { type Game, playsIn } from "./game";
 
@@ -23,6 +24,16 @@ export function registerGameProblem(actor: Actor, clubId: string, playerIds: rea
   if (!isSameClub(actor, clubId)) return "You can only register games for your own club.";
   if (isClubStaff(actor)) return null;
   if (!playerIds.includes(actor.userId)) return "Players can only register games they played in.";
+  return null;
+}
+
+/**
+ * Who can be on a game's teams: members of the game's club, and never a system admin (they run the platform, they
+ * don't play). Returns the problem, or null.
+ */
+export function playersProblem(clubId: string, players: readonly { readonly clubId: string | null; readonly roles: readonly Role[] }[]): string | null {
+  if (players.some((p) => p.roles.includes("SYSTEM_ADMIN"))) return "System admins don't play games.";
+  if (players.some((p) => p.clubId !== clubId)) return "Players must be members of the game's club.";
   return null;
 }
 
