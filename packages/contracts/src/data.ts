@@ -32,7 +32,8 @@ export const DataFieldSchema = z.object({
   label: LabelSchema,
   type: DataFieldTypeSchema,
   ref: z.string().optional(),
-  options: z.array(z.string()).optional(),
+  /** For `enum`: each value and how it reads. */
+  options: z.array(z.object({ value: z.string(), label: LabelSchema })).optional(),
   list: z.boolean(),
   search: z.boolean(),
   sort: z.boolean(),
@@ -59,6 +60,10 @@ export const DataTableSchema = z.object({
   editFields: z.array(z.string()),
   deleteLabel: LabelSchema.nullable(),
   deleteHint: LabelSchema.nullable(),
+  /** Named lists over the table (`view` in the list query). */
+  views: z.array(z.object({ key: z.string(), label: LabelSchema })),
+  /** Tables whose rows point at a row of this one (`of` in their list query). */
+  related: z.array(z.object({ table: z.string(), label: LabelSchema })),
 });
 export type DataTable = z.infer<typeof DataTableSchema>;
 export const DataTableListSchema = z.array(DataTableSchema);
@@ -90,6 +95,8 @@ export const DataPageSchema = z.object({
   page: z.number().int(),
   pageSize: z.number().int(),
   refs: DataRefsSchema,
+  /** When the list is "rows related to one row": that row. */
+  of: z.object({ table: z.string(), id: z.string(), label: z.string() }).optional(),
 });
 export type DataPage = z.infer<typeof DataPageSchema>;
 
@@ -107,8 +114,23 @@ export const DataListQuerySchema = z.object({
   pageSize: z.coerce.number().int().min(1).max(100).optional(),
   /** JSON object of `field: value` equality filters (`null` = empty). */
   filters: z.union([z.string().max(2000), z.record(z.string(), z.union([z.string(), z.boolean(), z.null()]))]).optional(),
+  /** One of the table's views. */
+  view: z.string().max(40).optional(),
+  /** `table:id`: only rows related to that row. */
+  of: z.string().regex(/^[A-Za-z]{1,40}:[a-f0-9]{24}$/).optional(),
 });
 export type DataListQuery = z.infer<typeof DataListQuerySchema>;
+
+/** Export pages are bigger: the browser fetches a few of them and builds the file. */
+export const DATA_EXPORT_PAGE_SIZE = 1000;
+export const DATA_EXPORT_MAX_ROWS = 100_000;
+export const DataExportQuerySchema = DataListQuerySchema.extend({
+  pageSize: z.coerce.number().int().min(1).max(DATA_EXPORT_PAGE_SIZE).optional(),
+});
+
+/** How many rows of each related table point at one row. */
+export const DataRelatedListSchema = z.array(z.object({ table: z.string(), label: LabelSchema, count: z.number().int() }));
+export type DataRelated = z.infer<typeof DataRelatedListSchema>[number];
 
 export const DataOptionsQuerySchema = z.object({ q: z.string().max(100).optional() });
 export const DataOptionSchema = z.object({ id: z.string(), label: z.string() });

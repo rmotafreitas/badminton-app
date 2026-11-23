@@ -1,4 +1,4 @@
-import { type RecordQuery, type RecordRow, type RecordStore, type RecordValue, type TableKey, tableDef } from "@bb/application";
+import { type RecordCondition, type RecordQuery, type RecordRow, type RecordStore, type RecordValue, type TableKey, tableDef } from "@bb/application";
 import { isObjectId } from "@bb/domain";
 import type { Database } from "@/shared/database";
 
@@ -50,7 +50,8 @@ const MAPPINGS: Record<TableKey, TableMapping> = {
       profile: { select: { name: true, photoVersion: true } },
     },
     related: { name: ["profile", "name"], photo: ["profile", "photoVersion"] },
-    label: (r) => String((r.profile as Row | null)?.name || r.email || r.phone || r.id),
+    // Name only: the Data use case decides who may read a nameless account's email or phone instead.
+    label: (r) => String((r.profile as Row | null)?.name ?? ""),
   },
   games: {
     model: (db) => db.game as unknown as Delegate,
@@ -59,7 +60,8 @@ const MAPPINGS: Record<TableKey, TableMapping> = {
   },
   trainingReviews: {
     model: (db) => db.trainingSessionReview as unknown as Delegate,
-    select: { id: true, userId: true, date: true, effort: true, note: true, createdAt: true },
+    // Never `note`: a player's training notes are theirs.
+    select: { id: true, userId: true, date: true, effort: true, createdAt: true },
     label: (r) => String(r.date ?? ""),
   },
   rallySessions: {
@@ -117,7 +119,7 @@ export class PrismaRecordStore implements RecordStore {
     // `id` second, so equal sort values page in a stable order.
     const orderBy = [related ? { [related[0]]: { [related[1]]: dir } } : { [m.columns?.[field] ?? field]: dir }, { id: dir }];
     const [rows, total] = await Promise.all([
-      m.model(this.db).findMany({ where, select: m.select, orderBy, skip: query.skip, take: query.take }),
+      query.take > 0 ? m.model(this.db).findMany({ where, select: m.select, orderBy, skip: query.skip, take: query.take }) : [],
       m.model(this.db).count({ where }),
     ]);
     return { rows: rows.map((r) => this.toRow(table, r)), total };
@@ -157,6 +159,7 @@ export class PrismaRecordStore implements RecordStore {
       const column = m.columns?.[key] ?? key;
       and.push(type === "roles" || type === "refs" ? { [column]: { has: value } } : { [column]: value });
     }
+    for (const condition of query.conditions ?? []) and.push(this.condition(table, condition));
     if (query.search) {
       // Prisma's MongoDB connector turns `contains` into a $regex WITHOUT escaping it: escape, or "+351" breaks the
       // search and ".*" or a catastrophic pattern would be run as typed.
@@ -169,6 +172,24 @@ export class PrismaRecordStore implements RecordStore {
       });
     }
     return and.length ? { AND: and } : {};
+  }
+
+  private condition(table: TableKey, c: RecordCondition): Row {
+    const m = MAPPINGS[table];
+    const fields = tableDef(table)?.fields ?? [];
+    const column = (key: string) => m.columns?.[key] ?? key;
+    const isList = (key: string) => ["roles", "refs"].includes(fields.find((f) => f.key === key)?.type ?? "");
+    switch (c.op) {
+      case "any":
+        return { OR: c.fields.map((key) => (isList(key) ? { [column(key)]: { has: c.value } } : { [column(key)]: c.value })) };
+      case "empty":
+        // MongoDB: `null` doesn't match a field that was never set.
+        return isList(c.field) ? { [column(c.field)]: { isEmpty: true } } : { OR: [{ [column(c.field)]: null }, { [column(c.field)]: { isSet: false } }] };
+      case "after":
+        return { [column(c.field)]: { gt: c.value } };
+      case "before":
+        return { [column(c.field)]: { lt: c.value } };
+    }
   }
 
   private toRow(table: TableKey, row: Row): RecordRow {

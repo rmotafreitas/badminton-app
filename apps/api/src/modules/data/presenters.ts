@@ -13,7 +13,7 @@ export const presentDataTable = (t: TableView): DataTable => ({
     label: f.label,
     type: f.type,
     ref: f.ref,
-    options: f.options ? [...f.options] : undefined,
+    options: f.options?.map((value) => ({ value, label: f.optionLabels?.[value] ?? { en: value, pt: value } })),
     list: !!f.list,
     search: !!f.search,
     sort: !!f.sort,
@@ -30,6 +30,8 @@ export const presentDataTable = (t: TableView): DataTable => ({
   editFields: [...t.editFields],
   deleteLabel: t.deleteLabel ?? null,
   deleteHint: t.def.deleteHint ?? null,
+  views: t.views.map((v) => ({ key: v.key, label: v.label })),
+  related: t.related.map((r) => ({ table: r.table, label: r.label })),
 });
 
 function presentValue(field: FieldDef, rowId: string, value: RecordValue | undefined): DataValue {
@@ -58,6 +60,7 @@ export const presentDataPage = (p: RecordPage): DataPage => ({
   page: p.page,
   pageSize: p.pageSize,
   refs: presentRefs(p.refs),
+  ...(p.of && { of: { ...p.of } }),
 });
 
 export const presentDataRecord = (r: { table: TableView; row: RecordRow; refs: RecordPage["refs"] }): DataRecord => ({
@@ -65,39 +68,3 @@ export const presentDataRecord = (r: { table: TableView; row: RecordRow; refs: R
   row: presentRow(r.table.def.fields, r.row),
   refs: presentRefs(r.refs),
 });
-
-// ── CSV ──────────────────────────────────────────────────────────────────────
-
-/** Spreadsheet formula injection: a cell starting with = + - @ would run as a formula in Excel/Sheets. */
-const cell = (text: string) => {
-  const safe = /^[=+\-@\t\r]/.test(text) ? `'${text}` : text;
-  return /[",\n\r;]/.test(safe) ? `"${safe.replaceAll('"', '""')}"` : safe;
-};
-
-function csvText(field: FieldDef, value: RecordValue | undefined, refs: RecordPage["refs"]): string {
-  if (value === undefined || value === null) return "";
-  if (value instanceof Date) return value.toISOString();
-  const name = (id: string) => (field.ref && refs[field.ref]?.[id]) || id;
-  switch (field.type) {
-    case "ref":
-      return name(String(value));
-    case "refs":
-      return (value as string[]).map(name).join(" / ");
-    case "roles":
-      return (value as string[]).join(" ");
-    case "sets":
-      return (value as { team1Score: number; team2Score: number }[]).map((s) => `${s.team1Score}-${s.team2Score}`).join(" ");
-    default:
-      return String(value);
-  }
-}
-
-/** Every exportable column (images aren't), with a UTF-8 BOM so Excel reads accents right. */
-export function dataCsv(page: RecordPage, lang: "en" | "pt"): string {
-  const fields = page.table.def.fields.filter((f) => f.type !== "image");
-  const lines = [
-    ["id", ...fields.map((f) => f.label[lang])].map(cell).join(","),
-    ...page.rows.map((row) => [row.id, ...fields.map((f) => csvText(f, row.values[f.key], page.refs))].map(cell).join(",")),
-  ];
-  return `﻿${lines.join("\r\n")}\r\n`;
-}

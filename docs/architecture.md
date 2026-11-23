@@ -76,19 +76,36 @@ reaches another feature only through its `index.ts`, and `shared/` imports no fe
 
 ### Data screens (generic CRUD per table)
 
-`/data` gives club staff and system admins a list / search / filter / sort / page / CSV / view / create / edit / delete
-screen for every collection, from one table registry: `packages/application/src/data/registry.ts`. Each table lists
-its fields (label in en/pt, type, and whether it is listed, searched, sorted, filtered, created, edited) and `access` per
-role: `scope: "all"` or `"club"` (only rows of the actor's club, via `clubField`), plus create / update / delete and
-which fields that role may set. Players see no tables.
+`/data` gives club staff and system admins a list / search / filter / sort / page / view / export / create / edit /
+delete screen for every collection, from one table registry: `packages/application/src/data/registry.ts`. Each table
+lists its fields (label in en/pt, type, enum option labels, and whether it is listed, searched, sorted, filtered,
+created, edited) and `access` per role: `scope: "all"` or `"club"` (only rows of the actor's club, via `clubField`),
+plus create / update / delete and which fields that role may set. Players see no tables.
 
+- **Views** (AEFA's "listagens"): named lists per table in `views`, shown as chips and kept in the URL (`?view=`).
+  A condition is `is` (equals; contains on `roles`/`refs`), `empty`, or `after`/`before` now ± N days. No query
+  builder, no user-saved filters: a new view is one line in the registry. Search and filters narrow a view further.
+- **Related rows:** `related` lists the tables that point at a row (`{ table, fields }`; several fields = any of them,
+  e.g. a player on either team). The detail sheet shows a count per table the caller may open
+  (`GET /api/data/:table/:id/related`), each linking to that table with `?of=table:id`. `of` first checks the caller may
+  see that row (else 404), and the child list keeps its own scope.
+- **Export** is built in the browser: `GET /api/data/:table/export` returns pages of up to 1000 rows (same access,
+  scope, view and filters as the list); the web fetches them 4 at a time with retries and a progress sheet, then writes
+  Excel (.xlsx, `shared/lib/export/sheet.ts`, lazy-loaded with fflate) or CSV (`;` and a decimal comma in pt, `,` in
+  en; BOM; formula injection defused). One response never carries the whole table (Vercel's 4.5 MB body limit and
+  function timeout), and exports stop at 100 000 rows. The Registrations page uses the same `ExportButton`.
 - **Reads** go through the `RecordStore` port (`PrismaRecordStore`): it selects only registry fields, so secrets
-  (password and token hashes) never leave the server. Search terms are regex-escaped: Prisma's MongoDB `contains`
-  does **not** escape them.
-- **Writes never touch the store directly.** Each table's handler (`data/data.ts`) calls the use case that owns the
-  rules: clubs → `CreateClub`/`UpdateClub`/`DeleteClub`; users → `CreateAccount`/`UpdateAccount`/`DeleteAccount`
-  (system admins) or `AddClubMember`/`SetMemberRoles`/`RemoveClubMember` (club admins); games → `UpdateGame`/`DeleteGame`
-  (ratings replay). Fields a role may not set are a 400, not silently dropped.
+  (password and token hashes) and players' training notes never leave the server. Search terms are regex-escaped:
+  Prisma's MongoDB `contains` does **not** escape them. Every filter value is checked against its field (an object is a
+  400, never a query operator). A nameless account's label falls back to its email or phone only for someone allowed to
+  see contacts (`canSeeContactDetails`); anyone else sees a short id.
+- **Writes go through use cases.** Each table's handler (`handlers()` in `data/data.ts`) calls the use case that owns
+  the rules: clubs → `CreateClub`/`UpdateClub`/`DeleteClub`; users → `CreateAccount`/`UpdateAccount`/`DeleteAccount`
+  (system admins) or `AddClubMember`/`SetMemberRoles`/`RemoveClubMember` (club admins; SYSTEM_ADMIN is a 400);
+  games → `UpdateGame`/`DeleteGame` (ratings replay); recordings → `ModerateRallySession` (the owner's pin limit holds);
+  training reviews → `RemoveTrainingReview`. Fields a role may not set are a 400, not silently dropped.
+  **Exception:** housekeeping tables with no rules of their own (sessions, sign-in methods, sign-in codes, rate-limit
+  windows) are deleted directly through the session repository / `RecordStore.remove`.
 - **Add a table:** an entry in `TABLES`, a mapping in `PrismaRecordStore` (and the fake in `@bb/testing`), and a handler
   if anything can be changed. The web renders it with no further code.
 

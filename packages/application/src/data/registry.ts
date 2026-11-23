@@ -3,10 +3,11 @@ import { AUTH_PROVIDERS, RALLY_FORMATS, type Role } from "@bb/domain";
 /**
  * The Data screens' table definitions: one entry per collection, in the spirit of a column config file. Each field
  * says how it is shown and which of list / search / sort / filter / create / edit it takes part in; `access` says which
- * roles see the table, whether they see every row or only their club's, and what they may change.
+ * roles see the table, whether they see every row or only their club's, and what they may change. `views` are the
+ * table's named lists (AEFA's "listagens"); `related` are the other tables that point at a row.
  *
- * Secrets (password hashes, token hashes) are simply not listed, so they never leave the server. Writes never go
- * straight to the database: each table's handler (`handlers.ts`) calls the use case that owns the rules.
+ * Secrets (password hashes, token hashes) are simply not listed, so they never leave the server. Writes go through
+ * each table's handler (`handlers()` in `data.ts`), which calls the use case that owns the rules.
  */
 
 export type FieldType =
@@ -45,6 +46,8 @@ export interface FieldDef {
   readonly ref?: TableKey;
   /** For `enum`. */
   readonly options?: readonly string[];
+  /** For `enum`: how each option reads (the raw value when missing). */
+  readonly optionLabels?: Readonly<Record<string, Label>>;
   /** For `image`: where `/api/media` finds it. */
   readonly image?: { readonly owner: "club" | "profile"; readonly kind: string };
   /** A column of the table. */
@@ -74,6 +77,28 @@ export interface TableAccess {
   readonly deleteLabel?: Label;
 }
 
+/**
+ * One condition of a view. `is`: equals (on `roles` / `refs`: contains). `empty`: no value. `after` / `before`: a date
+ * later / earlier than now plus that many days (negative = in the past).
+ */
+export type ViewCondition =
+  | { readonly field: string; readonly is: string | boolean }
+  | { readonly field: string; readonly empty: true }
+  | { readonly field: string; readonly after?: number; readonly before?: number };
+
+/** A named list over the table: every condition holds. Search and filters still narrow it further. */
+export interface ViewDef {
+  readonly key: string;
+  readonly label: Label;
+  readonly where: readonly ViewCondition[];
+}
+
+/** Rows of `table` that point at this row through any of `fields`. */
+export interface RelatedDef {
+  readonly table: TableKey;
+  readonly fields: readonly string[];
+}
+
 export interface TableDef {
   readonly key: TableKey;
   readonly label: Label;
@@ -89,6 +114,8 @@ export interface TableDef {
   readonly access: Partial<Record<Role, TableAccess>>;
   /** Shown before a delete. */
   readonly deleteHint?: Label;
+  readonly views?: readonly ViewDef[];
+  readonly related?: readonly RelatedDef[];
 }
 
 export const TABLE_KEYS = [
@@ -129,6 +156,10 @@ export const TABLES: readonly TableDef[] = [
       CLUB_ADMIN: { scope: "club", update: true },
       COACH: { scope: "club" },
     },
+    related: [
+      { table: "users", fields: ["clubId"] },
+      { table: "games", fields: ["clubId"] },
+    ],
     deleteHint: L(
       "Members are moved out of the club. Clubs with recorded games can't be deleted.",
       "Os membros saem do clube. Clubes com jogos registados não podem ser eliminados.",
@@ -167,6 +198,20 @@ export const TABLES: readonly TableDef[] = [
       },
       COACH: { scope: "club" },
     },
+    views: [
+      { key: "active", label: L("Active", "Ativos"), where: [{ field: "isActive", is: true }] },
+      { key: "inactive", label: L("Inactive", "Inativos"), where: [{ field: "isActive", is: false }] },
+      { key: "coaches", label: L("Coaches", "Treinadores"), where: [{ field: "roles", is: "COACH" }] },
+      { key: "clubAdmins", label: L("Club admins", "Administradores"), where: [{ field: "roles", is: "CLUB_ADMIN" }] },
+      { key: "neverSignedIn", label: L("Never signed in", "Nunca entraram"), where: [{ field: "lastAccess", empty: true }] },
+    ],
+    related: [
+      { table: "games", fields: ["team1PlayerIds", "team2PlayerIds"] },
+      { table: "rallySessions", fields: ["ownerId"] },
+      { table: "trainingReviews", fields: ["userId"] },
+      { table: "authMethods", fields: ["userId"] },
+      { table: "authSessions", fields: ["userId"] },
+    ],
     deleteHint: L(
       "Accounts with games or recordings can't be deleted: deactivate them instead. In a club, this removes the person from the club; their games stay.",
       "Contas com jogos ou gravações não podem ser eliminadas: desativa-as. Num clube, isto remove a pessoa do clube; os jogos ficam.",
@@ -181,7 +226,15 @@ export const TABLES: readonly TableDef[] = [
     clubField: "clubId",
     fields: [
       { key: "playedAt", label: L("Played", "Jogado"), type: "datetime", list: true, sort: true, edit: true, required: true },
-      { key: "type", label: L("Type", "Tipo"), type: "enum", options: ["SINGLES", "DOUBLES"], list: true, filter: true },
+      {
+        key: "type",
+        label: L("Type", "Tipo"),
+        type: "enum",
+        options: ["SINGLES", "DOUBLES"],
+        optionLabels: { SINGLES: L("Singles", "Singulares"), DOUBLES: L("Doubles", "Pares") },
+        list: true,
+        filter: true,
+      },
       { key: "clubId", label: L("Club", "Clube"), type: "ref", ref: "clubs", list: true, filter: true },
       { key: "team1PlayerIds", label: L("Team 1", "Equipa 1"), type: "refs", ref: "users", list: true },
       { key: "team2PlayerIds", label: L("Team 2", "Equipa 2"), type: "refs", ref: "users", list: true },
@@ -194,6 +247,12 @@ export const TABLES: readonly TableDef[] = [
       CLUB_ADMIN: { scope: "club", update: true, delete: true },
       COACH: { scope: "club", update: true, delete: true },
     },
+    views: [
+      { key: "last30Days", label: L("Last 30 days", "Últimos 30 dias"), where: [{ field: "playedAt", after: -30 }] },
+      { key: "singles", label: L("Singles", "Singulares"), where: [{ field: "type", is: "SINGLES" }] },
+      { key: "doubles", label: L("Doubles", "Pares"), where: [{ field: "type", is: "DOUBLES" }] },
+    ],
+    related: [{ table: "rallySessions", fields: ["gameId"] }],
     deleteHint: L("Ratings of the club are recalculated.", "Os ratings do clube são recalculados."),
   },
   {
@@ -206,7 +265,6 @@ export const TABLES: readonly TableDef[] = [
       { key: "userId", label: L("Player", "Jogador"), type: "ref", ref: "users", list: true, filter: true },
       { key: "date", label: L("Day", "Dia"), type: "day", list: true, sort: true },
       { key: "effort", label: L("Effort", "Esforço"), type: "integer", list: true, sort: true },
-      { key: "note", label: L("Note", "Nota"), type: "longtext", list: true, search: true },
       createdAt,
     ],
     access: systemOnly,
@@ -222,8 +280,29 @@ export const TABLES: readonly TableDef[] = [
       { key: "ownerId", label: L("Owner", "Dono"), type: "ref", ref: "users", list: true, filter: true },
       { key: "recordedAt", label: L("Recorded", "Gravado"), type: "datetime", list: true, sort: true },
       { key: "durationS", label: L("Length", "Duração"), type: "seconds", list: true, sort: true },
-      { key: "status", label: L("Status", "Estado"), type: "enum", options: ["pending", "analysing", "analysed", "failed"], list: true, filter: true },
-      { key: "format", label: L("Format", "Formato"), type: "enum", options: RALLY_FORMATS, list: true, filter: true },
+      {
+        key: "status",
+        label: L("Status", "Estado"),
+        type: "enum",
+        options: ["pending", "analysing", "analysed", "failed"],
+        optionLabels: {
+          pending: L("Waiting", "Em espera"),
+          analysing: L("Analysing", "A analisar"),
+          analysed: L("Analysed", "Analisado"),
+          failed: L("Failed", "Falhou"),
+        },
+        list: true,
+        filter: true,
+      },
+      {
+        key: "format",
+        label: L("Format", "Formato"),
+        type: "enum",
+        options: RALLY_FORMATS,
+        optionLabels: { singles: L("Singles", "Singulares"), doubles: L("Doubles", "Pares"), practice: L("Practice", "Treino") },
+        list: true,
+        filter: true,
+      },
       { key: "gameId", label: L("Game", "Jogo"), type: "ref", ref: "games" },
       { key: "pinned", label: L("Kept", "Guardado"), type: "boolean", list: true, filter: true, edit: true },
       { key: "videoBytes", label: L("Video size", "Tamanho do vídeo"), type: "bytes", list: true, sort: true },
@@ -232,6 +311,15 @@ export const TABLES: readonly TableDef[] = [
       createdAt,
     ],
     access: { SYSTEM_ADMIN: { scope: "all", update: true, delete: true } },
+    views: [
+      { key: "failed", label: L("Failed", "Falhadas"), where: [{ field: "status", is: "failed" }] },
+      { key: "kept", label: L("Kept", "Guardadas"), where: [{ field: "pinned", is: true }] },
+      {
+        key: "expiringSoon",
+        label: L("Video expires within 7 days", "Vídeo expira em 7 dias"),
+        where: [{ field: "videoExpiresAt", after: 0, before: 7 }],
+      },
+    ],
     deleteHint: L("The video and analysis files are deleted too.", "O vídeo e a análise também são apagados."),
   },
   {
@@ -242,7 +330,21 @@ export const TABLES: readonly TableDef[] = [
     defaultSort: { field: "createdAt", dir: "desc" },
     fields: [
       { key: "userId", label: L("User", "Utilizador"), type: "ref", ref: "users", list: true, filter: true },
-      { key: "provider", label: L("Provider", "Fornecedor"), type: "enum", options: AUTH_PROVIDERS, list: true, filter: true },
+      {
+        key: "provider",
+        label: L("Provider", "Fornecedor"),
+        type: "enum",
+        options: AUTH_PROVIDERS,
+        optionLabels: {
+          google: L("Google", "Google"),
+          email: L("Email link", "Link por email"),
+          "email-code": L("Email code", "Código por email"),
+          phone: L("Phone", "Telemóvel"),
+          password: L("Password", "Palavra-passe"),
+        },
+        list: true,
+        filter: true,
+      },
       { key: "providerId", label: L("Identifier", "Identificador"), type: "text", list: true, search: true },
       { ...createdAt, list: true },
     ],
@@ -265,6 +367,7 @@ export const TABLES: readonly TableDef[] = [
       { ...createdAt, label: L("Signed in", "Entrou"), list: true },
     ],
     access: systemOnly,
+    views: [{ key: "expired", label: L("Expired", "Expiradas"), where: [{ field: "expiresAt", before: 0 }] }],
     deleteHint: L("That device is signed out.", "Esse dispositivo fica sem sessão."),
   },
   {
@@ -275,12 +378,21 @@ export const TABLES: readonly TableDef[] = [
     defaultSort: { field: "createdAt", dir: "desc" },
     fields: [
       { key: "target", label: L("Sent to", "Enviado para"), type: "text", list: true, search: true },
-      { key: "type", label: L("Kind", "Tipo"), type: "enum", options: ["email-link", "email-code", "sms-code"], list: true, filter: true },
+      {
+        key: "type",
+        label: L("Kind", "Tipo"),
+        type: "enum",
+        options: ["email-link", "email-code", "sms-code"],
+        optionLabels: { "email-link": L("Email link", "Link por email"), "email-code": L("Email code", "Código por email"), "sms-code": L("SMS code", "Código por SMS") },
+        list: true,
+        filter: true,
+      },
       { key: "used", label: L("Used", "Usado"), type: "boolean", list: true, filter: true },
       { key: "expiresAt", label: L("Expires", "Expira"), type: "datetime", list: true, sort: true },
       { ...createdAt, list: true },
     ],
     access: systemOnly,
+    views: [{ key: "unused", label: L("Unused", "Por usar"), where: [{ field: "used", is: false }] }],
   },
   {
     key: "rateLimits",

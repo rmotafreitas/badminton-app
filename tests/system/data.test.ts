@@ -78,18 +78,99 @@ describe("data: listing", () => {
     expect((await get(w.api, w.cookie(w.clubAdmin), `/api/data/clubs/${w.club.id}`)).status).toBe(200);
   });
 
-  it("exports CSV with names for references and formulas defused", async () => {
+  it("exports in big pages, scoped and filtered like the list", async () => {
     const w = world();
-    w.api.store.addUser({ name: "=HYPERLINK(evil)", email: "evil@test.pt", clubId: w.club.id });
-    const res = await get(w.api, w.cookie(w.clubAdmin), "/api/data/users/export?sort=name&dir=asc&lang=pt");
-    expect(res.headers.get("content-type")).toContain("text/csv");
-    const bytes = new Uint8Array(await res.arrayBuffer());
-    expect([...bytes.slice(0, 3)]).toEqual([0xef, 0xbb, 0xbf]); // BOM, so Excel reads UTF-8
-    const csv = new TextDecoder().decode(bytes);
-    expect(csv.split("\r\n")[0]).toBe("id,Nome,Email,Telemóvel,Funções,Clube,Rating singulares,Rating pares,Ativo,Último acesso,Desde");
-    expect(csv).toContain(",CFBG,");
-    expect(csv).toContain("'=HYPERLINK(evil)");
-    expect(csv).not.toContain("zed@test.pt");
+    const page = await json(await get(w.api, w.cookie(w.clubAdmin), "/api/data/users/export?sort=name&dir=asc&pageSize=1000"));
+    expect(page.pageSize).toBe(1000);
+    expect(page.rows.map((r: any) => r.values.name)).toEqual(["Ana", "Bea", "Rui"]);
+    expect(page.refs.clubs[w.club.id]).toBe("CFBG");
+    // The list itself stays at 100 a page; exports stop at 100 000 rows.
+    expect((await get(w.api, w.cookie(w.clubAdmin), "/api/data/users?pageSize=1000")).status).toBe(422);
+    expect((await get(w.api, w.cookie(w.clubAdmin), "/api/data/users/export?pageSize=1000&page=101")).status).toBe(400);
+    expect((await get(w.api, w.cookie(w.player), "/api/data/users/export")).status).toBe(404);
+  });
+
+  it("checks every filter value against its field", async () => {
+    const w = world();
+    const status = async (filters: object, table = "users") =>
+      (await get(w.api, w.cookie(w.admin), `/api/data/${table}?filters=${encodeURIComponent(JSON.stringify(filters))}`)).status;
+    expect(await status({ roles: "COACH" })).toBe(200);
+    expect(await status({ roles: "KING" })).toBe(400);
+    // An object (a query operator) never reaches the database: refused at the edge or by the use case.
+    expect(await status({ roles: { $ne: null } })).toBeOneOf([400, 422]);
+    expect(await status({ isActive: "yes" })).toBe(400);
+    expect(await status({ clubId: "nope" })).toBe(400);
+    expect(await status({ type: "SINGLES" }, "games")).toBe(200);
+    expect(await status({ type: "TRIPLES" }, "games")).toBe(400);
+    expect(await status({ type: { $gt: "" } }, "games")).toBeOneOf([400, 422]);
+  });
+
+  it("views are named lists, narrowed further by filters", async () => {
+    const w = world();
+    // Deactivated the way a system admin does it, through Data.
+    expect((await write(w.api, w.cookie(w.admin), "PATCH", `/api/data/users/${w.player.id}`, { isActive: false })).status).toBe(200);
+    const names = async (query: string) =>
+      (await json(await get(w.api, w.cookie(w.clubAdmin), `/api/data/users?sort=name&dir=asc&${query}`))).rows.map((r: any) => r.values.name);
+    const table = (await json(await get(w.api, w.cookie(w.clubAdmin), "/api/data/users"))).table;
+    expect(table.views.map((v: any) => v.key)).toEqual(["active", "inactive", "coaches", "clubAdmins", "neverSignedIn"]);
+    expect(await names("view=inactive")).toEqual(["Bea"]);
+    expect(await names("view=coaches")).toEqual(["Rui"]);
+    // Ana is the one asking, so she has just been seen.
+    expect(await names("view=neverSignedIn")).toEqual(["Bea", "Rui"]);
+    expect(await names(`view=active&filters=${encodeURIComponent(JSON.stringify({ roles: "CLUB_ADMIN" }))}`)).toEqual(["Ana"]);
+    expect((await get(w.api, w.cookie(w.clubAdmin), "/api/data/users?view=everything")).status).toBe(400);
+  });
+
+  it("date views count from now", async () => {
+    const w = world();
+    const admin = w.api.as(w.admin);
+    await admin.games.post({ clubId: w.club.id, type: "SINGLES", team1PlayerIds: [w.player.id], team2PlayerIds: [w.coach.id], team1Points: 21, team2Points: 9 });
+    w.api.clock.advance(40 * 86_400_000);
+    const fourth = w.api.store.addUser({ name: "Duo", email: "duo@test.pt", clubId: w.club.id });
+    // A fresh session: the first one has expired by now.
+    const doubles = await w.api.as(w.admin).games.post({ clubId: w.club.id, type: "DOUBLES", team1PlayerIds: [w.player.id, w.clubAdmin.id], team2PlayerIds: [w.coach.id, fourth.id], team1Points: 21, team2Points: 9 });
+    expect(doubles.status).toBe(200);
+    const page = await json(await get(w.api, w.cookie(w.admin), "/api/data/games?view=last30Days"));
+    expect(page.rows.map((r: any) => r.values.type)).toEqual(["DOUBLES"]);
+    expect(page.table.fields.find((f: any) => f.key === "type").options).toEqual([
+      { value: "SINGLES", label: { en: "Singles", pt: "Singulares" } },
+      { value: "DOUBLES", label: { en: "Doubles", pt: "Pares" } },
+    ]);
+  });
+
+  it("related rows: counts in scope, and the child list filtered to that row", async () => {
+    const w = world();
+    const admin = w.api.as(w.admin);
+    await admin.games.post({ clubId: w.club.id, type: "SINGLES", team1PlayerIds: [w.player.id], team2PlayerIds: [w.coach.id], team1Points: 21, team2Points: 9 });
+    await admin.games.post({ clubId: w.club.id, type: "SINGLES", team1PlayerIds: [w.coach.id], team2PlayerIds: [w.player.id], team1Points: 21, team2Points: 9 });
+    await admin.games.post({ clubId: w.club.id, type: "SINGLES", team1PlayerIds: [w.coach.id], team2PlayerIds: [w.clubAdmin.id], team1Points: 21, team2Points: 9 });
+    // A club admin sees only the related tables they may open.
+    const counts = await json(await get(w.api, w.cookie(w.clubAdmin), `/api/data/users/${w.player.id}/related`));
+    expect(counts).toEqual([{ table: "games", label: { en: "Games", pt: "Jogos" }, count: 2 }]);
+    const forAdmin = await json(await get(w.api, w.cookie(w.admin), `/api/data/users/${w.player.id}/related`));
+    expect(forAdmin.map((c: any) => c.table)).toEqual(["games", "rallySessions", "trainingReviews", "authMethods", "authSessions"]);
+    // Either team counts: the player is on team 1 of one game and team 2 of the other.
+    const games = await json(await get(w.api, w.cookie(w.clubAdmin), `/api/data/games?of=users:${w.player.id}`));
+    expect(games.total).toBe(2);
+    expect(games.of).toEqual({ table: "users", id: w.player.id, label: "Bea" });
+    const club = await json(await get(w.api, w.cookie(w.clubAdmin), `/api/data/users?of=clubs:${w.club.id}`));
+    expect(club.total).toBe(3);
+    // Someone the caller can't see is NotFound, and only declared relations exist.
+    expect((await get(w.api, w.cookie(w.clubAdmin), `/api/data/games?of=users:${w.outsider.id}`)).status).toBe(404);
+    expect((await get(w.api, w.cookie(w.clubAdmin), `/api/data/users/${w.outsider.id}/related`)).status).toBe(404);
+    expect((await get(w.api, w.cookie(w.clubAdmin), `/api/data/clubs?of=users:${w.player.id}`)).status).toBe(400);
+  });
+
+  it("a nameless account reads as its email only to those who may see it", async () => {
+    const w = world();
+    const nameless = w.api.store.addUser({ email: "ghost@test.pt", clubId: w.other.id });
+    const game = await w.api.as(w.admin).games.post({ clubId: w.club.id, type: "SINGLES", team1PlayerIds: [w.player.id], team2PlayerIds: [nameless.id], team1Points: 21, team2Points: 9 });
+    const id = (game.data as any).id;
+    const forCoach = await json(await get(w.api, w.cookie(w.coach), `/api/data/games/${id}`));
+    expect(forCoach.refs.users[nameless.id]).toBe(`#${nameless.id.slice(-6)}`);
+    expect(JSON.stringify(forCoach)).not.toContain("ghost@test.pt");
+    const forAdmin = await json(await get(w.api, w.cookie(w.admin), `/api/data/games/${id}`));
+    expect(forAdmin.refs.users[nameless.id]).toBe("ghost@test.pt");
   });
 
   it("reference options are scoped like the table", async () => {
@@ -127,9 +208,17 @@ describe("data: writes go through the rules", () => {
     const created = await json(await write(w.api, cookie, "POST", "/api/data/users", { name: "Nova", email: "Nova@Test.pt", roles: ["COACH"] }));
     expect(created.row.values).toMatchObject({ name: "Nova", email: "nova@test.pt", clubId: w.club.id, roles: ["COACH", "PLAYER"] });
 
-    // Granting SYSTEM_ADMIN is ignored for club admins.
-    const promoted = await json(await write(w.api, cookie, "PATCH", `/api/data/users/${w.player.id}`, { roles: ["CLUB_ADMIN", "SYSTEM_ADMIN"] }));
+    // Granting SYSTEM_ADMIN is refused (400), not quietly dropped.
+    expect((await write(w.api, cookie, "PATCH", `/api/data/users/${w.player.id}`, { roles: ["CLUB_ADMIN", "SYSTEM_ADMIN"] })).status).toBe(400);
+    expect((await write(w.api, cookie, "POST", "/api/data/users", { email: "boss@test.pt", roles: ["SYSTEM_ADMIN"] })).status).toBe(400);
+    const promoted = await json(await write(w.api, cookie, "PATCH", `/api/data/users/${w.player.id}`, { roles: ["CLUB_ADMIN"] }));
     expect(promoted.row.values.roles).toEqual(["CLUB_ADMIN", "PLAYER"]);
+
+    // An existing account without a club joins with the roles chosen, like an invite.
+    const free = w.api.store.addUser({ name: "Free", email: "free@test.pt" });
+    const joined = await json(await write(w.api, cookie, "POST", "/api/data/users", { email: "free@test.pt", roles: ["COACH"] }));
+    expect(joined.row.id).toBe(free.id);
+    expect(joined.row.values.roles).toEqual(["COACH", "PLAYER"]);
 
     const removed = await w.api.request(`/api/data/users/${w.player.id}`, { method: "DELETE", headers: { cookie, origin: APP_ORIGIN, "content-type": "application/json" } });
     expect(removed.status).toBe(204);
@@ -165,6 +254,36 @@ describe("data: writes go through the rules", () => {
     expect(w.api.store.users.get(w.player.id)!.eloSingles).toBeLessThan(before);
     expect((await write(w.api, w.cookie(w.coach), "PATCH", `/api/data/games/${id}`, { sets: [] })).status).toBe(400);
     expect((await write(w.api, w.cookie(w.player), "PATCH", `/api/data/games/${id}`, { sets: [{ team1Score: 1, team2Score: 21 }] })).status).toBe(404);
+  });
+
+  it("recordings: a system admin keeps them within the owner's pin limit, and deleting removes the files", async () => {
+    const w = world();
+    const owner = w.api.as(w.player);
+    const ids: string[] = [];
+    for (let i = 0; i < 6; i++) {
+      const s = await owner["rally-sessions"].post({ clientId: `client-000${i}`, recordedAt: w.api.clock.now().toISOString(), durationS: 42 });
+      ids.push((s.data as any).id);
+    }
+    const cookie = w.cookie(w.admin);
+    for (const id of ids.slice(0, 5)) expect((await write(w.api, cookie, "PATCH", `/api/data/rallySessions/${id}`, { pinned: true })).status).toBe(200);
+    const over = await write(w.api, cookie, "PATCH", `/api/data/rallySessions/${ids[5]}`, { pinned: true });
+    expect(over.status).toBe(409);
+    expect((await json(over)).code).toBe("pin_limit");
+    const del = await w.api.request(`/api/data/rallySessions/${ids[5]}`, { method: "DELETE", headers: { cookie, origin: APP_ORIGIN, "content-type": "application/json" } });
+    expect(del.status).toBe(204);
+    expect(w.api.store.rally.has(ids[5]!)).toBe(false);
+  });
+
+  it("training reviews: no notes in Data, and a system admin can remove one", async () => {
+    const w = world();
+    await w.api.as(w.player)["training-reviews"].put({ date: "2026-02-10", effort: 7, note: "private thoughts" });
+    const page = await json(await get(w.api, w.cookie(w.admin), "/api/data/trainingReviews"));
+    expect(page.table.fields.map((f: any) => f.key)).not.toContain("note");
+    expect(JSON.stringify(page)).not.toContain("private thoughts");
+    const id = page.rows[0].id;
+    const del = await w.api.request(`/api/data/trainingReviews/${id}`, { method: "DELETE", headers: { cookie: w.cookie(w.admin), origin: APP_ORIGIN, "content-type": "application/json" } });
+    expect(del.status).toBe(204);
+    expect(w.api.store.reviews.size).toBe(0);
   });
 
   it("revoking a session signs that device out", async () => {

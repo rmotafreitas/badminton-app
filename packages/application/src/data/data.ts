@@ -1,12 +1,23 @@
-import { type Actor, BadRequest, Forbidden, isObjectId, NotFound, type Role } from "@bb/domain";
+import { type Actor, BadRequest, canSeeContactDetails, Forbidden, isObjectId, NotFound, ROLES, type Role } from "@bb/domain";
 import type { AddClubMember, CreateClub, DeleteClub, RemoveClubMember, SetMemberRoles, UpdateClub } from "@/clubs";
 import type { DeleteGame, UpdateGame } from "@/games";
 import type { CreateAccount, DeleteAccount, SessionRepository, UpdateAccount } from "@/identity";
-import type { RallySessionRepository } from "@/rally";
-import type { ImageUpload, ObjectStorage } from "@/shared";
-import type { TrainingReviewRepository } from "@/training";
-import type { GameSetValue, RecordRow, RecordStore, RecordValue } from "./ports";
-import { accessFor, editableFields, type FieldDef, type TableAccess, type TableDef, type TableKey, TABLES, tableDef } from "./registry";
+import type { ModerateRallySession } from "@/rally";
+import type { Clock, ImageUpload } from "@/shared";
+import type { RemoveTrainingReview } from "@/training";
+import type { GameSetValue, RecordCondition, RecordRow, RecordStore, RecordValue } from "./ports";
+import {
+  accessFor,
+  editableFields,
+  type FieldDef,
+  type Label,
+  type TableAccess,
+  type TableDef,
+  type TableKey,
+  TABLES,
+  tableDef,
+  type ViewDef,
+} from "./registry";
 import { parseValues } from "./values";
 
 type Values = Record<string, RecordValue>;
@@ -26,10 +37,10 @@ interface TableHandler {
 
 export interface DataDeps {
   readonly store: RecordStore;
-  readonly storage: ObjectStorage;
+  readonly clock: Clock;
   readonly sessions: Pick<SessionRepository, "delete">;
-  readonly reviews: Pick<TrainingReviewRepository, "delete">;
-  readonly rally: Pick<RallySessionRepository, "findById" | "update" | "delete">;
+  readonly removeTrainingReview: RemoveTrainingReview;
+  readonly moderateRallySession: ModerateRallySession;
   readonly createClub: CreateClub;
   readonly updateClub: UpdateClub;
   readonly deleteClub: DeleteClub;
@@ -106,21 +117,21 @@ function handlers(deps: DataDeps): Partial<Record<TableKey, TableHandler>> {
       },
       delete: ({ actor }, id) => deps.deleteGame.execute({ actor, gameId: id }),
     },
-    trainingReviews: { delete: (_ctx, id) => deps.reviews.delete(id) },
+    trainingReviews: { delete: ({ actor }, id) => deps.removeTrainingReview.execute({ actor, reviewId: id }) },
     rallySessions: {
-      update: async (_ctx, id, values) => {
-        await deps.rally.update(id, {
-          ...(values.title !== undefined && { title: str(values.title) }),
-          ...(values.pinned !== undefined && { pinned: values.pinned as boolean }),
+      update: async ({ actor }, id, values) => {
+        await deps.moderateRallySession.update({
+          actor,
+          id,
+          input: {
+            ...(values.title !== undefined && { title: str(values.title) }),
+            ...(values.pinned !== undefined && { pinned: values.pinned as boolean }),
+          },
         });
       },
-      delete: async (_ctx, id) => {
-        const session = await deps.rally.findById(id);
-        if (!session) return;
-        await Promise.all([session.videoKey, session.resultKey].filter((k): k is string => !!k).map((k) => deps.storage.delete(k)));
-        await deps.rally.delete(id);
-      },
+      delete: ({ actor }, id) => deps.moderateRallySession.delete({ actor, id }),
     },
+    // Housekeeping tables with no rules of their own: deleted directly (documented in docs/architecture.md).
     authSessions: { delete: (_ctx, id) => deps.sessions.delete(id) },
     authMethods: { delete: (_ctx, id) => deps.store.remove("authMethods", id) },
     signInCodes: { delete: (_ctx, id) => deps.store.remove("signInCodes", id) },
@@ -132,6 +143,9 @@ function handlers(deps: DataDeps): Partial<Record<TableKey, TableHandler>> {
 
 export interface TableView {
   readonly def: TableDef;
+  readonly views: readonly { readonly key: string; readonly label: Label }[];
+  /** Tables pointing at a row that this caller may open. */
+  readonly related: readonly { readonly table: TableKey; readonly label: Label }[];
   readonly scope: "all" | "club";
   readonly canCreate: boolean;
   readonly canUpdate: boolean;
@@ -149,11 +163,16 @@ function resolve(actor: Actor, key: string) {
   return { def, access };
 }
 
-function view(def: TableDef, access: TableAccess, handler: TableHandler | undefined): TableView {
+function view(actor: Actor, def: TableDef, access: TableAccess, handler: TableHandler | undefined): TableView {
   const create = handler?.create ? editableFields(def, access, "create") : [];
   const edit = handler?.update ? editableFields(def, access, "edit") : [];
   return {
     def,
+    views: (def.views ?? []).map((v) => ({ key: v.key, label: v.label })),
+    related: (def.related ?? []).flatMap((r) => {
+      const child = tableDef(r.table);
+      return child && accessFor(child, actor.roles, actor.clubId) ? [{ table: r.table, label: child.label }] : [];
+    }),
     scope: access.scope,
     canCreate: create.length > 0,
     canUpdate: edit.length > 0,
@@ -168,26 +187,6 @@ function view(def: TableDef, access: TableAccess, handler: TableHandler | undefi
 const scopeWhere = (def: TableDef, access: TableAccess, actor: Actor): Record<string, string> =>
   access.scope === "club" && def.clubField ? { [def.clubField]: actor.clubId as string } : {};
 
-async function refLabels(store: RecordStore, def: TableDef, rows: readonly RecordRow[]) {
-  const wanted = new Map<TableKey, Set<string>>();
-  for (const field of def.fields) {
-    if (!field.ref || (field.type !== "ref" && field.type !== "refs")) continue;
-    const ids = wanted.get(field.ref) ?? new Set<string>();
-    for (const row of rows) {
-      const value = row.values[field.key];
-      for (const id of Array.isArray(value) ? value : [value]) if (typeof id === "string") ids.add(id);
-    }
-    wanted.set(field.ref, ids);
-  }
-  const out: Partial<Record<TableKey, Record<string, string>>> = {};
-  await Promise.all(
-    [...wanted].map(async ([table, ids]) => {
-      if (ids.size) out[table] = Object.fromEntries(await store.labels(table, [...ids]));
-    }),
-  );
-  return out;
-}
-
 export interface RecordPage {
   readonly table: TableView;
   readonly rows: readonly RecordRow[];
@@ -196,6 +195,8 @@ export interface RecordPage {
   readonly pageSize: number;
   /** Display names of referenced rows, per table and id. */
   readonly refs: Partial<Record<TableKey, Record<string, string>>>;
+  /** When listing the rows related to one row: that row. */
+  readonly of?: { readonly table: TableKey; readonly id: string; readonly label: string };
 }
 
 export interface ListInput {
@@ -207,10 +208,57 @@ export interface ListInput {
   readonly page?: number;
   readonly pageSize?: number;
   readonly filters?: Readonly<Record<string, string | boolean | null>>;
+  /** One of the table's views. */
+  readonly view?: string;
+  /** Only the rows related to this row (one of its table's `related`). */
+  readonly of?: { readonly table: string; readonly id: string };
 }
 
 export const MAX_PAGE_SIZE = 100;
-export const MAX_EXPORT_ROWS = 5000;
+/** Exports fetch big pages, several at a time; past this many rows they stop. */
+export const EXPORT_PAGE_SIZE = 1000;
+export const MAX_EXPORT_ROWS = 100_000;
+
+const DAY_MS = 86_400_000;
+
+function viewConditions(view: ViewDef, now: Date): RecordCondition[] {
+  return view.where.flatMap((c): RecordCondition[] => {
+    if ("is" in c) return [{ op: "any", fields: [c.field], value: c.is }];
+    if ("empty" in c) return [{ op: "empty", field: c.field }];
+    const at = (days: number) => new Date(now.getTime() + days * DAY_MS);
+    return [
+      ...(c.after !== undefined ? [{ op: "after" as const, field: c.field, value: at(c.after) }] : []),
+      ...(c.before !== undefined ? [{ op: "before" as const, field: c.field, value: at(c.before) }] : []),
+    ];
+  });
+}
+
+/** A filter value of the right kind for its field: anything else is a 400, never a database query. */
+function filterValue(field: FieldDef, value: unknown): string | boolean | null {
+  const bad = () => new BadRequest(`Invalid filter for "${field.key}".`, "bad_filter");
+  if (value === null) {
+    if (field.type === "boolean" || field.type === "roles") throw bad();
+    return null;
+  }
+  switch (field.type) {
+    case "boolean":
+      if (typeof value !== "boolean") throw bad();
+      return value;
+    case "ref":
+    case "refs":
+      if (typeof value !== "string" || !isObjectId(value)) throw bad();
+      return value;
+    case "enum":
+      if (typeof value !== "string" || !field.options?.includes(value)) throw bad();
+      return value;
+    case "roles":
+      if (typeof value !== "string" || !(ROLES as readonly string[]).includes(value)) throw bad();
+      return value;
+    default:
+      if (typeof value !== "string" || value.length > 100) throw bad();
+      return value;
+  }
+}
 
 const searchable = (f: FieldDef) => f.search && ["text", "longtext", "email", "phone"].includes(f.type);
 
@@ -224,7 +272,7 @@ export class DataTables {
   describe({ actor }: { actor: Actor }): TableView[] {
     return TABLES.flatMap((def) => {
       const access = accessFor(def, actor.roles, actor.clubId);
-      return access ? [view(def, access, this.handlers[def.key])] : [];
+      return access ? [view(actor, def, access, this.handlers[def.key])] : [];
     });
   }
 
@@ -238,27 +286,51 @@ export class DataTables {
     for (const [key, value] of Object.entries(input.filters ?? {})) {
       const field = def.fields.find((f) => f.key === key && f.filter);
       if (!field) throw new BadRequest(`You can't filter by "${key}".`, "bad_filter");
-      if ((field.type === "ref" && value !== null && (typeof value !== "string" || !isObjectId(value))) || (field.type === "boolean" && typeof value !== "boolean")) {
-        throw new BadRequest(`Invalid filter for "${key}".`, "bad_filter");
-      }
-      where[key] = value;
+      where[key] = filterValue(field, value);
     }
     Object.assign(where, scopeWhere(def, access, input.actor));
+    const conditions: RecordCondition[] = [];
+    if (input.view !== undefined) {
+      const named = def.views?.find((v) => v.key === input.view);
+      if (!named) throw new BadRequest(`No view "${input.view}".`, "bad_view");
+      conditions.push(...viewConditions(named, this.deps.clock.now()));
+    }
+    let of: RecordPage["of"];
+    if (input.of) {
+      const parent = await this.relatedTo(input.actor, input.of.table, input.of.id, def.key);
+      conditions.push(parent.condition);
+      of = parent.of;
+    }
     const term = input.q?.trim().slice(0, 100);
     const fields = def.fields.filter(searchable).map((f) => f.key);
     const { rows, total } = await this.deps.store.list(def.key, {
       where,
+      conditions,
       search: term && fields.length ? { term, fields } : undefined,
       sort: { field: sortField, dir },
       skip: (page - 1) * pageSize,
       take: pageSize,
     });
-    return { table: view(def, access, this.handlers[def.key]), rows, total, page, pageSize, refs: await refLabels(this.deps.store, def, rows) };
+    return {
+      table: view(input.actor, def, access, this.handlers[def.key]),
+      rows,
+      total,
+      page,
+      pageSize,
+      refs: await this.refLabels(input.actor, def, rows),
+      ...(of && { of }),
+    };
   }
 
-  /** Every matching row (up to MAX_EXPORT_ROWS), for a CSV download. */
-  export(input: Omit<ListInput, "page" | "pageSize">): Promise<RecordPage> {
-    return this.list({ ...input, page: 1, pageSize: MAX_EXPORT_ROWS }, MAX_EXPORT_ROWS);
+  /**
+   * One page of an export: pages are bigger than the list's, so the browser builds the file from a few requests. The
+   * same access, scope, view and filters apply.
+   */
+  exportPage(input: ListInput): Promise<RecordPage> {
+    const pageSize = Math.min(Math.max(Math.trunc(input.pageSize ?? EXPORT_PAGE_SIZE), 1), EXPORT_PAGE_SIZE);
+    const page = Math.max(Math.trunc(input.page ?? 1), 1);
+    if ((page - 1) * pageSize >= MAX_EXPORT_ROWS) throw new BadRequest(`Exports stop at ${MAX_EXPORT_ROWS} rows.`, "export_too_big");
+    return this.list({ ...input, page, pageSize }, EXPORT_PAGE_SIZE);
   }
 
   async get({ actor, table, id }: { actor: Actor; table: string; id: string }) {
@@ -267,7 +339,76 @@ export class DataTables {
     const row = await this.deps.store.get(def.key, id);
     const scope = scopeWhere(def, access, actor);
     if (!row || Object.entries(scope).some(([k, v]) => (k === "id" ? row.id : row.values[k]) !== v)) throw new NotFound();
-    return { table: view(def, access, this.handlers[def.key]), row, refs: await refLabels(this.deps.store, def, [row]) };
+    return { table: view(actor, def, access, this.handlers[def.key]), row, refs: await this.refLabels(actor, def, [row]) };
+  }
+
+  /** How many rows of each related table point at this row (only tables the caller may open, in their scope). */
+  async related({ actor, table, id }: { actor: Actor; table: string; id: string }) {
+    const { table: parent } = await this.get({ actor, table, id });
+    return Promise.all(
+      parent.related.map(async ({ table: key, label }) => {
+        const child = resolve(actor, key);
+        const entry = parent.def.related?.find((r) => r.table === key) as NonNullable<TableDef["related"]>[number];
+        const { total } = await this.deps.store.list(key, {
+          where: scopeWhere(child.def, child.access, actor),
+          conditions: [{ op: "any", fields: entry.fields, value: id }],
+          sort: { field: child.def.defaultSort.field, dir: child.def.defaultSort.dir },
+          skip: 0,
+          take: 0,
+        });
+        return { table: key, label, count: total };
+      }),
+    );
+  }
+
+  /** The condition for "rows of `child` related to that row", after checking the caller may see that row. */
+  private async relatedTo(actor: Actor, table: string, id: string, child: TableKey) {
+    const entry = tableDef(table)?.related?.find((r) => r.table === child);
+    if (!entry) throw new BadRequest(`"${table}" rows have no "${child}".`, "bad_related");
+    const parent = await this.get({ actor, table, id });
+    const label = (await this.labels(actor, parent.table.def.key, [id])).get(id) ?? id;
+    return {
+      condition: { op: "any", fields: entry.fields, value: id } satisfies RecordCondition,
+      of: { table: parent.table.def.key, id, label },
+    };
+  }
+
+  /**
+   * Display names of rows. A nameless account reads as its email or phone only to someone allowed to see those;
+   * anyone else sees a short id.
+   */
+  private async labels(actor: Actor, table: TableKey, ids: readonly string[]): Promise<Map<string, string>> {
+    const labels = await this.deps.store.labels(table, ids);
+    if (table !== "users") return labels;
+    await Promise.all(
+      [...labels].map(async ([id, label]) => {
+        if (label) return;
+        const user = await this.deps.store.get("users", id);
+        const visible = user && canSeeContactDetails(actor, { userId: id, clubId: (user.values.clubId as string | null) ?? null });
+        labels.set(id, (visible && ((user.values.email as string | null) || (user.values.phone as string | null))) || `#${id.slice(-6)}`);
+      }),
+    );
+    return labels;
+  }
+
+  private async refLabels(actor: Actor, def: TableDef, rows: readonly RecordRow[]) {
+    const wanted = new Map<TableKey, Set<string>>();
+    for (const field of def.fields) {
+      if (!field.ref || (field.type !== "ref" && field.type !== "refs")) continue;
+      const ids = wanted.get(field.ref) ?? new Set<string>();
+      for (const row of rows) {
+        const value = row.values[field.key];
+        for (const id of Array.isArray(value) ? value : [value]) if (typeof id === "string") ids.add(id);
+      }
+      wanted.set(field.ref, ids);
+    }
+    const out: Partial<Record<TableKey, Record<string, string>>> = {};
+    await Promise.all(
+      [...wanted].map(async ([table, ids]) => {
+        if (ids.size) out[table] = Object.fromEntries(await this.labels(actor, table, [...ids]));
+      }),
+    );
+    return out;
   }
 
   async create({ actor, table, values, uploads = {} }: { actor: Actor; table: string; values: Record<string, unknown>; uploads?: Uploads }) {
@@ -303,7 +444,7 @@ export class DataTables {
   async options({ actor, table, q }: { actor: Actor; table: string; q?: string }) {
     const { def } = resolve(actor, table);
     const page = await this.list({ actor, table, q, sort: def.titleField, dir: "asc", pageSize: 20 });
-    const labels = await this.deps.store.labels(def.key, page.rows.map((r) => r.id));
+    const labels = await this.labels(actor, def.key, page.rows.map((r) => r.id));
     return page.rows.map((r) => ({ id: r.id, label: labels.get(r.id) ?? r.id }));
   }
 }

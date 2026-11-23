@@ -1,4 +1,4 @@
-import { BadRequest, isObjectId, ROLES, type Role } from "@bb/domain";
+import { BadRequest, isCalendarDay, isObjectId, ROLES, type Role } from "@bb/domain";
 import type { GameSetValue, RecordValue } from "./ports";
 import type { FieldDef } from "./registry";
 
@@ -57,7 +57,7 @@ export function parseValue(field: FieldDef, raw: unknown): RecordValue {
       return raw;
     case "day":
       if (raw === null) return null;
-      if (typeof raw !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(raw)) throw bad(field, "use YYYY-MM-DD.");
+      if (typeof raw !== "string" || !isCalendarDay(raw)) throw bad(field, "use a real day, YYYY-MM-DD.");
       return raw;
     case "datetime": {
       if (raw === null) return null;
