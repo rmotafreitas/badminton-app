@@ -115,7 +115,7 @@ export async function collectRows({
     const first = await fetchOne(1);
     if (signal.aborted) throw new ExportAborted();
     // Resuming: pages kept from before only line up if the total is still the same.
-    if (received.total !== null && received.total !== first.total) got.clear();
+    if (received.total !== first.total) got.clear();
     received.total = first.total;
     got.set(1, first.rows);
     total = Math.min(first.total, maxRows);
