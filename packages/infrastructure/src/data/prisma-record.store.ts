@@ -132,6 +132,14 @@ export class PrismaRecordStore implements RecordStore {
     return row ? this.toRow(table, row) : null;
   }
 
+  async getMany(table: TableKey, ids: readonly string[]): Promise<RecordRow[]> {
+    const valid = [...new Set(ids)].filter(isObjectId);
+    if (!valid.length) return [];
+    const m = MAPPINGS[table];
+    const rows = await m.model(this.db).findMany({ where: { id: { in: valid } }, select: m.select });
+    return rows.map((r) => this.toRow(table, r));
+  }
+
   async labels(table: TableKey, ids: readonly string[]): Promise<Map<string, string>> {
     const valid = [...new Set(ids)].filter(isObjectId);
     if (!valid.length) return new Map();

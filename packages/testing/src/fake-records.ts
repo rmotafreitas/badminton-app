@@ -130,6 +130,7 @@ export function fakeRecords(store: FakeStore): RecordStore {
       return { rows: rows.slice(query.skip, query.skip + query.take), total: rows.length };
     },
     get: async (table, id) => find(table, id),
+    getMany: async (table, ids) => rowsOf(store, table).filter((r) => ids.includes(r.id)),
     labels: async (table, ids) => new Map(ids.flatMap((id) => {
       const row = find(table, id);
       return row ? [[id, label(table, row)] as const] : [];

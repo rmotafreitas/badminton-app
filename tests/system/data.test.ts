@@ -103,6 +103,9 @@ describe("data: listing", () => {
     expect(await status({ type: "SINGLES" }, "games")).toBe(200);
     expect(await status({ type: "TRIPLES" }, "games")).toBe(400);
     expect(await status({ type: { $gt: "" } }, "games")).toBeOneOf([400, 422]);
+    // "No club" matches accounts whose club was never set too.
+    const noClub = await json(await get(w.api, w.cookie(w.admin), `/api/data/users?filters=${encodeURIComponent(JSON.stringify({ clubId: null }))}`));
+    expect(noClub.rows.map((r: any) => r.values.name)).toEqual(["Root"]);
   });
 
   it("views are named lists, narrowed further by filters", async () => {

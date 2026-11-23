@@ -41,6 +41,8 @@ export interface RecordQuery {
 export interface RecordStore {
   list(table: TableKey, query: RecordQuery): Promise<{ rows: RecordRow[]; total: number }>;
   get(table: TableKey, id: string): Promise<RecordRow | null>;
+  /** Several rows by id, in one query (missing ones left out). */
+  getMany(table: TableKey, ids: readonly string[]): Promise<RecordRow[]>;
   /** Display names of rows other tables point to (a user's name, a club's name, a game's date). */
   labels(table: TableKey, ids: readonly string[]): Promise<Map<string, string>>;
   remove(table: "authMethods" | "signInCodes" | "rateLimits", id: string): Promise<void>;

@@ -1,4 +1,4 @@
-import type { ClubRegistrationList, Registration, RegistrationCategory, RegistrationForm } from "@bb/contracts";
+import { type ClubRegistrationList, DATA_EXPORT_MAX_ROWS, type Registration, type RegistrationCategory, type RegistrationForm } from "@bb/contracts";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { ChevronRight, Download, ExternalLink, FileUp, Settings2, Trash2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -391,7 +391,7 @@ export function ClubRegistrationsPage({ clubId, member }: { clubId: string; memb
               headers={exportHeaders}
               fetchPage={exportPage}
               pageSize={Math.max(rows.length, 1)}
-              maxRows={100_000}
+              maxRows={DATA_EXPORT_MAX_ROWS}
               lang={lang}
               disabled={!rows.length}
             />

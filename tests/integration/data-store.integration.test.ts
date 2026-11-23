@@ -112,6 +112,12 @@ describe("PrismaRecordStore", () => {
     expect(coaches.rows.map((r) => r.id)).not.toContain(a!.id);
   });
 
+  it("gets several rows in one call", async () => {
+    const [x, y] = await Promise.all(["x", "y"].map((n) => db.user.create({ data: { email: `${n}@many.pt` } })));
+    const rows = await store.getMany("users", [x!.id, y!.id, "nope", x!.id]);
+    expect(rows.map((r) => r.values.email).sort()).toEqual(["x@many.pt", "y@many.pt"]);
+  });
+
   it("a nameless user's label is empty (the use case decides what to show), and training notes aren't read", async () => {
     const user = await db.user.create({ data: { email: "nameless@test.pt" } });
     expect((await store.labels("users", [user.id])).get(user.id)).toBe("");

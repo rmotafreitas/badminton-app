@@ -221,7 +221,7 @@ export class ModerateRallySession extends RallyUseCase {
   async update({ actor, id, input }: { actor: Actor; id: string; input: { title?: string | null; pinned?: boolean } }): Promise<RallySession> {
     const session = await this.load(actor, id);
     const patch: RallySessionPatch = {};
-    if (input.title !== undefined) patch.title = input.title?.slice(0, 120) ?? null;
+    if (input.title !== undefined) patch.title = input.title?.trim().slice(0, 120) || null;
     if (input.pinned !== undefined && input.pinned !== session.pinned) {
       if (input.pinned) await checkPinLimit(this.deps.sessions, session.ownerId);
       patch.pinned = input.pinned;
