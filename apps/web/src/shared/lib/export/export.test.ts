@@ -136,6 +136,24 @@ describe("collecting pages", () => {
     expect(received.pages.size).toBe(0);
   });
 
+  it("a changed total stops the run at once: a page landing just after is not kept", async () => {
+    // Pages 2 and 3 resolve from one promise, so their continuations interleave in the same microtask flush:
+    // page 2 reports the change, page 3's result arrives right behind it.
+    let open = () => {};
+    const gate = new Promise<void>((r) => {
+      open = r;
+    });
+    const fetchPage = async (page: number): Promise<ExportPage> => {
+      if (page > 1) await gate;
+      return { total: page === 2 ? 299 : 300, rows: [[page]] };
+    };
+    setTimeout(() => open(), 5);
+    const received = noPages();
+    await expect(collectRows({ fetchPage, pageSize: 100, maxRows: 1000, signal: new AbortController().signal, received })).rejects.toBeInstanceOf(ExportChanged);
+    await new Promise((r) => setTimeout(r, 20));
+    expect(received.pages.size).toBe(0);
+  });
+
   it("resuming after the total changed refetches everything", async () => {
     let total = 300;
     let fail = true;

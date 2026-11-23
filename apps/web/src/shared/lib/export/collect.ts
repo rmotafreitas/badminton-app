@@ -104,19 +104,16 @@ export async function collectRows({
   const count = () => [...got.values()].reduce((n, rows) => n + rows.length, 0);
   const report = () => onProgress?.({ done: Math.min(count(), total), total });
   const changed = () => {
+    stop(); // first: no other worker may write a page after this
     got.clear();
     received.total = null;
     return new ExportChanged();
   };
-  /** A page, unless this run was stopped meanwhile: a stopped run never writes into `received`. */
-  const fetchOne = async (page: number) => {
-    const result = await withRetries(() => fetchPage(page, signal), signal, retries);
-    if (signal.aborted) throw new ExportAborted();
-    return result;
-  };
+  const fetchOne = (page: number) => withRetries(() => fetchPage(page, signal), signal, retries);
 
   try {
     const first = await fetchOne(1);
+    if (signal.aborted) throw new ExportAborted();
     // Resuming: pages kept from before only line up if the total is still the same.
     if (received.total !== null && received.total !== first.total) got.clear();
     received.total = first.total;
@@ -128,19 +125,27 @@ export async function collectRows({
     const missing = Array.from({ length: pages - 1 }, (_, i) => i + 2).filter((p) => !got.has(p));
     let next = 0;
     const worker = async () => {
-      while (next < missing.length) {
-        if (signal.aborted) throw new ExportAborted();
-        const page = missing[next++] as number;
-        const result = await fetchOne(page);
-        if (result.total !== first.total) throw changed();
-        got.set(page, result.rows);
-        report();
+      try {
+        while (next < missing.length) {
+          if (signal.aborted) throw new ExportAborted();
+          const page = missing[next++] as number;
+          const result = await fetchOne(page);
+          // Checked right before writing: another worker may have stopped the run while this one awaited.
+          if (signal.aborted) throw new ExportAborted();
+          if (result.total !== first.total) throw changed();
+          got.set(page, result.rows);
+          report();
+        }
+      } catch (error) {
+        // Stop the others synchronously, in this same step: waiting for Promise.all to reject leaves a gap in which
+        // another worker's page could still land.
+        stop();
+        throw error;
       }
     };
     try {
       await Promise.all(Array.from({ length: Math.min(concurrency, missing.length) }, worker));
     } catch (error) {
-      stop(); // the other workers stop at their next step and write nothing more
       throw outer.aborted ? new ExportAborted() : error;
     }
 
