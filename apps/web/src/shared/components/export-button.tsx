@@ -72,18 +72,21 @@ export function ExportButton({
         },
       });
       const { toCsv, toXlsx, XLSX_TYPE } = await import("@/shared/lib/export/sheet");
+      // Cancelled (or left the page) while the writer was loading: no file.
+      if (current.controller.signal.aborted) return;
       const table = { name: title, headers, rows: result.rows };
       if (current.format === "xlsx") saveFile(toXlsx(table) as Uint8Array<ArrayBuffer>, `${name}-${today()}.xlsx`, XLSX_TYPE);
       else saveFile(toCsv(table, lang), `${name}-${today()}.csv`, "text/csv;charset=utf-8");
       if (result.capped) toast.info(fmt(dict.data.exportCapped, { max: maxRows.toLocaleString(lang) }));
-      run.current = null;
+      if (run.current === current) run.current = null;
       setSheet(false);
     } catch (error) {
       if (error instanceof ExportAborted || current.controller.signal.aborted) return;
       setFailed(error instanceof ExportChanged ? "changed" : "failed");
       setSheet(true);
     } finally {
-      setBusy(false);
+      // A newer export may be running by now: only the current run says when it's done.
+      if (run.current === current || run.current === null) setBusy(false);
     }
   };
 
