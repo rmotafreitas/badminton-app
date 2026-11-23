@@ -41,9 +41,36 @@ test("a system admin browses every table: search, filter, sort, details, CSV", a
   await expect(sheet.getByRole("button", { name: "Admin", exact: true })).toBeVisible(); // system admins may grant it
   await page.keyboard.press("Escape");
 
-  const download = page.waitForEvent("download");
-  await page.getByRole("button", { name: "CSV" }).click();
+  // Related rows: from Ana's sheet to her games, the list filtered to her.
+  await page.getByRole("row", { name: new RegExp(PEOPLE.ana.name) }).click();
+  await page.getByRole("dialog", { name: PEOPLE.ana.name }).getByRole("link", { name: /Games/ }).click();
+  await expect(page).toHaveURL(/\/data\/games\?.*of=users/);
+  await expect(page.getByText(`Of ${PEOPLE.ana.name}`)).toBeVisible();
+  await shot(page, "data-related");
+  await page.getByRole("button", { name: "Clear" }).first().click();
+  await expect(page.getByText(`Of ${PEOPLE.ana.name}`)).toHaveCount(0);
+
+  // Views: named lists, one tap away.
+  await page.goto("/data/users");
+  await page.getByRole("button", { name: "Coaches", exact: true }).click();
+  await expect(page).toHaveURL(/view=coaches/);
+  await expect(page.getByRole("row", { name: new RegExp(PEOPLE.coach.name) })).toBeVisible();
+  await expect(page.getByRole("row", { name: new RegExp(PEOPLE.ana.name) })).toHaveCount(0);
+  await shot(page, "data-view");
+  await page.getByRole("button", { name: "All", exact: true }).click();
+
+  // Export: a real Excel file, or CSV, built in the browser.
+  let download = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Export" }).click();
+  await page.getByRole("menuitem", { name: "Excel (.xlsx)" }).click();
+  const xlsx = await download;
+  expect(xlsx.suggestedFilename()).toMatch(/^users-\d{4}-\d{2}-\d{2}\.xlsx$/);
+  expect(readFileSync(await xlsx.path()).subarray(0, 2).toString()).toBe("PK"); // a zip, as .xlsx files are
+  download = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Export" }).click();
+  await page.getByRole("menuitem", { name: "CSV" }).click();
   const csv = readFileSync(await (await download).path(), "utf8");
+  expect(csv.split("\r\n")[0]).toMatch(/^\uFEFF?id,Name,Email,/);
   expect(csv).toContain("Ana Silva");
   expect(csv).not.toContain("passwordHash");
 });

@@ -117,8 +117,20 @@ test("phone: club admins manage members and browse data as cards and sheets", as
   await page.getByRole("main").getByRole("link", { name: /Members/ }).click();
   // Rows are cards on a phone: tap one, its details come up in a bottom sheet.
   await page.getByRole("button", { name: new RegExp(PEOPLE.ana.name) }).click();
-  await expect(page.getByRole("dialog", { name: PEOPLE.ana.name })).toBeVisible();
+  const sheet = page.getByRole("dialog", { name: PEOPLE.ana.name });
+  await expect(sheet).toBeVisible();
   await shot(page, "data-record");
+  // From her sheet to her games (a club admin sees the tables of their club only), then back via a view.
+  await sheet.getByRole("link", { name: /Games/ }).click();
+  await expect(page.getByText(`Of ${PEOPLE.ana.name}`)).toBeVisible();
+  await page.goto("/data/users?view=coaches");
+  await expect(page.getByRole("button", { name: "Coaches", exact: true })).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByRole("button", { name: new RegExp(PEOPLE.coach.name) })).toBeVisible();
+  await shot(page, "data-view");
+  const download = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Export" }).click();
+  await page.getByRole("menuitem", { name: "Excel (.xlsx)" }).click();
+  expect((await download).suggestedFilename()).toMatch(/\.xlsx$/);
 });
 
 test("phone: the registration form, from the sidebar to the details sheet", async ({ page }) => {

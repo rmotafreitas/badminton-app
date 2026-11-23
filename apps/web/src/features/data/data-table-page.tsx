@@ -1,10 +1,10 @@
-import type { DataField, DataRow, DataTable } from "@bb/contracts";
+import { DATA_EXPORT_MAX_ROWS, DATA_EXPORT_PAGE_SIZE, type DataField, type DataRow, type DataTable } from "@bb/contracts";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { ArrowDown, ArrowLeft, ArrowUp, ChevronLeft, ChevronRight, Download, Plus, Search, X } from "lucide-react";
+import { ArrowDown, ArrowLeft, ArrowUp, ChevronLeft, ChevronRight, Plus, Search, X } from "lucide-react";
 import { useEffect, useState } from "react";
-import { toast } from "sonner";
 import { useAppContext } from "@/app/context";
+import { ExportButton } from "@/shared/components/export-button";
 import { Page, PageHeader } from "@/shared/components/page-header";
 import { useDictionary } from "@/shared/i18n";
 import { fmt } from "@/shared/i18n/ui";
@@ -16,9 +16,9 @@ import { Empty, EmptyHeader, EmptyTitle } from "@/shared/ui/empty";
 import { Input } from "@/shared/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/shared/ui/select";
 import { Skeleton } from "@/shared/ui/skeleton";
-import { Spinner } from "@/shared/ui/spinner";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/shared/ui/table";
-import { dataPageQuery, dataTablesQuery, downloadCsv, type Filters, type ListParams } from "./api";
+import { dataPageQuery, dataTablesQuery, type Filters, fetchExportPage, type ListParams } from "./api";
+import { useTableExport } from "./export";
 import { FieldValue, listedFields, type Refs, useFormatValue, useLabel, useRowTitle } from "./fields";
 import { RecordSheet } from "./record-sheet";
 import { RefPicker } from "./record-form";
@@ -30,6 +30,10 @@ export interface DataSearch {
   dir?: "asc" | "desc";
   page?: number;
   filters?: Filters;
+  /** One of the table's views. */
+  view?: string;
+  /** `table:id`: only the rows related to that row (from its detail sheet). */
+  of?: string;
 }
 
 const PAGE_SIZE = 25;
@@ -69,7 +73,7 @@ function FilterControl({ field, value, refs, onChange }: { field: DataField; val
         ]
       : field.type === "roles"
         ? (["SYSTEM_ADMIN", "CLUB_ADMIN", "COACH", "PLAYER"] as const).map((r) => [r, dict.roles[r]])
-        : (field.options ?? []).map((o) => [o, o]);
+        : (field.options ?? []).map((o) => [o.value, o.label[label.lang]]);
   const current = value === undefined || value === null ? "__all" : String(value);
   return (
     <Select value={current} onValueChange={(v) => onChange(v === "__all" ? undefined : field.type === "boolean" ? v === "true" : v)}>
@@ -125,10 +129,18 @@ export function DataTablePage({ tableKey, search, onSearch }: { tableKey: string
   const tables = useQuery(dataTablesQuery(api));
   const [text, setText] = useState(search.q ?? "");
   const q = useDebounced(text.trim(), 300);
-  const params: ListParams = { q: search.q, sort: search.sort, dir: search.dir, page: search.page ?? 1, pageSize: PAGE_SIZE, filters: search.filters };
+  const params: ListParams = {
+    q: search.q,
+    sort: search.sort,
+    dir: search.dir,
+    page: search.page ?? 1,
+    pageSize: PAGE_SIZE,
+    filters: search.filters,
+    view: search.view,
+    of: search.of,
+  };
   const page = useQuery(dataPageQuery(api, tableKey, params));
   const [open, setOpen] = useState<DataRow | "new" | null>(null);
-  const [exporting, setExporting] = useState(false);
 
   // Typing updates the URL once it settles; a new search starts on page 1.
   useEffect(() => {
@@ -139,6 +151,7 @@ export function DataTablePage({ tableKey, search, onSearch }: { tableKey: string
   // The table definition paints from the persisted list even before the first page arrives.
   const table = page.data?.table ?? tables.data?.find((t) => t.key === tableKey);
   const refs = (page.data?.refs ?? {}) as Refs;
+  const exported = useTableExport(table);
   const fields = table ? listedFields(table) : [];
   // A club-scoped view only has one club: filtering by club means nothing there.
   const filterFields = table?.fields.filter((f) => f.filter && !(table.scope === "club" && f.ref === "clubs")) ?? [];
@@ -157,15 +170,9 @@ export function DataTablePage({ tableKey, search, onSearch }: { tableKey: string
     const dir = sortField === f.key && sortDir === "asc" ? "desc" : "asc";
     onSearch({ ...search, sort: f.key, dir, page: undefined });
   };
-  const exportCsv = async () => {
-    setExporting(true);
-    try {
-      await downloadCsv(tableKey, params, label.lang);
-    } catch {
-      toast.error(dict.data.exportFailed);
-    } finally {
-      setExporting(false);
-    }
+  const fetchPage = async (n: number, signal: AbortSignal) => {
+    const result = await fetchExportPage(api, tableKey, params, n, DATA_EXPORT_PAGE_SIZE, signal);
+    return { total: result.total, rows: result.rows.map((row) => exported.cells(row, result.refs as Refs)) };
   };
 
   const total = page.data?.total ?? 0;
@@ -193,9 +200,16 @@ export function DataTablePage({ tableKey, search, onSearch }: { tableKey: string
         actions={
           table && (
             <div className="flex gap-2">
-              <Button variant="outline" onClick={exportCsv} disabled={exporting || !total}>
-                {exporting ? <Spinner /> : <Download />} {exporting ? dict.data.exporting : dict.data.export}
-              </Button>
+              <ExportButton
+                name={tableKey}
+                title={label(table.label)}
+                headers={exported.headers}
+                fetchPage={fetchPage}
+                pageSize={DATA_EXPORT_PAGE_SIZE}
+                maxRows={DATA_EXPORT_MAX_ROWS}
+                lang={label.lang}
+                disabled={!total}
+              />
               {table.canCreate && (
                 <Button onClick={() => setOpen("new")}>
                   <Plus /> {dict.data.new}
@@ -205,6 +219,40 @@ export function DataTablePage({ tableKey, search, onSearch }: { tableKey: string
           )
         }
       />
+
+      {table && table.views.length > 0 && (
+        <nav aria-label={dict.data.views} className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:px-0">
+          {[{ key: undefined, text: dict.data.all }, ...table.views.map((v) => ({ key: v.key as string | undefined, text: label(v.label) }))].map((v) => (
+            <Button
+              key={v.key ?? "__all"}
+              size="sm"
+              variant={search.view === v.key ? "default" : "outline"}
+              aria-pressed={search.view === v.key}
+              className="h-9 shrink-0 rounded-full"
+              onClick={() => onSearch({ ...search, view: v.key, page: undefined })}
+            >
+              {v.text}
+            </Button>
+          ))}
+        </nav>
+      )}
+
+      {search.of && (
+        <div>
+          <Badge variant="secondary" className="h-9 gap-1 rounded-full pr-1 pl-3 text-sm">
+            {fmt(dict.data.relatedOf, { name: page.data?.of?.label ?? "…" })}
+            <Button
+              variant="ghost"
+              size="icon"
+              className="size-7 rounded-full"
+              aria-label={dict.data.clear}
+              onClick={() => onSearch({ ...search, of: undefined, page: undefined })}
+            >
+              <X />
+            </Button>
+          </Badge>
+        </div>
+      )}
 
       <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
         <div className="relative w-full sm:max-w-xs">
@@ -232,7 +280,7 @@ export function DataTablePage({ tableKey, search, onSearch }: { tableKey: string
           ) : page.data.rows.length === 0 ? (
             <Empty className="py-12">
               <EmptyHeader>
-                <EmptyTitle>{search.q || activeFilters ? dict.data.noMatch : dict.data.empty}</EmptyTitle>
+                <EmptyTitle>{search.q || activeFilters || search.view || search.of ? dict.data.noMatch : dict.data.empty}</EmptyTitle>
               </EmptyHeader>
             </Empty>
           ) : (

@@ -1,13 +1,14 @@
 import type { ClubRegistrationList, Registration, RegistrationCategory, RegistrationForm } from "@bb/contracts";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { ChevronRight, Download, ExternalLink, FileUp, Settings2, Trash2 } from "lucide-react";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useAppContext } from "@/app/context";
+import { ExportButton } from "@/shared/components/export-button";
 import { Page, PageHeader } from "@/shared/components/page-header";
 import { PlayerAvatar } from "@/shared/components/player-avatar";
 import { ResponsiveSheet } from "@/shared/components/responsive-sheet";
-import { useDictionary } from "@/shared/i18n";
+import { useDictionary, useLanguage } from "@/shared/i18n";
 import { fmt } from "@/shared/i18n/ui";
 import { normalizeSearch } from "@/shared/lib/search";
 import { cn } from "@/shared/lib/utils";
@@ -322,15 +323,25 @@ function FormSettingsSheet({ clubId, onClose }: { clubId: string; onClose: () =>
 }
 
 /** The club admin's season overview: who has handed in the signed form, and who's approved. */
-export function ClubRegistrationsPage({ clubId }: { clubId: string }) {
+/** `member`: open that member's sheet once the list is here (links from the Data screens). */
+export function ClubRegistrationsPage({ clubId, member }: { clubId: string; member?: string }) {
   const dict = useDictionary().ui;
   const t = dict.registration;
+  const lang = useLanguage().lang.startsWith("pt") ? ("pt" as const) : ("en" as const);
   const { api } = useAppContext();
   const list = useQuery(clubRegistrationsQuery(api, clubId));
   const [filter, setFilter] = useState<Filter>("all");
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState<Row | null>(null);
   const [settings, setSettings] = useState(false);
+  const linked = useRef(false);
+
+  useEffect(() => {
+    if (linked.current || !member || !list.data) return;
+    linked.current = true;
+    const row = list.data.rows.find((r) => r.member.id === member);
+    if (row) setOpen(row);
+  }, [member, list.data]);
 
   const rows = (list.data?.rows ?? [])
     .filter((r) => filter === "all" || statusOf(r.registration) === filter)
@@ -344,6 +355,22 @@ export function ClubRegistrationsPage({ clubId }: { clubId: string }) {
     ["received", t.filterReceived],
     ["approved", t.filterApproved],
   ];
+  const statusText = { none: t.badgeNone, pending: t.badgePending, received: t.badgeReceived, approved: t.badgeApproved };
+  // The export is what's on screen: this status and search, already loaded, so it downloads at once.
+  const exportHeaders = [t.colName, t.colEmail, t.season, t.colStatus, t.categoriesFor, t.received, t.approved, t.notes];
+  const exportPage = async () => ({
+    total: rows.length,
+    rows: rows.map(({ member: m, registration: r }) => [
+      m.name,
+      m.email,
+      list.data?.season ?? null,
+      statusText[statusOf(r)],
+      r?.categories.map((c) => t.cat[c]).join(", ") || null,
+      r ? (r.signedReceived ? dict.data.yes : dict.data.no) : null,
+      r?.approvedAt ? new Date(r.approvedAt) : null,
+      r?.notes ?? null,
+    ]),
+  });
 
   return (
     <Page>
@@ -357,9 +384,21 @@ export function ClubRegistrationsPage({ clubId }: { clubId: string }) {
           )
         }
         actions={
-          <Button variant="outline" onClick={() => setSettings(true)}>
-            <Settings2 /> {t.formSettings}
-          </Button>
+          <div className="flex gap-2">
+            <ExportButton
+              name={`registrations-${(list.data?.season ?? "").replace(/[^\w-]+/g, "-")}`}
+              title={t.clubTitle}
+              headers={exportHeaders}
+              fetchPage={exportPage}
+              pageSize={Math.max(rows.length, 1)}
+              maxRows={100_000}
+              lang={lang}
+              disabled={!rows.length}
+            />
+            <Button variant="outline" onClick={() => setSettings(true)}>
+              <Settings2 /> {t.formSettings}
+            </Button>
+          </div>
         }
       />
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
